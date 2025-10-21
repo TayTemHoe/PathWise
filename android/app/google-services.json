@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "199631573515",
+    "project_id": "pathwise-283ff",
+    "storage_bucket": "pathwise-283ff.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:199631573515:android:efdb50944211cbec066d0e",
+        "android_client_info": {
+          "package_name": "com.example.path_wise"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBsoKVY7VS_W1C39hdxb7OhhUCkPn9E7b4"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
