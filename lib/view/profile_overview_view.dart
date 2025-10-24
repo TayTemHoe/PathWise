@@ -1,9 +1,10 @@
-import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
-import 'package:intl/intl.dart';
-import 'package:path_wise/viewmodel/profile_view_model.dart';
-import 'package:path_wise/model/user_profile.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
+import 'package:provider/provider.dart';
+import '../routes.dart';
+import '../viewmodel/profile_view_model.dart';
+import '../model/user_profile.dart';
 
 class ProfileOverviewScreen extends StatelessWidget {
   const ProfileOverviewScreen({super.key});
@@ -19,120 +20,160 @@ class ProfileOverviewScreen extends StatelessWidget {
 
         return Scaffold(
           backgroundColor: const Color(0xFFF7F8FC),
-          appBar: AppBar(
-            elevation: 0,
-            backgroundColor: Colors.white,
-            title: const Text(
-              'My Profile',
-              style: TextStyle(fontWeight: FontWeight.w700),
-            ),
-            foregroundColor: const Color(0xFF111827),
-          ),
-          body: vm.isLoading
-              ? const Center(child: CircularProgressIndicator())
-              : RefreshIndicator(
+          body: RefreshIndicator(
             onRefresh: vm.loadAll,
-            child: SingleChildScrollView(
+            child: CustomScrollView(
               physics: const AlwaysScrollableScrollPhysics(),
-              padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Header: avatar, name, location, last updated
-                  _HeaderCard(
-                    name: p?.name ?? '-',
-                    location: _composeLocation(p),
-                    lastUpdated: _formatDate(p?.lastUpdated),
-                    photoUrl: p?.profilePictureUrl,
-                    onChangePhoto: () {
-                      // Navigate to your image picker flow or call vm.uploadProfilePicture(...)
-                      // Example navigation (replace as needed):
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Open photo picker...')),
-                      );
-                    },
+              slivers: [
+                // ======= Gradient header like mockup =======
+                SliverAppBar(
+                  pinned: true,
+                  expandedHeight: 105,
+                  elevation: 0,
+                  backgroundColor: Colors.transparent,
+                  flexibleSpace: Container(
+                    decoration: const BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: [Color(0xFF7C4DFF), Color(0xFF6EA8FF)],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
+                    ),
+                    child: FlexibleSpaceBar(
+                      titlePadding: const EdgeInsetsDirectional.only(
+                        start: 16, bottom: 16, end: 16,
+                      ),
+                      title: const Text(
+                        'My Profile',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w800,
+                          fontSize: 18,
+                        ),
+                      ),
+                      background: SafeArea(
+                        bottom: false,
+                        child: Padding(
+                          padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+                          child: Align(
+                            alignment: Alignment.bottomLeft,
+                            child: Text(
+                              '',
+                              style: TextStyle(
+                                color: Colors.white.withOpacity(.9),
+                                fontSize: 13,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
                   ),
+                ),
 
-                  const SizedBox(height: 12),
+                // ======= Content =======
+                SliverToBoxAdapter(
+                  child: vm.isLoading
+                      ? const Padding(
+                    padding: EdgeInsets.only(top: 100),
+                    child: Center(child: CircularProgressIndicator()),
+                  )
+                      : Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+                    child: Column(
+                      children: [
+                        _HeaderCard(
+                          name: p?.name ?? '-',
+                          location: _composeLocation(p),
+                          lastUpdated: _formatDate(p?.lastUpdated),
+                          photoUrl: p?.profilePictureUrl,
+                          onChangePhoto: () {
+                            // TODO: open picker → vm.uploadProfilePicture(file)
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('Open photo picker...'),
+                              ),
+                            );
+                          },
+                        ),
+                        const SizedBox(height: 12),
+                        _CompletionCard(
+                          percent: (p?.completionPercent ?? 0)
+                              .clamp(0, 100)
+                              .toDouble(),
+                        ),
+                        const SizedBox(height: 12),
 
-                  // Completion card
-                  _CompletionCard(
-                    percent: (p?.completionPercent ?? 0).clamp(0, 100).toDouble(),
+                        // ======= Sections =======
+                        _SectionCard(
+                          icon: Icons.person_outline,
+                          iconBg: const Color(0xFFEFF4FF),
+                          iconColor: const Color(0xFF4F46E5),
+                          title: 'Personal Information',
+                          subtitle:
+                          'Basic details and contact information',
+                          isComplete: _isPersonalComplete(p),
+                          onTap: () => Navigator.pushNamed(
+                              context, AppRoutes.editPersonal),
+                        ),
+                        _SectionCard(
+                          icon: Icons.star_border_rounded,
+                          iconBg: const Color(0xFFEFF6FF),
+                          iconColor: const Color(0xFF3B82F6),
+                          title: 'Skills & Expertise',
+                          subtitle:
+                          '${skills.length} ${skills.length == 1 ? 'skill' : 'skills'} across categories',
+                          isComplete: skills.isNotEmpty,
+                          onTap: () => Navigator.pushNamed(
+                              context, '/edit-skills'),
+                        ),
+                        _SectionCard(
+                          icon: Icons.school_outlined,
+                          iconBg: const Color(0xFFECFDF5),
+                          iconColor: const Color(0xFF10B981),
+                          title: 'Education',
+                          subtitle:
+                          '${edus.length} education entr${edus.length == 1 ? 'y' : 'ies'}',
+                          isComplete: edus.isNotEmpty,
+                          onTap: () => Navigator.pushNamed(
+                              context, '/edit-education'),
+                        ),
+                        _SectionCard(
+                          icon: Icons.work_outline_rounded,
+                          iconBg: const Color(0xFFFDF2F8),
+                          iconColor: const Color(0xFFEC4899),
+                          title: 'Work Experience',
+                          subtitle:
+                          '${exps.length} work experience${exps.length == 1 ? '' : 's'}',
+                          isComplete: exps.isNotEmpty,
+                          onTap: () => Navigator.pushNamed(
+                              context, '/edit-experience'),
+                        ),
+                        _SectionCard(
+                          icon: Icons.settings_suggest_outlined,
+                          iconBg: const Color(0xFFFFFBEB),
+                          iconColor: const Color(0xFFF59E0B),
+                          title: 'Career Preferences',
+                          subtitle: _prefsSummary(p),
+                          isComplete: _hasPreferences(p),
+                          onTap: () => Navigator.pushNamed(
+                              context, '/edit-preferences'),
+                        ),
+                        _SectionCard(
+                          icon: Icons.psychology_alt_outlined,
+                          iconBg: const Color(0xFFF5F3FF),
+                          iconColor: const Color(0xFF8B5CF6),
+                          title: 'Personality Assessment',
+                          subtitle: _personalitySummary(p),
+                          isComplete: _hasPersonality(p),
+                          onTap: () => Navigator.pushNamed(
+                              context, '/edit-personality'),
+                        ),
+                      ],
+                    ),
                   ),
-
-                  const SizedBox(height: 12),
-
-                  // Sections (cards)
-                  _SectionCard(
-                    icon: Icons.person_outline,
-                    iconBg: const Color(0xFFEFF4FF),
-                    iconColor: const Color(0xFF4F46E5),
-                    title: 'Personal Information',
-                    subtitle: 'Basic details and contact information',
-                    isComplete: _isPersonalComplete(p),
-                    onTap: () =>
-                        Navigator.pushNamed(context, '/edit-personal'),
-                  ),
-
-                  _SectionCard(
-                    icon: Icons.star_border_rounded,
-                    iconBg: const Color(0xFFEFF6FF),
-                    iconColor: const Color(0xFF3B82F6),
-                    title: 'Skills & Expertise',
-                    subtitle:
-                    '${skills.length} ${skills.length == 1 ? 'skill' : 'skills'} across categories',
-                    isComplete: skills.isNotEmpty,
-                    onTap: () =>
-                        Navigator.pushNamed(context, '/edit-skills'),
-                  ),
-
-                  _SectionCard(
-                    icon: Icons.school_outlined,
-                    iconBg: const Color(0xFFECFDF5),
-                    iconColor: const Color(0xFF10B981),
-                    title: 'Education',
-                    subtitle:
-                    '${edus.length} education entr${edus.length == 1 ? 'y' : 'ies'}',
-                    isComplete: edus.isNotEmpty,
-                    onTap: () =>
-                        Navigator.pushNamed(context, '/edit-education'),
-                  ),
-
-                  _SectionCard(
-                    icon: Icons.work_outline_rounded,
-                    iconBg: const Color(0xFFFDF2F8),
-                    iconColor: const Color(0xFFEC4899),
-                    title: 'Work Experience',
-                    subtitle:
-                    '${exps.length} work experience${exps.length == 1 ? '' : 's'}',
-                    isComplete: exps.isNotEmpty,
-                    onTap: () =>
-                        Navigator.pushNamed(context, '/edit-experience'),
-                  ),
-
-                  _SectionCard(
-                    icon: Icons.settings_suggest_outlined,
-                    iconBg: const Color(0xFFFFFBEB),
-                    iconColor: const Color(0xFFF59E0B),
-                    title: 'Career Preferences',
-                    subtitle: _prefsSummary(p),
-                    isComplete: _hasPreferences(p),
-                    onTap: () =>
-                        Navigator.pushNamed(context, '/edit-preferences'),
-                  ),
-
-                  _SectionCard(
-                    icon: Icons.psychology_alt_outlined,
-                    iconBg: const Color(0xFFF5F3FF),
-                    iconColor: const Color(0xFF8B5CF6),
-                    title: 'Personality Assessment',
-                    subtitle: _personalitySummary(p),
-                    isComplete: _hasPersonality(p),
-                    onTap: () =>
-                        Navigator.pushNamed(context, '/edit-personality'),
-                  ),
-                ],
-              ),
+                ),
+              ],
             ),
           ),
         );
@@ -140,17 +181,27 @@ class ProfileOverviewScreen extends StatelessWidget {
     );
   }
 
+  // ===== Helpers =====
   static String _composeLocation(UserProfile? p) {
     final city = (p?.city ?? '').trim();
+    final state = (p?.state ?? '').trim();
     final country = (p?.country ?? '').trim();
+
+    // Prefer "City, Country" like mockup
     if (city.isNotEmpty && country.isNotEmpty) return '$city, $country';
-    return city.isNotEmpty ? city : (country.isNotEmpty ? country : '-');
+    if (state.isNotEmpty && country.isNotEmpty) return '$state, $country';
+    return city.isNotEmpty
+        ? city
+        : state.isNotEmpty
+        ? state
+        : country.isNotEmpty
+        ? country
+        : '-';
   }
 
   static String? _formatDate(Timestamp? ts) {
     if (ts == null) return null;
-    final d = ts.toDate();
-    return DateFormat('dd/MM/yyyy').format(d);
+    return DateFormat('dd/MM/yyyy').format(ts.toDate());
   }
 
   static bool _isPersonalComplete(UserProfile? p) {
@@ -161,24 +212,20 @@ class ProfileOverviewScreen extends StatelessWidget {
       (p.phone ?? '').isNotEmpty,
       p.dob != null,
       (p.gender ?? '').isNotEmpty,
-      (p.city ?? '').isNotEmpty,
-      (p.country ?? '').isNotEmpty,
+      (p.city ?? '').isNotEmpty || (p.state ?? '').isNotEmpty || (p.country ?? '').isNotEmpty,
     ];
     return checks.every((e) => e);
   }
 
   static String _prefsSummary(UserProfile? p) {
     if (p == null) return 'Job search preferences and career goals';
-    final roles = (p.desiredJobTitles ?? []);
-    final locs = (p.preferredLocations ?? []);
-    if (roles.isEmpty && locs.isEmpty) {
-      return 'Job search preferences and career goals';
-    }
+    final roles = p.desiredJobTitles ?? const [];
+    final locs = p.preferredLocations ?? const [];
+    if (roles.isEmpty && locs.isEmpty) return 'Job search preferences and career goals';
     if (roles.isNotEmpty && locs.isNotEmpty) {
-      return '${roles.take(1).join()} • ${locs.take(1).join()}';
+      return '${roles.first} • ${locs.first}';
     }
-    if (roles.isNotEmpty) return roles.take(2).join(', ');
-    return locs.take(2).join(', ');
+    return roles.isNotEmpty ? roles.take(2).join(', ') : locs.take(2).join(', ');
   }
 
   static bool _hasPreferences(UserProfile? p) {
@@ -194,11 +241,14 @@ class ProfileOverviewScreen extends StatelessWidget {
 
   static String _personalitySummary(UserProfile? p) {
     final mbti = p?.mbti ?? '';
-    final riasec = (p?.riasec?.isNotEmpty == true) ? p!.riasec!.join('/') : '';
-    if (mbti.isEmpty && riasec.isEmpty) return 'MBTI, RIASEC, and personality insights';
-    if (mbti.isNotEmpty && riasec.isNotEmpty) return 'MBTI: $mbti   •   RIASEC: $riasec';
-    if (mbti.isNotEmpty) return 'MBTI: $mbti';
-    return 'RIASEC: $riasec';
+    final riasec = p?.riasec ?? '';
+    if (mbti.isEmpty && riasec.isEmpty) {
+      return 'MBTI, RIASEC, and personality insights';
+    }
+    if (mbti.isNotEmpty && riasec.isNotEmpty) {
+      return 'MBTI: $mbti   •   RIASEC: $riasec';
+    }
+    return mbti.isNotEmpty ? 'MBTI: $mbti' : 'RIASEC: $riasec';
   }
 
   static bool _hasPersonality(UserProfile? p) {
@@ -228,12 +278,18 @@ class _HeaderCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final initials = (name.isNotEmpty)
-        ? name.trim().split(RegExp(r'\s+')).map((e) => e[0]).take(2).join().toUpperCase()
+        ? name
+        .trim()
+        .split(RegExp(r'\s+'))
+        .where((e) => e.isNotEmpty)
+        .map((e) => e[0])
+        .take(2)
+        .join()
+        .toUpperCase()
         : 'A';
 
     return Card(
       elevation: 0,
-      margin: const EdgeInsets.only(bottom: 4),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       child: Padding(
         padding: const EdgeInsets.all(14),
@@ -245,7 +301,7 @@ class _HeaderCard extends StatelessWidget {
                   radius: 36,
                   backgroundColor: const Color(0xFFE5E7EB),
                   backgroundImage: (photoUrl != null && photoUrl!.isNotEmpty)
-                      ? NetworkImage(photoUrl!) as ImageProvider
+                      ? NetworkImage(photoUrl!)
                       : null,
                   child: (photoUrl == null || photoUrl!.isEmpty)
                       ? Text(
@@ -283,6 +339,8 @@ class _HeaderCard extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(name,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
                         fontSize: 18,
                         fontWeight: FontWeight.w800,
@@ -294,7 +352,7 @@ class _HeaderCard extends StatelessWidget {
                       const Icon(Icons.location_on_outlined,
                           size: 16, color: Color(0xFF6B7280)),
                       const SizedBox(width: 4),
-                      Flexible(
+                      Expanded(
                         child: Text(
                           location,
                           maxLines: 1,
@@ -331,7 +389,6 @@ class _HeaderCard extends StatelessWidget {
 
 class _CompletionCard extends StatelessWidget {
   const _CompletionCard({required this.percent});
-
   final double percent;
 
   @override
