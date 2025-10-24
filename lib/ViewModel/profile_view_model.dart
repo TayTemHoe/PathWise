@@ -1,9 +1,8 @@
-import 'dart:async';
 import 'dart:io';
 import 'package:flutter/foundation.dart';
-import 'package:firebase_auth/firebase_auth.dart';
-import 'package:path_wise/model/user_profile.dart';
-import 'package:path_wise/service/profile_service.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import '../model/user_profile.dart';
+import '../service/profile_service.dart';
 
 class ProfileViewModel extends ChangeNotifier {
   ProfileViewModel({ProfileService? service})
@@ -11,22 +10,11 @@ class ProfileViewModel extends ChangeNotifier {
 
   final ProfileService _service;
 
-  // ========================= Root (users/{uid}) ================================
-
+  // ===== Root state =====
   UserProfile? _profile;
   UserProfile? get profile => _profile;
 
-  bool _loading = false;
-  bool get isLoading => _loading;
-
-  String? _error;
-  String? get errorMessage => _error;
-
-  //String get uid => FirebaseAuth.instance.currentUser!.uid;
-  String get uid => 'U0001';
-
-  // ========================= Subcollections (cache) ============================
-
+  // Subcollections (loaded terpisah)
   List<Skill> _skills = [];
   List<Skill> get skills => List.unmodifiable(_skills);
 
@@ -36,448 +24,490 @@ class ProfileViewModel extends ChangeNotifier {
   List<Experience> _experience = [];
   List<Experience> get experience => List.unmodifiable(_experience);
 
-  StreamSubscription? _skillsSub;
-  StreamSubscription? _eduSub;
-  StreamSubscription? _expSub;
+  // ===== UI flags =====
+  bool _isLoading = false;
+  bool get isLoading => _isLoading;
 
-  // ========================= Lifecycle ========================================
+  bool _savingRoot = false;
+  bool get savingRoot => _savingRoot;
 
-  Future<void> init({String? appUserIdIfNew}) async {
-    _setLoading(true);
-    _error = null;
-    try {
-      // Ensure root doc exists (first time user)
-      await _service.createOrInitUser(uid, appUserId: appUserIdIfNew);
+  bool _loadingSkills = false;
+  bool get loadingSkills => _loadingSkills;
 
-      // Fetch root profile once
-      await _fetchRoot();
+  bool _loadingEdu = false;
+  bool get loadingEdu => _loadingEdu;
 
-      // Start listening to subcollections
-      _listenSkills();
-      _listenEducation();
-      _listenExperience();
+  bool _loadingExp = false;
+  bool get loadingExp => _loadingExp;
 
-      // Ensure completion + validation always in sync (optional on init)
-      await recomputeCompletionAndValidation();
-    } catch (e) {
-      _error = e.toString();
-    } finally {
-      _setLoading(false);
-    }
-  }
+  String? _error;
+  String? get error => _error;
 
-  @override
-  void dispose() {
-    _skillsSub?.cancel();
-    _eduSub?.cancel();
-    _expSub?.cancel();
-    super.dispose();
-  }
-
-  // ========================= Root helpers =====================================
-
-  Future<void> _fetchRoot() async {
-    final p = await _service.getUserProfile(uid);
-    _profile = p ??
-        UserProfile(
-          uid: uid,
-          appUserId: null,
-          completionPercent: 0,
-          createdAt: DateTime.now(),
-          lastUpdated: DateTime.now(),
-          personalInfo: const PersonalInfo(),
-          preferences: const Preferences(),
-          personality: const Personality(),
-          validation: const {},
-        );
+  // ====== Helpers ======
+  void _setLoading(bool v) {
+    _isLoading = v;
     notifyListeners();
   }
 
-  Future<void> refreshAll() async {
-    _setLoading(true);
-    try {
-      await _fetchRoot();
-      // subcollections already streaming
-    } finally {
-      _setLoading(false);
-    }
+  void _setError(Object e) {
+    _error = e.toString();
+    notifyListeners();
   }
 
-  // Update partial fields at root (e.g., personalInfo / preferences / personality)
-  Future<void> updateRootPartial(Map<String, dynamic> partial) async {
-    await _service.updateUserProfileFields(uid, partial);
-    await _fetchRoot();
-    await recomputeCompletionAndValidation();
-  }
+  // =========================
+  // Loaders
+  // =========================
 
-  // Convenience setters
-  Future<void> updatePersonalInfo(PersonalInfo info) async {
-    await updateRootPartial({'personalInfo': info.toMap()});
-  }
-
-  Future<void> updatePreferences(Preferences pref) async {
-    await updateRootPartial({'preferences': pref.toMap()});
-  }
-
-  Future<void> updatePersonality(Personality p) async {
-    await updateRootPartial({'personality': p.toMap()});
-  }
-
-  // Upload profile picture
-  Future<void> uploadProfilePicture(File image) async {
+  /// Load root + subcollections in parallel (untuk Profile Overview).
+  Future<void> loadAll() async {
     _setLoading(true);
     _error = null;
     try {
-      await _service.uploadProfilePicture(uid, image);
-      await _fetchRoot();
+      final up = await _service.getUserWithSubcollections(uid);
+      if (up == null) {
+        // 🔴 STOP CREATING EMPTY USER HERE
+        throw Exception("User profile not found for uid: $uid");
+      } else {
+        _profile = up;
+        _skills = up.skills ?? [];
+        _education = up.education ?? [];
+        _experience = up.experience ?? [];
+      }
+      await _recalcAndPatchCompletion(); // jaga consistency meter
     } catch (e) {
-      _error = e.toString();
+      _setError(e);
     } finally {
       _setLoading(false);
     }
   }
 
-  // ========================= Streams (subcollections) ==========================
 
-  void _listenSkills() {
-    _skillsSub?.cancel();
-    _skillsSub = _service.watchSkills(uid).listen((items) {
-      _skills = items;
-      notifyListeners();
-    });
-  }
-
-  void _listenEducation() {
-    _eduSub?.cancel();
-    _eduSub = _service.watchEducation(uid).listen((items) {
-      _education = items;
-      notifyListeners();
-    });
-  }
-
-  void _listenExperience() {
-    _expSub?.cancel();
-    _expSub = _service.watchExperience(uid).listen((items) {
-      _experience = items;
-      notifyListeners();
-    });
-  }
-
-  // ========================= CRUD: Skills =====================================
-
-  Future<String?> addSkill({
-    required String name,
-    required String category, // Technical/Soft/Language/Industry
-    num? level,
-    String? levelText,
-    num? years,
-    Map<String, dynamic>? verification,
-  }) async {
+  Future<void> refreshRootOnly() async {
     try {
-      final id = await _service.addSkill(
-        uid,
-        Skill(
-          id: 'new', // will be replaced by Firestore id
-          name: name,
-          category: category,
-          level: level,
-          levelText: levelText,
-          yearsExperience: years,
-          verification: verification,
-          order: _skills.length,
-          updatedAt: DateTime.now(),
-        ),
-      );
-      await recomputeCompletionAndValidation();
-      return id;
-    } catch (e) {
-      _error = e.toString();
+      final up = await _service.getUser(uid);
+      if (up != null) _profile = up;
       notifyListeners();
-      return null;
+    } catch (e) {
+      _setError(e);
     }
   }
 
-  Future<void> updateSkill(Skill s) async {
-    await _service.updateSkill(uid, s);
-    await recomputeCompletionAndValidation();
-  }
-
-  Future<void> deleteSkill(String skillId) async {
-    await _service.deleteSkill(uid, skillId);
-    await recomputeCompletionAndValidation();
-  }
-
-  Future<void> reorderSkills(List<Skill> ordered) async {
-    await _service.reorderSkills(uid, ordered);
-  }
-
-  // ========================= CRUD: Education ===================================
-
-  Future<String?> addEducation({
-    required String institution,
-    required String degreeLevel,
-    required String fieldOfStudy,
-    DateTime? startDate,
-    DateTime? endDate,
-    bool isCurrent = false,
-    String? gpa,
-    LocationVO? location,
-  }) async {
+  Future<void> refreshSkills() async {
+    _loadingSkills = true;
+    notifyListeners();
     try {
-      final id = await _service.addEducation(
-        uid,
-        Education(
-          id: 'new',
-          institution: institution,
-          degreeLevel: degreeLevel,
-          fieldOfStudy: fieldOfStudy,
-          startDate: startDate,
-          endDate: endDate,
-          isCurrent: isCurrent,
-          gpa: gpa,
-          location: location,
-          order: _education.length,
-          updatedAt: DateTime.now(),
-        ),
-      );
-      await recomputeCompletionAndValidation();
-      return id;
-    } catch (e) {
-      _error = e.toString();
+      _skills = await _service.listSkills(uid: uid, limit: 200);
       notifyListeners();
-      return null;
+    } catch (e) {
+      _setError(e);
+    } finally {
+      _loadingSkills = false;
+      notifyListeners();
     }
   }
 
-  Future<void> updateEducation(Education e) async {
-    await _service.updateEducation(uid, e);
-    await recomputeCompletionAndValidation();
-  }
-
-  Future<void> deleteEducation(String eduId) async {
-    await _service.deleteEducation(uid, eduId);
-    await recomputeCompletionAndValidation();
-  }
-
-  Future<void> reorderEducation(List<Education> ordered) async {
-    await _service.reorderEducation(uid, ordered);
-  }
-
-  // ========================= CRUD: Experience ==================================
-
-  Future<String?> addExperience({
-    required String jobTitle,
-    required String company,
-    required String employmentType, // Full-time/Part-time/Contract/Internship/Freelance
-    DateTime? startDate,
-    DateTime? endDate,
-    bool isCurrent = false,
-    LocationVO? location,
-    String? industry,
-    String? description,
-    List<Map<String, dynamic>> achievements = const [],
-    num? yearsInRole,
-  }) async {
+  Future<void> refreshEducation() async {
+    _loadingEdu = true;
+    notifyListeners();
     try {
-      final id = await _service.addExperience(
-        uid,
-        Experience(
-          id: 'new',
-          jobTitle: jobTitle,
-          company: company,
-          employmentType: employmentType,
-          startDate: startDate,
-          endDate: endDate,
-          isCurrent: isCurrent,
-          location: location,
-          industry: industry,
-          description: description,
-          achievements: achievements,
-          yearsInRole: yearsInRole,
-          order: _experience.length,
-          updatedAt: DateTime.now(),
-        ),
-      );
-      await recomputeCompletionAndValidation();
-      return id;
-    } catch (e) {
-      _error = e.toString();
+      _education = await _service.listEducation(uid: uid, limit: 100);
       notifyListeners();
-      return null;
+    } catch (e) {
+      _setError(e);
+    } finally {
+      _loadingEdu = false;
+      notifyListeners();
     }
   }
 
-  Future<void> updateExperience(Experience x) async {
-    await _service.updateExperience(uid, x);
-    await recomputeCompletionAndValidation();
-  }
-
-  Future<void> deleteExperience(String expId) async {
-    await _service.deleteExperience(uid, expId);
-    await recomputeCompletionAndValidation();
-  }
-
-  Future<void> reorderExperience(List<Experience> ordered) async {
-    await _service.reorderExperience(uid, ordered);
-  }
-
-  // ========================= Completion & Validation ===========================
-
-  Future<void> recomputeCompletionAndValidation() async {
-    if (_profile == null) {
-      await _fetchRoot();
-      if (_profile == null) return;
+  Future<void> refreshExperience() async {
+    _loadingExp = true;
+    notifyListeners();
+    try {
+      _experience = await _service.listExperience(uid: uid, limit: 100);
+      notifyListeners();
+    } catch (e) {
+      _setError(e);
+    } finally {
+      _loadingExp = false;
+      notifyListeners();
     }
-
-    final sections = _calcSectionPercents(
-      personal: _profile!.personalInfo,
-      skills: _skills,
-      education: _education,
-      experience: _experience,
-      preferences: _profile!.preferences,
-    );
-
-    final completion =
-        (sections['personal']! * 0.20) +
-            (sections['skills']! * 0.25) +
-            (sections['education']! * 0.20) +
-            (sections['experience']! * 0.25) +
-            (sections['preferences']! * 0.10);
-
-    final issues = _collectIssues(_profile!, _skills, _education, _experience);
-
-    final validation = {
-      'requiredOk': issues.isEmpty,
-      'issues': issues,
-      'sections': sections,
-    };
-
-    await _service.updateCompletionAndValidation(
-      uid,
-      completionPercent: double.parse(completion.toStringAsFixed(1)),
-      validation: validation,
-    );
-
-    await _fetchRoot();
   }
 
-  Map<String, double> _calcSectionPercents({
-    required PersonalInfo? personal,
-    required List<Skill> skills,
-    required List<Education> education,
-    required List<Experience> experience,
-    required Preferences? preferences,
+  // =========================
+  // Root updates (users/{uid})
+  // =========================
+
+  /// Update full root doc menggunakan model (gunakan ini selepas edit besar).
+  Future<bool> updateRoot(UserProfile updated) async {
+    _savingRoot = true;
+    _error = null;
+    notifyListeners();
+    try {
+      await _service.updateUser(uid, updated.copyWith(
+        lastUpdated: Timestamp.now(),
+      ));
+      _profile = updated;
+      await _recalcAndPatchCompletion();
+      return true;
+    } catch (e) {
+      _setError(e);
+      return false;
+    } finally {
+      _savingRoot = false;
+      notifyListeners();
+    }
+  }
+
+  /// Patch sebagian field root doc. Contoh:
+  /// patchRoot({'personalInfo.name': 'Aisyah'})
+  Future<bool> patchRoot(Map<String, dynamic> patch) async {
+    _savingRoot = true;
+    _error = null;
+    notifyListeners();
+    try {
+      await _service.patchUser(uid, patch);
+      await refreshRootOnly();
+      await _recalcAndPatchCompletion();
+      return true;
+    } catch (e) {
+      _setError(e);
+      return false;
+    } finally {
+      _savingRoot = false;
+      notifyListeners();
+    }
+  }
+
+  /// Update Personal Info (helper supaya UI simple).
+  Future<bool> updatePersonalInfo({
+    String? name,
+    String? phone,
+    Timestamp? dob,
+    String? gender,
+    String? city,
+    String? state,
+    String? country,
   }) {
-    // Personal: name, email, phone, dob, gender, location.city/state/country, picture
-    int filled = 0;
-    int total = 8;
-    if (personal?.name?.isNotEmpty == true) filled++;
-    if (personal?.email?.isNotEmpty == true) filled++;
-    if (personal?.phone?.isNotEmpty == true) filled++;
-    if (personal?.dob != null) filled++;
-    if (personal?.gender?.isNotEmpty == true) filled++;
-    if (personal?.location?.city?.isNotEmpty == true) filled++;
-    if (personal?.location?.state?.isNotEmpty == true) filled++;
-    if (personal?.location?.country?.isNotEmpty == true) filled++;
-    final personalPct = (filled / total) * 100.0;
-
-    // Skills: >= 1 skill = 50%; >= 5 skill = 80%; >= 10 skill = 100%
-    double skillsPct = 0;
-    if (skills.isNotEmpty) skillsPct = 50;
-    if (skills.length >= 5) skillsPct = 80;
-    if (skills.length >= 10) skillsPct = 100;
-
-    // Education: >=1 = 60%; +20 if ada fieldOfStudy & degreeLevel filled; +20 jika ada tanggal valid
-    double eduPct = 0;
-    if (education.isNotEmpty) {
-      eduPct = 60;
-      final good = education.where((e) =>
-      (e.fieldOfStudy.isNotEmpty) && (e.degreeLevel.isNotEmpty)).isNotEmpty;
-      if (good) eduPct += 20;
-      final dated = education.where((e) => e.startDate != null).isNotEmpty;
-      if (dated) eduPct += 20;
-      if (eduPct > 100) eduPct = 100;
-    }
-
-    // Experience: >=1 = 60%; +20 jika ada description/achievements; +20 jika tanggal valid
-    double expPct = 0;
-    if (experience.isNotEmpty) {
-      expPct = 60;
-      final goodDesc = experience.where((x) =>
-      (x.description?.isNotEmpty == true) || (x.achievements.isNotEmpty)).isNotEmpty;
-      if (goodDesc) expPct += 20;
-      final dated = experience.where((x) => x.startDate != null).isNotEmpty;
-      if (dated) expPct += 20;
-      if (expPct > 100) expPct = 100;
-    }
-
-    // Preferences: desiredJobTitles/industries/workEnvironment/locations/salary
-    int pFilled = 0;
-    int pTotal = 5;
-    if ((preferences?.desiredJobTitles.isNotEmpty ?? false)) pFilled++;
-    if ((preferences?.industries.isNotEmpty ?? false)) pFilled++;
-    if ((preferences?.workEnvironment.isNotEmpty ?? false)) pFilled++;
-    if ((preferences?.preferredLocations.isNotEmpty ?? false)) pFilled++;
-    if (preferences?.salary != null) pFilled++;
-    final prefPct = (pFilled / pTotal) * 100.0;
-
-    return {
-      'personal': double.parse(personalPct.toStringAsFixed(1)),
-      'skills': skillsPct,
-      'education': eduPct,
-      'experience': expPct,
-      'preferences': double.parse(prefPct.toStringAsFixed(1)),
-    };
+    return patchRoot({
+      if (name != null) 'personalInfo.name': name,
+      if (phone != null) 'personalInfo.phone': phone,
+      if (dob != null) 'personalInfo.dob': dob,
+      if (gender != null) 'personalInfo.gender': gender,
+      if (city != null) 'personalInfo.location.city': city,
+      if (state != null) 'personalInfo.location.state': state,
+      if (country != null) 'personalInfo.location.country': country,
+    });
   }
 
-  List<String> _collectIssues(
-      UserProfile p,
-      List<Skill> skills,
-      List<Education> edus,
-      List<Experience> exps,
-      ) {
+  /// Update Preferences (tanpa relocationDistanceKm sesuai requirement).
+  Future<bool> updatePreferences({
+    List<String>? desiredJobTitles,
+    List<String>? industries,
+    String? companySize,
+    List<String>? workEnvironment,
+    List<String>? preferredLocations,
+    bool? willingToRelocate,
+    String? remoteAcceptance,
+    SalaryPref? salary,
+  }) {
+    return patchRoot({
+      if (desiredJobTitles != null)
+        'preferences.desiredJobTitles': desiredJobTitles,
+      if (industries != null) 'preferences.industries': industries,
+      if (companySize != null) 'preferences.companySize': companySize,
+      if (workEnvironment != null)
+        'preferences.workEnvironment': workEnvironment,
+      if (preferredLocations != null)
+        'preferences.preferredLocations': preferredLocations,
+      if (willingToRelocate != null)
+        'preferences.willingToRelocate': willingToRelocate,
+      if (remoteAcceptance != null)
+        'preferences.remoteAcceptance': remoteAcceptance,
+      if (salary != null) 'preferences.salary': salary.toMap(),
+    });
+  }
+
+  /// Update Personality (tanpa `source`).
+  Future<bool> updatePersonality({
+    String? mbti,
+    List<String>? riasec,
+    Timestamp? updatedAt,
+  }) {
+    return patchRoot({
+      if (mbti != null) 'personality.mbti': mbti,
+      if (riasec != null) 'personality.riasec': riasec,
+      'personality.updatedAt': updatedAt ?? Timestamp.now(),
+    });
+  }
+
+  /// Upload gambar profil -> update URL di Firestore -> refresh local
+  Future<String?> uploadProfilePicture(File file, {String fileExt = 'jpg'}) async {
+    try {
+      final url = await _service.uploadProfilePicture(uid: uid, file: file, fileExt: fileExt);
+      // refresh root & local cache
+      await refreshRootOnly();
+      return url;
+    } catch (e) {
+      _setError(e);
+      return null;
+    }
+  }
+
+  // =========================
+  // Skills CRUD
+  // =========================
+
+  Future<String?> addSkill(Skill skill) async {
+    try {
+      final id = await _service.addSkill(uid: uid, skill: skill);
+      await refreshSkills();
+      await _recalcAndPatchCompletion();
+      return id;
+    } catch (e) {
+      _setError(e);
+      return null;
+    }
+  }
+
+  Future<bool> updateSkill(Skill skill) async {
+    try {
+      await _service.updateSkill(uid: uid, skill: skill);
+      await refreshSkills();
+      await _recalcAndPatchCompletion();
+      return true;
+    } catch (e) {
+      _setError(e);
+      return false;
+    }
+  }
+
+  Future<bool> deleteSkill(String skillId) async {
+    try {
+      await _service.deleteSkill(uid: uid, skillId: skillId);
+      _skills.removeWhere((s) => s.id == skillId);
+      notifyListeners();
+      await _recalcAndPatchCompletion();
+      return true;
+    } catch (e) {
+      _setError(e);
+      return false;
+    }
+  }
+
+  Future<bool> reorderSkills(List<String> orderedIds) async {
+    try {
+      await _service.reorderSkills(uid: uid, orderedIds: orderedIds);
+      await refreshSkills();
+      return true;
+    } catch (e) {
+      _setError(e);
+      return false;
+    }
+  }
+
+  // =========================
+  // Education CRUD
+  // =========================
+
+  Future<String?> addEducation(Education edu) async {
+    try {
+      final id = await _service.addEducation(uid: uid, education: edu);
+      await refreshEducation();
+      await _recalcAndPatchCompletion();
+      return id;
+    } catch (e) {
+      _setError(e);
+      return null;
+    }
+  }
+
+  Future<bool> updateEducation(Education edu) async {
+    try {
+      await _service.updateEducation(uid: uid, education: edu);
+      await refreshEducation();
+      await _recalcAndPatchCompletion();
+      return true;
+    } catch (e) {
+      _setError(e);
+      return false;
+    }
+  }
+
+  Future<bool> deleteEducation(String eduId) async {
+    try {
+      await _service.deleteEducation(uid: uid, eduId: eduId);
+      _education.removeWhere((e) => e.id == eduId);
+      notifyListeners();
+      await _recalcAndPatchCompletion();
+      return true;
+    } catch (e) {
+      _setError(e);
+      return false;
+    }
+  }
+
+  Future<bool> reorderEducation(List<String> orderedIds) async {
+    try {
+      await _service.reorderEducation(uid: uid, orderedIds: orderedIds);
+      await refreshEducation();
+      return true;
+    } catch (e) {
+      _setError(e);
+      return false;
+    }
+  }
+
+  // =========================
+  // Experience CRUD
+  // =========================
+
+  Future<String?> addExperience(Experience exp) async {
+    try {
+      final id = await _service.addExperience(uid: uid, experience: exp);
+      await refreshExperience();
+      await _recalcAndPatchCompletion();
+      return id;
+    } catch (e) {
+      _setError(e);
+      return null;
+    }
+  }
+
+  Future<bool> updateExperience(Experience exp) async {
+    try {
+      await _service.updateExperience(uid: uid, experience: exp);
+      await refreshExperience();
+      await _recalcAndPatchCompletion();
+      return true;
+    } catch (e) {
+      _setError(e);
+      return false;
+    }
+  }
+
+  Future<bool> deleteExperience(String expId) async {
+    try {
+      await _service.deleteExperience(uid: uid, expId: expId);
+      _experience.removeWhere((x) => x.id == expId);
+      notifyListeners();
+      await _recalcAndPatchCompletion();
+      return true;
+    } catch (e) {
+      _setError(e);
+      return false;
+    }
+  }
+
+  Future<bool> reorderExperience(List<String> orderedIds) async {
+    try {
+      await _service.reorderExperience(uid: uid, orderedIds: orderedIds);
+      await refreshExperience();
+      return true;
+    } catch (e) {
+      _setError(e);
+      return false;
+    }
+  }
+
+  // =========================
+  // Validation + Completion
+  // =========================
+
+  /// Kira completion berdasarkan bobot:
+  /// Personal (20), Skills (25), Education (20), Experience (25), Preferences (10)
+  double _computeCompletion(UserProfile p, {
+    required List<Skill> skills,
+    required List<Education> edu,
+    required List<Experience> exp,
+  }) {
+    double personal = 0;
+    if ((p.name ?? '').isNotEmpty &&
+        (p.email ?? '').isNotEmpty &&
+        (p.phone ?? '').isNotEmpty &&
+        p.dob != null &&
+        (p.gender ?? '').isNotEmpty &&
+        (p.city ?? '').isNotEmpty &&
+        (p.country ?? '').isNotEmpty) {
+      personal = 100;
+    } else {
+      int ticks = 0;
+      if ((p.name ?? '').isNotEmpty) ticks++;
+      if ((p.email ?? '').isNotEmpty) ticks++;
+      if ((p.phone ?? '').isNotEmpty) ticks++;
+      if (p.dob != null) ticks++;
+      if ((p.gender ?? '').isNotEmpty) ticks++;
+      if ((p.city ?? '').isNotEmpty) ticks++;
+      if ((p.country ?? '').isNotEmpty) ticks++;
+      personal = (ticks / 7.0) * 100.0;
+    }
+
+    final skillScore = skills.isEmpty
+        ? 0.0
+        : (skills.length >= 5 ? 100.0 : (skills.length / 5.0) * 100.0);
+
+    final eduScore = edu.isEmpty ? 0.0 : 100.0;
+
+    final expScore = exp.isEmpty
+        ? 0.0
+        : (exp.length >= 2 ? 100.0 : (exp.length / 2.0) * 100.0);
+
+    double prefScore = 0.0;
+    final hasPrefs = (p.desiredJobTitles?.isNotEmpty == true) ||
+        (p.industries?.isNotEmpty == true) ||
+        (p.workEnvironment?.isNotEmpty == true) ||
+        (p.preferredLocations?.isNotEmpty == true) ||
+        p.willingToRelocate != null ||
+        (p.remoteAcceptance ?? '').isNotEmpty ||
+        p.salary != null;
+    if (hasPrefs) prefScore = 100.0;
+
+    final total = (personal * 0.20) +
+        (skillScore * 0.25) +
+        (eduScore * 0.20) +
+        (expScore * 0.25) +
+        (prefScore * 0.10);
+
+    return double.parse(total.toStringAsFixed(1));
+  }
+
+  /// Validasi minimum untuk UC009 (supaya Save bisa jalan).
+  /// Return: list isu error (kosong berarti valid).
+  List<String> validateProfile(UserProfile p) {
     final issues = <String>[];
 
-    // Personal
-    final pi = p.personalInfo;
-    if (pi == null || (pi.name == null || pi.name!.isEmpty)) {
-      issues.add('Personal: name is required');
-    }
-    if (pi == null || (pi.email == null || pi.email!.isEmpty)) {
-      issues.add('Personal: email is required');
-    }
+    // Personal required minimal
+    if ((p.name ?? '').isEmpty) issues.add('Name is required');
+    if ((p.email ?? '').isEmpty) issues.add('Email is required');
+    if ((p.phone ?? '').isEmpty) issues.add('Phone is required');
 
-    // Education dates sanity
-    for (final e in edus) {
-      if (e.endDate != null && e.startDate != null && e.endDate!.isBefore(e.startDate!)) {
-        issues.add('Education: endDate before startDate in "${e.institution}"');
+    // Tanggal masuk akal (contoh: DOB tidak di masa depan)
+    if (p.dob != null) {
+      final now = DateTime.now();
+      if (p.dob!.toDate().isAfter(now)) {
+        issues.add('Date of birth cannot be in the future');
       }
     }
 
-    // Experience dates sanity
-    for (final x in exps) {
-      if (x.endDate != null && x.startDate != null && x.endDate!.isBefore(x.startDate!)) {
-        issues.add('Experience: endDate before startDate in "${x.company}"');
-      }
-    }
-
-    // Skills cap (UI should enforce, but keep guard)
-    if (skills.length > 50) {
-      issues.add('Skills: more than 50 items');
-    }
-
-    // Experience cap
-    if (exps.length > 15) {
-      issues.add('Experience: more than 15 items');
-    }
+    // Optional: format email/phone bisa ditambah regex di UI.
 
     return issues;
   }
 
-  // ========================= UI helpers ========================================
-
-  void _setLoading(bool v) {
-    _loading = v;
+  /// Recalculate completion & patch ke Firestore.
+  Future<void> _recalcAndPatchCompletion() async {
+    if (_profile == null) return;
+    final cp = _computeCompletion(
+      _profile!,
+      skills: _skills,
+      edu: _education,
+      exp: _experience,
+    );
+    _profile = _profile!.copyWith(completionPercent: cp);
+    await _service.patchUser(uid, {
+      'completionPercent': cp,
+      'lastUpdated': FieldValue.serverTimestamp(),
+    });
     notifyListeners();
   }
 }

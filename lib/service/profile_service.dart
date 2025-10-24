@@ -1,7 +1,6 @@
 import 'dart:io';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_storage/firebase_storage.dart';
-
 import 'package:path_wise/model/user_profile.dart';
 
 class ProfileService {
@@ -14,12 +13,14 @@ class ProfileService {
   final FirebaseFirestore _db;
   final FirebaseStorage _storage;
 
-  // ==== Firestore refs ==========================================================
-  CollectionReference<Map<String, dynamic>> get _users =>
+  // ----------------------------
+  // Helpers
+  // ----------------------------
+  CollectionReference<Map<String, dynamic>> _usersCol() =>
       _db.collection('users');
 
   DocumentReference<Map<String, dynamic>> _userDoc(String uid) =>
-      _users.doc(uid);
+      _usersCol().doc(uid);
 
   CollectionReference<Map<String, dynamic>> _skillsCol(String uid) =>
       _userDoc(uid).collection('skills');
@@ -30,265 +31,322 @@ class ProfileService {
   CollectionReference<Map<String, dynamic>> _expCol(String uid) =>
       _userDoc(uid).collection('experience');
 
-  // =============================================================================
-  //                                ROOT DOCUMENT
-  // =============================================================================
+  // ============================
+  // Root: users/{uid}
+  // ============================
 
-  /// Create or initialize a user root document (id: Firebase UID).
-  /// Pass [appUserId] like "U0001" if you want to set it once.
-  Future<void> createOrInitUser(
-      String uid, {
-        String? appUserId,
-        DateTime? createdAt,
-      }) async {
-    final doc = await _userDoc(uid).get();
-    if (!doc.exists) {
-      await _userDoc(uid).set({
-        if (appUserId != null) 'appUserId': appUserId,
-        'createdAt': Timestamp.fromDate(createdAt ?? DateTime.now()),
-        'lastUpdated': Timestamp.fromDate(DateTime.now()),
-        'completionPercent': 0.0,
-      }, SetOptions(merge: true));
-    }
+  /// Create or merge a user root document.
+  Future<void> createOrMergeUser(String uid, UserProfile profile) async {
+    await _userDoc(uid).set(
+      {
+        ...profile.toMap(),
+        'createdAt': FieldValue.serverTimestamp(),
+        'lastUpdated': FieldValue.serverTimestamp(),
+      },
+      SetOptions(merge: true),
+    );
   }
 
-  /// Fetch a user profile (root doc only; subcollections use separate calls).
-  Future<UserProfile?> getUserProfile(String uid) async {
+  /// Get user profile (root doc). Return null if not found.
+  Future<UserProfile?> getUser(String uid) async {
     final snap = await _userDoc(uid).get();
     if (!snap.exists) return null;
-    return UserProfile.fromDoc(snap);
+    return UserProfile.fromFirestore(snap);
   }
 
-  /// Overwrite or create the whole root doc from [profile].
-  Future<void> setUserProfile(UserProfile profile, {bool merge = true}) async {
-    await _userDoc(profile.uid).set(profile.toMap(), SetOptions(merge: merge));
+  /// Update entire user document with model payload.
+  Future<void> updateUser(String uid, UserProfile profile) async {
+    final map = profile.toMap();
+    map['lastUpdated'] = FieldValue.serverTimestamp();
+    await _userDoc(uid).update(map);
   }
 
-  /// Update only some fields at root (e.g., updating personalInfo/preferences).
-  Future<void> updateUserProfileFields(
-      String uid,
-      Map<String, dynamic> partial,
-      ) async {
+  /// Patch partial fields on user doc (e.g., only preferences or personalInfo).
+  Future<void> patchUser(String uid, Map<String, dynamic> patch) async {
     await _userDoc(uid).update({
-      ...partial,
-      'lastUpdated': Timestamp.fromDate(DateTime.now()),
+      ...patch,
+      'lastUpdated': FieldValue.serverTimestamp(),
     });
   }
 
-  /// Query by display ID (e.g., "U0001") → returns first match or null
-  Future<UserProfile?> getUserByAppUserId(String appUserId) async {
-    final q = await _users.where('appUserId', isEqualTo: appUserId).limit(1).get();
-    if (q.docs.isEmpty) return null;
-    return UserProfile.fromDoc(q.docs.first);
+  /// Delete root user doc ONLY (does NOT delete subcollections).
+  Future<void> deleteUserDocOnly(String uid) => _userDoc(uid).delete();
+
+  /// Danger: delete ALL user data (root + subcollections).
+  /// Use carefully; Firestore has no cascade delete, so we do it manually.
+  Future<void> deleteAllUserData(String uid) async {
+    // delete subcollections (batch per 400 ops safety)
+    Future<void> deleteCol(
+        CollectionReference<Map<String, dynamic>> col,
+        ) async {
+      const int pageSize = 300;
+      Query<Map<String, dynamic>> q = col.limit(pageSize);
+      while (true) {
+        final snap = await q.get();
+        if (snap.docs.isEmpty) break;
+        final batch = _db.batch();
+        for (final d in snap.docs) {
+          batch.delete(d.reference);
+        }
+        await batch.commit();
+        if (snap.docs.length < pageSize) break;
+      }
+    }
+
+    await deleteCol(_skillsCol(uid));
+    await deleteCol(_eduCol(uid));
+    await deleteCol(_expCol(uid));
+
+    await deleteUserDocOnly(uid);
   }
 
-  // =============================================================================
-  //                            PROFILE PICTURE (STORAGE)
-  // =============================================================================
+  // ============================
+  // Profile Picture (Storage)
+  // ============================
 
-  /// Upload profile picture to `profile_pictures/{uid}.jpg`
-  /// Returns the public download URL.
-  Future<String> uploadProfilePicture(
-      String uid,
-      File imageFile, {
-        String contentType = 'image/jpeg',
-      }) async {
-    final ref = _storage.ref().child('profile_pictures/$uid.jpg');
+  /// Upload profile picture and return download URL.
+  /// Enforce size/type di Storage Rules; app-side boleh validate juga.
+  Future<String> uploadProfilePicture({
+    required String uid,
+    required File file,
+    String fileExt = 'jpg', // 'jpg' | 'png' | 'gif'
+  }) async {
+    final ref = _storage.ref().child('profile_pictures/$uid.$fileExt');
 
-    await ref.putFile(
-      imageFile,
-      SettableMetadata(contentType: contentType),
-    );
+    // Upload
+    final task = await ref.putFile(file);
+    // URL
+    final url = await task.ref.getDownloadURL();
 
-    final url = await ref.getDownloadURL();
-
-    // Save URL to root doc
-    await updateUserProfileFields(uid, {
+    // Update user doc with URL + lastUpdated
+    await _userDoc(uid).update({
       'personalInfo.profilePictureUrl': url,
-      'personalInfo.pictureMeta': {
-        // optional: you can fill actual image metadata if known
-        // 'w': 400, 'h': 400, 'format': 'jpg', 'sizeBytes': imageFile.lengthSync(),
-      }
+      'lastUpdated': FieldValue.serverTimestamp(),
     });
 
     return url;
   }
 
-  // =============================================================================
-  //                                  SKILLS
-  // =============================================================================
+  // ============================
+  // Subcollection: skills
+  // ============================
 
-  /// Watch skills as a stream ordered by `order` asc.
-  Stream<List<Skill>> watchSkills(String uid) {
-    return _skillsCol(uid)
-        .orderBy('order')
-        .snapshots()
-        .map((s) => s.docs.map((d) => Skill.fromDoc(d)).toList());
+  Future<List<Skill>> listSkills({
+    required String uid,
+    int limit = 100,
+    DocumentSnapshot? startAfter,
+  }) async {
+    Query<Map<String, dynamic>> q =
+    _skillsCol(uid).orderBy('order').limit(limit);
+    if (startAfter != null) {
+      q = (q.startAfterDocument(startAfter));
+    }
+    final snap = await q.get();
+    return snap.docs
+        .map((d) => Skill.fromFirestore(d as DocumentSnapshot<Map<String, dynamic>>))
+        .toList();
   }
 
-  /// One-off fetch skills
-  Future<List<Skill>> getSkills(String uid) async {
-    final s = await _skillsCol(uid).orderBy('order').get();
-    return s.docs.map((d) => Skill.fromDoc(d)).toList();
+  Future<Skill?> getSkill({
+    required String uid,
+    required String skillId,
+  }) async {
+    final snap = await _skillsCol(uid).doc(skillId).get();
+    if (!snap.exists) return null;
+    return Skill.fromFirestore(snap);
   }
 
-  /// Add a skill (auto-assign `order` to end of list).
-  Future<String> addSkill(String uid, Skill skill) async {
-    // determine next order
-    final current = await _skillsCol(uid).orderBy('order', descending: true).limit(1).get();
-    final nextOrder = current.docs.isEmpty
-        ? 0
-        : ((current.docs.first.data()['order'] as num?)?.toInt() ?? 0) + 1;
-
+  /// Create a skill; returns new doc id.
+  Future<String> addSkill({
+    required String uid,
+    required Skill skill,
+  }) async {
     final ref = await _skillsCol(uid).add({
       ...skill.toMap(),
-      'order': nextOrder,
-      'updatedAt': Timestamp.fromDate(DateTime.now()),
+      'updatedAt': FieldValue.serverTimestamp(),
     });
     return ref.id;
   }
 
-  Future<void> updateSkill(String uid, Skill skill) async {
+  Future<void> updateSkill({
+    required String uid,
+    required Skill skill,
+  }) async {
     await _skillsCol(uid).doc(skill.id).update({
       ...skill.toMap(),
-      'updatedAt': Timestamp.fromDate(DateTime.now()),
+      'updatedAt': FieldValue.serverTimestamp(),
     });
   }
 
-  Future<void> deleteSkill(String uid, String skillId) async {
-    await _skillsCol(uid).doc(skillId).delete();
-  }
+  Future<void> deleteSkill({
+    required String uid,
+    required String skillId,
+  }) =>
+      _skillsCol(uid).doc(skillId).delete();
 
-  /// Batch reorder: pass list in the final order → updates `order` = index
-  Future<void> reorderSkills(String uid, List<Skill> ordered) async {
+  /// Reorder skill items by passing ordered ids list.
+  Future<void> reorderSkills({
+    required String uid,
+    required List<String> orderedIds,
+  }) async {
     final batch = _db.batch();
-    for (var i = 0; i < ordered.length; i++) {
-      final ref = _skillsCol(uid).doc(ordered[i].id);
-      batch.update(ref, {'order': i, 'updatedAt': Timestamp.fromDate(DateTime.now())});
+    for (int i = 0; i < orderedIds.length; i++) {
+      batch.update(_skillsCol(uid).doc(orderedIds[i]), {'order': i});
     }
     await batch.commit();
   }
 
-  // =============================================================================
-  //                                 EDUCATION
-  // =============================================================================
+  // ============================
+  // Subcollection: education
+  // ============================
 
-  Stream<List<Education>> watchEducation(String uid) {
-    return _eduCol(uid)
-        .orderBy('order', descending: false)
-        .snapshots()
-        .map((s) => s.docs.map((d) => Education.fromDoc(d)).toList());
+  Future<List<Education>> listEducation({
+    required String uid,
+    int limit = 50,
+    DocumentSnapshot? startAfter,
+  }) async {
+    Query<Map<String, dynamic>> q =
+    _eduCol(uid).orderBy('order', descending: false).limit(limit);
+    if (startAfter != null) q = q.startAfterDocument(startAfter);
+    final snap = await q.get();
+    return snap.docs
+        .map((d) => Education.fromFirestore(d as DocumentSnapshot<Map<String, dynamic>>))
+        .toList();
   }
 
-  Future<List<Education>> getEducation(String uid) async {
-    final s = await _eduCol(uid).orderBy('order').get();
-    return s.docs.map((d) => Education.fromDoc(d)).toList();
+  Future<Education?> getEducation({
+    required String uid,
+    required String eduId,
+  }) async {
+    final snap = await _eduCol(uid).doc(eduId).get();
+    if (!snap.exists) return null;
+    return Education.fromFirestore(snap);
   }
 
-  Future<String> addEducation(String uid, Education edu) async {
-    final current = await _eduCol(uid).orderBy('order', descending: true).limit(1).get();
-    final nextOrder = current.docs.isEmpty
-        ? 0
-        : ((current.docs.first.data()['order'] as num?)?.toInt() ?? 0) + 1;
-
+  /// Create an education entry; returns new doc id.
+  Future<String> addEducation({
+    required String uid,
+    required Education education,
+  }) async {
     final ref = await _eduCol(uid).add({
-      ...edu.toMap(),
-      'order': nextOrder,
-      'updatedAt': Timestamp.fromDate(DateTime.now()),
+      ...education.toMap(),
+      'updatedAt': FieldValue.serverTimestamp(),
     });
     return ref.id;
   }
 
-  Future<void> updateEducation(String uid, Education edu) async {
-    await _eduCol(uid).doc(edu.id).update({
-      ...edu.toMap(),
-      'updatedAt': Timestamp.fromDate(DateTime.now()),
+  Future<void> updateEducation({
+    required String uid,
+    required Education education,
+  }) async {
+    await _eduCol(uid).doc(education.id).update({
+      ...education.toMap(),
+      'updatedAt': FieldValue.serverTimestamp(),
     });
   }
 
-  Future<void> deleteEducation(String uid, String eduId) async {
-    await _eduCol(uid).doc(eduId).delete();
-  }
+  Future<void> deleteEducation({
+    required String uid,
+    required String eduId,
+  }) =>
+      _eduCol(uid).doc(eduId).delete();
 
-  Future<void> reorderEducation(String uid, List<Education> ordered) async {
+  Future<void> reorderEducation({
+    required String uid,
+    required List<String> orderedIds,
+  }) async {
     final batch = _db.batch();
-    for (var i = 0; i < ordered.length; i++) {
-      batch.update(_eduCol(uid).doc(ordered[i].id), {
-        'order': i,
-        'updatedAt': Timestamp.fromDate(DateTime.now()),
-      });
+    for (int i = 0; i < orderedIds.length; i++) {
+      batch.update(_eduCol(uid).doc(orderedIds[i]), {'order': i});
     }
     await batch.commit();
   }
 
-  // =============================================================================
-  //                                EXPERIENCE
-  // =============================================================================
+  // ============================
+  // Subcollection: experience
+  // ============================
 
-  Stream<List<Experience>> watchExperience(String uid) {
-    return _expCol(uid)
-        .orderBy('order')
-        .snapshots()
-        .map((s) => s.docs.map((d) => Experience.fromDoc(d)).toList());
+  Future<List<Experience>> listExperience({
+    required String uid,
+    int limit = 50,
+    DocumentSnapshot? startAfter,
+  }) async {
+    Query<Map<String, dynamic>> q =
+    _expCol(uid).orderBy('order', descending: false).limit(limit);
+    if (startAfter != null) q = q.startAfterDocument(startAfter);
+    final snap = await q.get();
+    return snap.docs
+        .map((d) => Experience.fromFirestore(d as DocumentSnapshot<Map<String, dynamic>>))
+        .toList();
   }
 
-  Future<List<Experience>> getExperience(String uid) async {
-    final s = await _expCol(uid).orderBy('order').get();
-    return s.docs.map((d) => Experience.fromDoc(d)).toList();
+  Future<Experience?> getExperience({
+    required String uid,
+    required String expId,
+  }) async {
+    final snap = await _expCol(uid).doc(expId).get();
+    if (!snap.exists) return null;
+    return Experience.fromFirestore(snap);
   }
 
-  Future<String> addExperience(String uid, Experience exp) async {
-    final current = await _expCol(uid).orderBy('order', descending: true).limit(1).get();
-    final nextOrder = current.docs.isEmpty
-        ? 0
-        : ((current.docs.first.data()['order'] as num?)?.toInt() ?? 0) + 1;
-
+  /// Create an experience entry; returns new doc id.
+  Future<String> addExperience({
+    required String uid,
+    required Experience experience,
+  }) async {
     final ref = await _expCol(uid).add({
-      ...exp.toMap(),
-      'order': nextOrder,
-      'updatedAt': Timestamp.fromDate(DateTime.now()),
+      ...experience.toMap(),
+      'updatedAt': FieldValue.serverTimestamp(),
     });
     return ref.id;
   }
 
-  Future<void> updateExperience(String uid, Experience exp) async {
-    await _expCol(uid).doc(exp.id).update({
-      ...exp.toMap(),
-      'updatedAt': Timestamp.fromDate(DateTime.now()),
+  Future<void> updateExperience({
+    required String uid,
+    required Experience experience,
+  }) async {
+    await _expCol(uid).doc(experience.id).update({
+      ...experience.toMap(),
+      'updatedAt': FieldValue.serverTimestamp(),
     });
   }
 
-  Future<void> deleteExperience(String uid, String expId) async {
-    await _expCol(uid).doc(expId).delete();
-  }
+  Future<void> deleteExperience({
+    required String uid,
+    required String expId,
+  }) =>
+      _expCol(uid).doc(expId).delete();
 
-  Future<void> reorderExperience(String uid, List<Experience> ordered) async {
+  Future<void> reorderExperience({
+    required String uid,
+    required List<String> orderedIds,
+  }) async {
     final batch = _db.batch();
-    for (var i = 0; i < ordered.length; i++) {
-      batch.update(_expCol(uid).doc(ordered[i].id), {
-        'order': i,
-        'updatedAt': Timestamp.fromDate(DateTime.now()),
-      });
+    for (int i = 0; i < orderedIds.length; i++) {
+      batch.update(_expCol(uid).doc(orderedIds[i]), {'order': i});
     }
     await batch.commit();
   }
 
-  // =============================================================================
-  //                              COMPLETION & VALIDATION
-  // =============================================================================
+  // ============================
+  // Convenience: Load all subcollections (for overview screen)
+  // ============================
 
-  /// Update the completion percentage & validation map on root.
-  /// You’ll compute these in ViewModel, then call this method.
-  Future<void> updateCompletionAndValidation(
-      String uid, {
-        double? completionPercent,
-        Map<String, dynamic>? validation,
-      }) async {
-    final data = <String, dynamic>{
-      if (completionPercent != null) 'completionPercent': completionPercent,
-      if (validation != null) 'validation': validation,
-      'lastUpdated': Timestamp.fromDate(DateTime.now()),
-    };
-    await _userDoc(uid).update(data);
+  /// Load all subcollections in parallel (useful for overview page).
+  Future<UserProfile?> getUserWithSubcollections(String uid) async {
+    final user = await getUser(uid);
+    if (user == null) return null;
+
+    final results = await Future.wait([
+      listSkills(uid: uid, limit: 200),
+      listEducation(uid: uid, limit: 100),
+      listExperience(uid: uid, limit: 100),
+    ]);
+
+    return user.copyWith(
+      skills: results[0] as List<Skill>,
+      education: results[1] as List<Education>,
+      experience: results[2] as List<Experience>,
+    );
   }
 }
