@@ -125,7 +125,7 @@ class ProfileOverviewScreen extends StatelessWidget {
                           '${skills.length} ${skills.length == 1 ? 'skill' : 'skills'} across categories',
                           isComplete: skills.isNotEmpty,
                           onTap: () => Navigator.pushNamed(
-                              context, '/edit-skills'),
+                              context, AppRoutes.editSkills),
                         ),
                         _SectionCard(
                           icon: Icons.school_outlined,
@@ -136,7 +136,7 @@ class ProfileOverviewScreen extends StatelessWidget {
                           '${edus.length} education entr${edus.length == 1 ? 'y' : 'ies'}',
                           isComplete: edus.isNotEmpty,
                           onTap: () => Navigator.pushNamed(
-                              context, '/edit-education'),
+                              context, AppRoutes.editEducation),
                         ),
                         _SectionCard(
                           icon: Icons.work_outline_rounded,
@@ -147,7 +147,7 @@ class ProfileOverviewScreen extends StatelessWidget {
                           '${exps.length} work experience${exps.length == 1 ? '' : 's'}',
                           isComplete: exps.isNotEmpty,
                           onTap: () => Navigator.pushNamed(
-                              context, '/edit-experience'),
+                              context, AppRoutes.editExperience),
                         ),
                         _SectionCard(
                           icon: Icons.settings_suggest_outlined,
@@ -157,7 +157,7 @@ class ProfileOverviewScreen extends StatelessWidget {
                           subtitle: _prefsSummary(p),
                           isComplete: _hasPreferences(p),
                           onTap: () => Navigator.pushNamed(
-                              context, '/edit-preferences'),
+                              context, AppRoutes.editPreferences),
                         ),
                         _SectionCard(
                           icon: Icons.psychology_alt_outlined,
@@ -167,7 +167,7 @@ class ProfileOverviewScreen extends StatelessWidget {
                           subtitle: _personalitySummary(p),
                           isComplete: _hasPersonality(p),
                           onTap: () => Navigator.pushNamed(
-                              context, '/edit-personality'),
+                              context, AppRoutes.editPersonality),
                         ),
                       ],
                     ),
@@ -218,26 +218,40 @@ class ProfileOverviewScreen extends StatelessWidget {
   }
 
   static String _prefsSummary(UserProfile? p) {
-    if (p == null) return 'Job search preferences and career goals';
-    final roles = p.desiredJobTitles ?? const [];
-    final locs = p.preferredLocations ?? const [];
-    if (roles.isEmpty && locs.isEmpty) return 'Job search preferences and career goals';
+    if (p == null || p.preferences == null) {
+      return 'Job search preferences and career goals';
+    }
+
+    final prefs = p.preferences!;
+    final roles = prefs.desiredJobTitles ?? const [];
+    final locs = prefs.preferredLocations ?? const [];
+
+    if (roles.isEmpty && locs.isEmpty) {
+      return 'Job search preferences and career goals';
+    }
+
     if (roles.isNotEmpty && locs.isNotEmpty) {
       return '${roles.first} • ${locs.first}';
     }
-    return roles.isNotEmpty ? roles.take(2).join(', ') : locs.take(2).join(', ');
+
+    return roles.isNotEmpty
+        ? roles.take(2).join(', ')
+        : locs.take(2).join(', ');
   }
 
   static bool _hasPreferences(UserProfile? p) {
-    if (p == null) return false;
-    return (p.desiredJobTitles?.isNotEmpty == true) ||
-        (p.industries?.isNotEmpty == true) ||
-        (p.workEnvironment?.isNotEmpty == true) ||
-        (p.preferredLocations?.isNotEmpty == true) ||
-        p.willingToRelocate != null ||
-        (p.remoteAcceptance ?? '').isNotEmpty ||
-        p.salary != null;
+    if (p == null || p.preferences == null) return false;
+
+    final prefs = p.preferences!;
+    return (prefs.desiredJobTitles?.isNotEmpty == true) ||
+        (prefs.industries?.isNotEmpty == true) ||
+        (prefs.workEnvironment?.isNotEmpty == true) ||
+        (prefs.preferredLocations?.isNotEmpty == true) ||
+        (prefs.willingToRelocate != null) ||
+        ((prefs.remoteAcceptance ?? '').isNotEmpty) ||
+        (prefs.salary != null);
   }
+
 
   static String _personalitySummary(UserProfile? p) {
     final mbti = p?.mbti ?? '';

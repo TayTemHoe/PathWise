@@ -186,28 +186,12 @@ class ProfileService {
     await patchRoot(uid, p);
   }
 
-  Future<void> updatePreferences({
-    required String uid,
-    List<String>? desiredJobTitles,
-    List<String>? industries,
-    String? companySize,
-    List<String>? workEnvironment,
-    List<String>? preferredLocations,
-    bool? willingToRelocate,
-    String? remoteAcceptance,
-    SalaryPref? salary,
-  }) async {
-    final p = <String, dynamic>{
-      if (desiredJobTitles != null) 'preferences.desiredJobTitles': desiredJobTitles,
-      if (industries != null) 'preferences.industries': industries,
-      if (companySize != null) 'preferences.companySize': companySize,
-      if (workEnvironment != null) 'preferences.workEnvironment': workEnvironment,
-      if (preferredLocations != null) 'preferences.preferredLocations': preferredLocations,
-      if (willingToRelocate != null) 'preferences.willingToRelocate': willingToRelocate,
-      if (remoteAcceptance != null) 'preferences.remoteAcceptance': remoteAcceptance,
-      if (salary != null) 'preferences.salary': salary.toMap(),
-    };
-    await patchRoot(uid, p);
+  // profile_service.dart
+  Future<void> updatePreferences(String uid, Map<String, dynamic> prefs) async {
+    await _db.collection('users').doc(uid).update({
+      'preferences': prefs,
+      'lastUpdated': FieldValue.serverTimestamp(), // optional
+    });
   }
 
   Future<void> updateCompletionPercent(String uid, double value) async {

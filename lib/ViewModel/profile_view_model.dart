@@ -195,53 +195,23 @@ class ProfileViewModel extends ChangeNotifier {
   }
 
   // ------------- Update: Preferences -------------
-  Future<bool> updatePreferences({
-    List<String>? desiredJobTitles,
-    List<String>? industries,
-    String? companySize,
-    List<String>? workEnvironment,
-    List<String>? preferredLocations,
-    bool? willingToRelocate,
-    String? remoteAcceptance,
-    SalaryPref? salary,
-  }) async {
-    _setSavingRoot(true);
-    _setError(null);
+  UserProfile? _user;
+
+  UserProfile? get user => _user; // <= needed by the view
+
+  Future<bool> updatePreferences(Preferences prefs) async {
     try {
-      await _service.updatePreferences(
-        uid: uid,
-        desiredJobTitles: desiredJobTitles,
-        industries: industries,
-        companySize: companySize,
-        workEnvironment: workEnvironment,
-        preferredLocations: preferredLocations,
-        willingToRelocate: willingToRelocate,
-        remoteAcceptance: remoteAcceptance,
-        salary: salary,
-      );
-
-      _profile = (_profile ?? const UserProfile()).copyWith(
-        desiredJobTitles: desiredJobTitles ?? _profile?.desiredJobTitles,
-        industries: industries ?? _profile?.industries,
-        companySize: companySize ?? _profile?.companySize,
-        workEnvironment: workEnvironment ?? _profile?.workEnvironment,
-        preferredLocations: preferredLocations ?? _profile?.preferredLocations,
-        willingToRelocate: willingToRelocate ?? _profile?.willingToRelocate,
-        remoteAcceptance: remoteAcceptance ?? _profile?.remoteAcceptance,
-        salary: salary ?? _profile?.salary,
-        lastUpdated: Timestamp.now(),
-      );
+      await _service.updatePreferences(uid, prefs.toFirestore());
+      _user = _user?.copyWith(preferences: prefs);
       notifyListeners();
-
-      await _recalcAndPatchCompletion();
       return true;
     } catch (e) {
-      _setError(e);
+      _error = e.toString();
+      notifyListeners();
       return false;
-    } finally {
-      _setSavingRoot(false);
     }
   }
+
 
   // ------------- Upload Profile Picture -------------
   Future<String?> uploadProfilePicture(File file, {String? fileExt}) async {
@@ -479,13 +449,15 @@ class ProfileViewModel extends ChangeNotifier {
     final experiencePct = _experience.isNotEmpty ? 100.0 : 0.0;
 
     // --- Preferences (10%) ---
-    final hasPrefs = (p?.desiredJobTitles?.isNotEmpty == true) ||
-        (p?.industries?.isNotEmpty == true) ||
-        (p?.workEnvironment?.isNotEmpty == true) ||
-        (p?.preferredLocations?.isNotEmpty == true) ||
-        (p?.willingToRelocate != null) ||
-        ((p?.remoteAcceptance ?? '').isNotEmpty) ||
-        (p?.salary != null);
+// --- Preferences (10%) ---
+    final prefs = p?.preferences;
+    final hasPrefs = (prefs?.desiredJobTitles?.isNotEmpty == true) ||
+        (prefs?.industries?.isNotEmpty == true) ||
+        (prefs?.workEnvironment?.isNotEmpty == true) ||
+        (prefs?.preferredLocations?.isNotEmpty == true) ||
+        (prefs?.willingToRelocate != null) ||
+        ((prefs?.remoteAcceptance ?? '').isNotEmpty) ||
+        (prefs?.salary != null);
     final preferencesPct = hasPrefs ? 100.0 : 0.0;
 
     // weights

@@ -67,14 +67,7 @@ class UserProfile {
   final Timestamp? personalityUpdatedAt;
 
   // Preferences (map)
-  final List<String>? desiredJobTitles;
-  final List<String>? industries;
-  final String? companySize; // Startup/SME/Medium/Large/Any
-  final List<String>? workEnvironment; // Office/Remote/Hybrid/Any
-  final List<String>? preferredLocations; // e.g., "Kuala Lumpur"
-  final bool? willingToRelocate;
-  final String? remoteAcceptance; // Yes/No/HybridOnly
-  final SalaryPref? salary; // min/max/type/benefitsPriority
+  final Preferences? preferences;
 
   // Personal Info (map)
   final String? name;
@@ -105,14 +98,7 @@ class UserProfile {
     this.personalityUpdatedAt,
 
     // preferences
-    this.desiredJobTitles,
-    this.industries,
-    this.companySize,
-    this.workEnvironment,
-    this.preferredLocations,
-    this.willingToRelocate,
-    this.remoteAcceptance,
-    this.salary,
+    this.preferences,
 
     // personal info
     this.name,
@@ -138,8 +124,7 @@ class UserProfile {
     // Nested maps
     final personal    = _map(data['personalInfo']) ?? {};
     final loc         = _map(personal['location']) ?? {};
-    final prefs       = _map(data['preferences']) ?? {};
-    final salaryMap   = _map(prefs['salary']) ?? {};
+    final prefs = Preferences.fromAny(data);
     final personality = _map(data['personality']) ?? {};
 
     return UserProfile(
@@ -156,14 +141,8 @@ class UserProfile {
       personality['updatedAt'] as Timestamp? ?? data['personalityUpdatedAt'] as Timestamp?,
 
       // preferences
-      desiredJobTitles: _list(prefs['desiredJobTitles']) ?? _list(data['desiredJobTitles']),
-      industries: _list(prefs['industries']) ?? _list(data['industries']),
-      companySize: _s(prefs['companySize']) ?? _s(data['companySize']),
-      workEnvironment: _list(prefs['workEnvironment']) ?? _list(data['workEnvironment']),
-      preferredLocations: _list(prefs['preferredLocations']) ?? _list(data['preferredLocations']),
-      willingToRelocate: _b(prefs['willingToRelocate']) ?? _b(data['willingToRelocate']),
-      remoteAcceptance: _s(prefs['remoteAcceptance']) ?? _s(data['remoteAcceptance']),
-      salary: (salaryMap.isEmpty) ? null : SalaryPref.fromMap(salaryMap),
+      preferences: prefs,
+
 
       // personalInfo (nested → flat fallback)
       name: _s(personal['name']) ?? _s(data['name']),
@@ -198,16 +177,7 @@ class UserProfile {
         if (personalityUpdatedAt != null) 'updatedAt': personalityUpdatedAt,
       },
 
-      'preferences': {
-        if (desiredJobTitles != null) 'desiredJobTitles': desiredJobTitles,
-        if (industries != null) 'industries': industries,
-        if (companySize != null) 'companySize': companySize,
-        if (workEnvironment != null) 'workEnvironment': workEnvironment,
-        if (preferredLocations != null) 'preferredLocations': preferredLocations,
-        if (willingToRelocate != null) 'willingToRelocate': willingToRelocate,
-        if (remoteAcceptance != null) 'remoteAcceptance': remoteAcceptance,
-        if (salary != null) 'salary': salary!.toMap(),
-      },
+      'preferences': preferences?.toFirestore() ?? {},
 
       'personalInfo': {
         if (name != null) 'name': name,
@@ -235,14 +205,7 @@ class UserProfile {
     String? riasec,
     Timestamp? personalityUpdatedAt,
 
-    List<String>? desiredJobTitles,
-    List<String>? industries,
-    String? companySize,
-    List<String>? workEnvironment,
-    List<String>? preferredLocations,
-    bool? willingToRelocate,
-    String? remoteAcceptance,
-    SalaryPref? salary,
+    Preferences? preferences,
 
     String? name,
     String? email,
@@ -268,14 +231,7 @@ class UserProfile {
       riasec: riasec ?? this.riasec,
       personalityUpdatedAt: personalityUpdatedAt ?? this.personalityUpdatedAt,
 
-      desiredJobTitles: desiredJobTitles ?? this.desiredJobTitles,
-      industries: industries ?? this.industries,
-      companySize: companySize ?? this.companySize,
-      workEnvironment: workEnvironment ?? this.workEnvironment,
-      preferredLocations: preferredLocations ?? this.preferredLocations,
-      willingToRelocate: willingToRelocate ?? this.willingToRelocate,
-      remoteAcceptance: remoteAcceptance ?? this.remoteAcceptance,
-      salary: salary ?? this.salary,
+      preferences: preferences ?? this.preferences,
 
       name: name ?? this.name,
       email: email ?? this.email,
@@ -658,3 +614,170 @@ class ExpAchievements {
         skillsUsed: skillsUsed ?? this.skillsUsed,
       );
 }
+
+class Preferences {
+  final List<String>? desiredJobTitles;
+  final List<String>? industries;
+  final String? companySize;                 // Startup/Small/Medium/Large/Any
+  final List<String>? workEnvironment;       // Office/Remote/Hybrid/Any
+  final List<String>? preferredLocations;    // e.g. "Kuala Lumpur"
+  final bool? willingToRelocate;
+  final String? remoteAcceptance;            // Yes / No / HybridOnly
+  final PrefSalary? salary;                  // {min,max,type,currency?,benefitsPriority[]}
+
+  const Preferences({
+    this.desiredJobTitles,
+    this.industries,
+    this.companySize,
+    this.workEnvironment,
+    this.preferredLocations,
+    this.willingToRelocate,
+    this.remoteAcceptance,
+    this.salary,
+  });
+
+  factory Preferences.empty() => const Preferences();
+
+  // Build from nested map (preferred) OR from flattened top-level structure.
+  static Preferences fromAny(Map<String, dynamic> root) {
+    // If nested exists, use it.
+    final prefRaw = root['preferences'];
+    if (prefRaw is Map<String, dynamic>) {
+      return Preferences.fromMap(prefRaw);
+    }
+    // Otherwise, try read flattened keys from root.
+    return Preferences(
+      desiredJobTitles: _ls(root['desiredJobTitles']),
+      industries: _ls(root['industries']),
+      companySize: _s(root['companySize']),
+      workEnvironment: _ls(root['workEnvironment']),
+      preferredLocations: _ls(root['preferredLocations']),
+      willingToRelocate: root['willingToRelocate'] is bool ? root['willingToRelocate'] as bool : null,
+      remoteAcceptance: _s(root['remoteAcceptance']),
+      salary: PrefSalary.fromMap(root['salary'] as Map<String, dynamic>?),
+    );
+  }
+
+  factory Preferences.fromMap(Map<String, dynamic>? m) {
+    if (m == null) return const Preferences();
+    return Preferences(
+      desiredJobTitles: _ls(m['desiredJobTitles']),
+      industries: _ls(m['industries']),
+      companySize: _s(m['companySize']),
+      workEnvironment: _ls(m['workEnvironment']),
+      preferredLocations: _ls(m['preferredLocations']),
+      willingToRelocate: m['willingToRelocate'] is bool ? m['willingToRelocate'] as bool : null,
+      remoteAcceptance: _s(m['remoteAcceptance']),
+      salary: PrefSalary.fromMap(m['salary'] as Map<String, dynamic>?),
+    );
+  }
+
+  Map<String, dynamic> toFirestore() {
+    final map = <String, dynamic>{};
+
+    // only add each field if not null (clean map)
+    if (desiredJobTitles != null && desiredJobTitles!.isNotEmpty) {
+      map['desiredJobTitles'] = desiredJobTitles;
+    }
+    if (industries != null && industries!.isNotEmpty) {
+      map['industries'] = industries;
+    }
+    if (companySize != null && companySize!.isNotEmpty) {
+      map['companySize'] = companySize;
+    }
+    if (workEnvironment != null && workEnvironment!.isNotEmpty) {
+      map['workEnvironment'] = workEnvironment;
+    }
+    if (preferredLocations != null && preferredLocations!.isNotEmpty) {
+      map['preferredLocations'] = preferredLocations;
+    }
+    if (willingToRelocate != null) {
+      map['willingToRelocate'] = willingToRelocate;
+    }
+    if (remoteAcceptance != null && remoteAcceptance!.isNotEmpty) {
+      map['remoteAcceptance'] = remoteAcceptance;
+    }
+
+    // safely serialize nested salary object
+    if (salary != null) {
+      map['salary'] = salary!.toFirestore();
+    }
+
+    return map;
+  }
+
+
+  Preferences copyWith({
+    List<String>? desiredJobTitles,
+    List<String>? industries,
+    String? companySize,
+    List<String>? workEnvironment,
+    List<String>? preferredLocations,
+    bool? willingToRelocate,
+    String? remoteAcceptance,
+    PrefSalary? salary,
+  }) {
+    return Preferences(
+      desiredJobTitles: desiredJobTitles ?? this.desiredJobTitles,
+      industries: industries ?? this.industries,
+      companySize: companySize ?? this.companySize,
+      workEnvironment: workEnvironment ?? this.workEnvironment,
+      preferredLocations: preferredLocations ?? this.preferredLocations,
+      willingToRelocate: willingToRelocate ?? this.willingToRelocate,
+      remoteAcceptance: remoteAcceptance ?? this.remoteAcceptance,
+      salary: salary ?? this.salary,
+    );
+  }
+}
+
+class PrefSalary {
+  final int? min;
+  final int? max;
+  final String? type;                 // Monthly / Annual
+  final List<String>? benefitsPriority;
+
+  const PrefSalary({
+    this.min,
+    this.max,
+    this.type,
+    this.benefitsPriority,
+  });
+
+  factory PrefSalary.fromMap(Map<String, dynamic>? m) {
+    if (m == null) return const PrefSalary();
+    return PrefSalary(
+      min: _i(m['min']),
+      max: _i(m['max']),
+      type: _s(m['type']),
+      benefitsPriority: _ls(m['benefitsPriority']),
+    );
+  }
+
+  Map<String, dynamic> toFirestore() => {
+    if (min != null) 'min': min,
+    if (max != null) 'max': max,
+    if (type != null) 'type': type,
+    if (benefitsPriority != null) 'benefitsPriority': benefitsPriority,
+  };
+
+  PrefSalary copyWith({
+    int? min,
+    int? max,
+    String? type,
+    String? currency,
+    List<String>? benefitsPriority,
+  }) {
+    return PrefSalary(
+      min: min ?? this.min,
+      max: max ?? this.max,
+      type: type ?? this.type,
+      benefitsPriority: benefitsPriority ?? this.benefitsPriority,
+    );
+  }
+}
+
+// Small helpers for safe casting.
+List<String>? _ls(dynamic v) =>
+    v is List ? v.map((e) => e.toString()).toList() : null;
+
+
