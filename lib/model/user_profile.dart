@@ -3,6 +3,9 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 /// ===============================
 /// Safe parsers (resilient to type drift)
 /// ===============================
+String get uid {
+  return 'U0001'; // fallback for local testing
+}
 
 String? _s(Object? v) => v == null ? null : v.toString();
 

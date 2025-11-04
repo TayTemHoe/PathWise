@@ -25,7 +25,7 @@ class ProfileOverviewScreen extends StatelessWidget {
             child: CustomScrollView(
               physics: const AlwaysScrollableScrollPhysics(),
               slivers: [
-                // ======= Gradient header like mockup =======
+                // =======  header =======
                 SliverAppBar(
                   pinned: true,
                   expandedHeight: 105,

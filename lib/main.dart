@@ -2,7 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:path_wise/viewmodel/profile_view_model.dart';
-import 'package:path_wise/view/profile_overview_view.dart';
+import 'package:path_wise/ViewModel/career_view_model.dart';
+import 'package:path_wise/ViewModel/job_view_model.dart';
 import 'package:path_wise/routes.dart';
 import 'package:path_wise/view/edit_personal_view.dart';
 import 'package:path_wise/view/edit_skills_view.dart';
@@ -12,6 +13,7 @@ import 'package:path_wise/view/edit_preferences_view.dart';
 import 'package:path_wise/view/edit_personality_view.dart';
 import 'firebase_options.dart';
 import 'package:path_wise/view/bottomNavigationBar.dart';
+
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -37,6 +39,8 @@ class MyApp extends StatelessWidget {
             return vm;
           },
         ),
+        ChangeNotifierProvider(create: (_) => CareerViewModel()),
+        ChangeNotifierProvider(create: (_) => JobViewModel()),
       ],
       child: MaterialApp(
         routes: {
