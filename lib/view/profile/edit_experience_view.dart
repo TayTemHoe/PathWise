@@ -2,8 +2,8 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
-import '../model/user_profile.dart';
-import '../viewmodel/profile_view_model.dart';
+import 'package:path_wise/model/user_profile.dart';
+import 'package:path_wise/viewmodel/profile_view_model.dart';
 
 class EditExperienceScreen extends StatelessWidget {
   const EditExperienceScreen({super.key});

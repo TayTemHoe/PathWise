@@ -1,9 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:path_wise/model/careerroadmap_model.dart';
 import 'package:provider/provider.dart';
 import 'package:path_wise/ViewModel/careerroadmap_view_model.dart';
-import 'package:path_wise/ViewModel/career_view_model.dart';
 import 'package:path_wise/view/roadmap/create_roadmap_view.dart';
+import 'package:path_wise/model/careerroadmap_model.dart';
 
 // lib/view/roadmap/roadmap_detail_view.dart
 
@@ -1003,31 +1002,20 @@ class _RoadmapListViewState extends State<RoadmapListView> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              IconButton(
-                icon: const Icon(Icons.arrow_back, color: Colors.white),
-                onPressed: () => Navigator.pop(context),
-              ),
-              const Text(
-                'Your Career Roadmaps',
-                style: TextStyle(
-                  fontSize: 24,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.white,
-                ),
-              ),
-            ],
+          const Text(
+            'Career Roadmaps',
+            style: TextStyle(
+              fontSize: 28,
+              fontWeight: FontWeight.bold,
+              color: Colors.white,
+            ),
           ),
           const SizedBox(height: 8),
-          const Padding(
-            padding: EdgeInsets.only(left: 48),
-            child: Text(
-              'Explore your career progression paths',
-              style: TextStyle(
-                fontSize: 14,
-                color: Colors.white70,
-              ),
+          const Text(
+            'Explore your career progression paths',
+            style: TextStyle(
+              fontSize: 14,
+              color: Colors.white70,
             ),
           ),
         ],

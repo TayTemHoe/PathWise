@@ -4,7 +4,7 @@ import 'package:provider/provider.dart';
 import 'package:path_wise/ViewModel/job_view_model.dart';
 import 'package:path_wise/ViewModel/profile_view_model.dart';
 import 'package:path_wise/model/job_models.dart';
-import 'package:path_wise/view/job_details_view.dart';
+import 'package:path_wise/view/career/job_details_view.dart';
 
 class JobView extends StatefulWidget {
   final String? prefilledQuery; // For career suggestion navigation

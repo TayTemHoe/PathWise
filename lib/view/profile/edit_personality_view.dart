@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
-import 'package:path_wise/viewmodel/profile_view_model.dart';
+import 'package:path_wise/ViewModel/profile_view_model.dart';
 
 class EditPersonalityScreen extends StatefulWidget {
   const EditPersonalityScreen({super.key});

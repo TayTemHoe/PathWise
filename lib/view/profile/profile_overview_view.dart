@@ -2,9 +2,9 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
-import '../routes.dart';
-import '../viewmodel/profile_view_model.dart';
-import '../model/user_profile.dart';
+import 'package:path_wise/routes.dart';
+import 'package:path_wise/ViewModel/profile_view_model.dart';
+import 'package:path_wise/model/user_profile.dart';
 
 class ProfileOverviewScreen extends StatelessWidget {
   const ProfileOverviewScreen({super.key});
@@ -34,7 +34,7 @@ class ProfileOverviewScreen extends StatelessWidget {
                   flexibleSpace: Container(
                     decoration: const BoxDecoration(
                       gradient: LinearGradient(
-                        colors: [Color(0xFF7C4DFF), Color(0xFF6EA8FF)],
+                        colors: [Color(0xFF7C3AED), Color(0xFF9F7AEA)],
                         begin: Alignment.topLeft,
                         end: Alignment.bottomRight,
                       ),

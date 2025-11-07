@@ -1,7 +1,8 @@
 // lib/view/interview/interview_history_page.dart
 import 'package:flutter/material.dart';
+import 'package:path_wise/ViewModel/profile_view_model.dart';
 import 'package:provider/provider.dart';
-import 'package:path_wise/viewmodel/interview_view_model.dart';
+import 'package:path_wise/ViewModel/interview_view_model.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:intl/intl.dart';
 
@@ -22,8 +23,8 @@ class _InterviewHistoryPageState extends State<InterviewHistoryPage> {
   }
 
   Future<void> _loadHistory() async {
-    final user = FirebaseAuth.instance.currentUser;
-    if (user != null) {
+    final user = Provider.of<ProfileViewModel>(context, listen: false);
+    if (user.uid != null) {
       final interviewVM = Provider.of<InterviewViewModel>(context, listen: false);
       await interviewVM.loadSessionHistory(user.uid);
     }
@@ -403,8 +404,8 @@ class _InterviewHistoryPageState extends State<InterviewHistoryPage> {
   }
 
   void _viewSessionDetails(session) async {
-    final user = FirebaseAuth.instance.currentUser;
-    if (user == null) return;
+    final user = Provider.of<ProfileViewModel>(context, listen: false);
+    if (user.uid == null) return;
 
     // Load the session into current session
     final interviewVM = Provider.of<InterviewViewModel>(context, listen: false);

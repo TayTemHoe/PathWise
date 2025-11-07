@@ -1,18 +1,29 @@
 import 'package:flutter/material.dart';
+import 'package:path_wise/ViewModel/careerroadmap_view_model.dart';
+import 'package:path_wise/ViewModel/interview_view_model.dart';
+import 'package:path_wise/ViewModel/resume_view_model.dart';
 import 'package:provider/provider.dart';
 import 'package:firebase_core/firebase_core.dart';
-import 'package:path_wise/viewmodel/profile_view_model.dart';
+import 'package:path_wise/ViewModel/profile_view_model.dart';
 import 'package:path_wise/ViewModel/career_view_model.dart';
 import 'package:path_wise/ViewModel/job_view_model.dart';
 import 'package:path_wise/routes.dart';
-import 'package:path_wise/view/edit_personal_view.dart';
-import 'package:path_wise/view/edit_skills_view.dart';
-import 'package:path_wise/view/edit_education_view.dart';
-import 'package:path_wise/view/edit_experience_view.dart';
-import 'package:path_wise/view/edit_preferences_view.dart';
-import 'package:path_wise/view/edit_personality_view.dart';
+import 'package:path_wise/view/profile/edit_personal_view.dart';
+import 'package:path_wise/view/profile/edit_skills_view.dart';
+import 'package:path_wise/view/profile/edit_education_view.dart';
+import 'package:path_wise/view/profile/edit_experience_view.dart';
+import 'package:path_wise/view/profile/edit_preferences_view.dart';
+import 'package:path_wise/view/profile/edit_personality_view.dart';
 import 'firebase_options.dart';
 import 'package:path_wise/view/bottomNavigationBar.dart';
+import 'package:path_wise/view/interview/interview_home_view.dart';
+import 'package:path_wise/view/interview/interview_setup_view.dart';
+import 'package:path_wise/view/interview/interview_session_view.dart';
+import 'package:path_wise/view/interview/interview_result_view.dart';
+import 'package:path_wise/view/interview/interview_history_view.dart';
+import 'package:path_wise/view/resume/resume_create_view.dart';
+import 'package:path_wise/view/resume/resume_customize_view.dart';
+
 
 
 Future<void> main() async {
@@ -41,6 +52,9 @@ class MyApp extends StatelessWidget {
         ),
         ChangeNotifierProvider(create: (_) => CareerViewModel()),
         ChangeNotifierProvider(create: (_) => JobViewModel()),
+        ChangeNotifierProvider(create: (_) => InterviewViewModel()),
+        ChangeNotifierProvider(create: (_) => CareerRoadmapViewModel()),
+        ChangeNotifierProvider(create: (_) => ResumeViewModel()),
       ],
       child: MaterialApp(
         routes: {
@@ -50,6 +64,13 @@ class MyApp extends StatelessWidget {
           AppRoutes.editExperience:   (_) => const EditExperienceScreen(),
           AppRoutes.editPreferences:  (_) => const EditPreferencesScreen(),
           AppRoutes.editPersonality:  (_) => const EditPersonalityScreen(),
+          '/interview-home': (context) => const InterviewHomePage(),
+          '/interview-setup': (context) => const InterviewSetupPage(),
+          '/interview-session': (context) => const InterviewSessionPage(),
+          '/interview-results': (context) => const InterviewResultsPage(),
+          '/interview-history': (context) => const InterviewHistoryPage(),
+          '/resume/template-selection': (context) => TemplateSelectionPage(),
+          '/resume/edit':(context) => CustomizeResumePage(),
         },
         debugShowCheckedModeBanner: false,
         title: 'PathWise Demo',

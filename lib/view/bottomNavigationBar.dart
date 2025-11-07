@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:path_wise/view/profile_overview_view.dart';
-import 'package:path_wise/view/career_view.dart';
+import 'package:path_wise/view/profile/profile_overview_view.dart';
+import 'package:path_wise/view/career/career_view.dart';
+import 'package:path_wise/view/roadmap/careerroadmap_list_view.dart';
+import 'package:path_wise/view/resume/resume_home_view.dart';
+import 'package:path_wise/view/interview/interview_home_view.dart';
 
 class BottomNavScreen extends StatefulWidget {
   const BottomNavScreen({Key? key}) : super(key: key);
@@ -15,9 +18,9 @@ class _BottomNavScreenState extends State<BottomNavScreen> {
   // List of screens for each tab
   final List<Widget> _screens = [
     const CareerDiscoveryView(),
-    const RoadmapScreen(),
-    const ResumeScreen(),
-    const InterviewScreen(),
+    const RoadmapListView(),
+    const ResumeListPage(),
+    const InterviewHomePage(),
     const ProfileOverviewScreen(),
   ];
 

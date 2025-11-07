@@ -84,10 +84,7 @@ class CareerRoadmapViewModel extends ChangeNotifier {
   bool get profileOutdated => _profileOutdated;
 
   // Helper getters
-  String get uid {
-    final u = _auth.currentUser;
-    return u?.uid ?? 'U0001'; // fallback for testing
-  }
+  String get uid => _auth.currentUser?.uid ?? 'U0001';
 
   bool isStageExpanded(int index) => _expandedStages[index.toString()] ?? false;
   bool get hasRoadmap => _currentRoadmap != null;
@@ -214,8 +211,10 @@ class CareerRoadmapViewModel extends ChangeNotifier {
 
       // Generate/fetch roadmap and skill gaps via AI Service
       // This method handles caching automatically
+      debugPrint('✅ Received career roadmap from AI');
+
       final result = await _aiService.saveCareerRoadmapToFirestore(
-        uid: uid,
+        uid: profileViewModel.uid,
         jobTitle: jobTitle,
         userProfile: userProfile,
       );

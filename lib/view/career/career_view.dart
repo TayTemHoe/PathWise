@@ -4,7 +4,7 @@ import 'package:provider/provider.dart';
 import 'package:path_wise/ViewModel/career_view_model.dart';
 import 'package:path_wise/ViewModel/profile_view_model.dart';
 import 'package:path_wise/model/career_suggestion.dart';
-import 'package:path_wise/view/job_view.dart';
+import 'package:path_wise/view/career/job_view.dart';
 
 class CareerDiscoveryView extends StatefulWidget {
   const CareerDiscoveryView({Key? key}) : super(key: key);
@@ -62,8 +62,7 @@ class _CareerDiscoveryViewState extends State<CareerDiscoveryView>
       decoration: BoxDecoration(
         gradient: LinearGradient(
           colors: [
-            Color(0xFF7C3AED), // Purple
-            Color(0xFFEC4899), // Pink
+            Color(0xFF7C3AED), Color(0xFF9F7AEA)
           ],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
@@ -82,13 +81,6 @@ class _CareerDiscoveryViewState extends State<CareerDiscoveryView>
             ),
           ),
           SizedBox(height: 8),
-          Text(
-            'AI-powered career guidance tailored for you',
-            style: TextStyle(
-              fontSize: 14,
-              color: Colors.white.withOpacity(0.9),
-            ),
-          ),
         ],
       ),
     );
@@ -539,7 +531,7 @@ class _CareerDiscoveryViewState extends State<CareerDiscoveryView>
                       borderRadius: BorderRadius.circular(8),
                     ),
                   ),
-                  child: Text('Career Roadmap'),
+                  child: Text('View Details'),
                 ),
               ),
             ],

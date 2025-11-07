@@ -1,10 +1,9 @@
 // lib/view/interview/interview_home_view.dart
 import 'package:flutter/material.dart';
+import 'package:path_wise/ViewModel/profile_view_model.dart';
 import 'package:provider/provider.dart';
-import 'package:path_wise/viewmodel/interview_view_model.dart';
-import 'package:path_wise/viewmodel/career_view_model.dart';
-import 'package:firebase_auth/firebase_auth.dart';
-import 'package:intl/intl.dart';
+import 'package:path_wise/ViewModel/interview_view_model.dart';
+import 'package:path_wise/ViewModel/career_view_model.dart';
 
 class InterviewHomePage extends StatefulWidget {
   const InterviewHomePage({Key? key}) : super(key: key);
@@ -21,12 +20,13 @@ class _InterviewHomePageState extends State<InterviewHomePage> {
   }
 
   Future<void> _loadData() async {
-    final user = FirebaseAuth.instance.currentUser;
+    final profileVM = Provider.of<ProfileViewModel>(context, listen: false);
+    final user = profileVM.uid;
     if (user != null) {
       final interviewVM = Provider.of<InterviewViewModel>(context, listen: false);
       await Future.wait([
-        interviewVM.loadSessionHistory(user.uid),
-        interviewVM.loadRecentSessions(user.uid, limit: 5),
+        interviewVM.loadSessionHistory(user),
+        interviewVM.loadRecentSessions(user, limit: 5),
       ]);
     }
   }
@@ -35,12 +35,6 @@ class _InterviewHomePageState extends State<InterviewHomePage> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.grey[50],
-      appBar: AppBar(
-        title: const Text('Interview Simulator'),
-        backgroundColor: const Color(0xFF8B5CF6),
-        foregroundColor: Colors.white,
-        elevation: 0,
-      ),
       body: Consumer<InterviewViewModel>(
         builder: (context, interviewVM, child) {
           if (interviewVM.isLoading) {
@@ -85,7 +79,7 @@ class _InterviewHomePageState extends State<InterviewHomePage> {
         gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: [Color(0xFF8B5CF6), Color(0xFF7C3AED)],
+          colors: [Color(0xFF7C3AED), Color(0xFF9F7AEA)],
         ),
       ),
       child: Column(
@@ -100,13 +94,6 @@ class _InterviewHomePageState extends State<InterviewHomePage> {
             ),
           ),
           SizedBox(height: 8),
-          Text(
-            'Practice interviews with AI-powered feedback',
-            style: TextStyle(
-              color: Colors.white70,
-              fontSize: 14,
-            ),
-          ),
         ],
       ),
     );
@@ -482,7 +469,7 @@ class _InterviewHomePageState extends State<InterviewHomePage> {
   }
 
   void _startNewInterview(BuildContext context) async {
-    final user = FirebaseAuth.instance.currentUser;
+    final user = 'U0001';
     if (user == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Please login first')),

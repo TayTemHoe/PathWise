@@ -91,7 +91,6 @@ class CareerViewModel extends ChangeNotifier {
 
       debugPrint('🤖 Requesting career suggestions from Gemini AI...');
 
-      // Step 1: Get predictions from AI
       final predictions = await _aiService.getCareerSuggestions(profileViewModel);
 
       debugPrint('✅ Received predictions from AI');

@@ -1,7 +1,7 @@
 // lib/view/interview/interview_results_page.dart
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:path_wise/viewmodel/interview_view_model.dart';
+import 'package:path_wise/ViewModel/interview_view_model.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
 class InterviewResultsPage extends StatelessWidget {

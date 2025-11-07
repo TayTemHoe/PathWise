@@ -1,11 +1,12 @@
-// lib/view/roadmap/roadmap_list_view.dart
+// lib/view/roadmap/careerroadmap_list_view.dart
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:path_wise/ViewModel/careerroadmap_view_model.dart';
 import 'package:path_wise/view/roadmap/roadmap_detail_view.dart';
 import 'package:path_wise/view/roadmap/create_roadmap_view.dart';
 
-/// Main screen showing all career roadmaps
+/// Main screen showing all career roadmaps as independent page
+/// This is a standalone page that can be used as a bottom navigation item
 /// UC015: Initial entry point for viewing roadmaps
 class RoadmapListView extends StatefulWidget {
   const RoadmapListView({Key? key}) : super(key: key);
@@ -76,37 +77,29 @@ class _RoadmapListViewState extends State<RoadmapListView> {
     );
   }
 
+  /// Header without back button - standalone page design
   Widget _buildHeader() {
     return Padding(
       padding: const EdgeInsets.all(20),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              IconButton(
-                icon: const Icon(Icons.arrow_back, color: Colors.white),
-                onPressed: () => Navigator.pop(context),
-              ),
-              const Text(
-                'Your Career Roadmaps',
-                style: TextStyle(
-                  fontSize: 24,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.white,
-                ),
-              ),
-            ],
+          const Text(
+            'Career Roadmaps',
+            style: TextStyle(
+              fontSize: 28,
+              fontWeight: FontWeight.bold,
+              color: Colors.white,
+            ),
           ),
           const SizedBox(height: 8),
-          const Padding(
-            padding: EdgeInsets.only(left: 48),
-            child: Text(
-              'Explore your career progression paths',
-              style: TextStyle(
-                fontSize: 14,
-                color: Colors.white70,
-              ),
+          Text(
+            _roadmaps.isEmpty
+                ? 'Start planning your career journey'
+                : 'Your career progression paths',
+            style: const TextStyle(
+              fontSize: 14,
+              color: Colors.white70,
             ),
           ),
         ],
@@ -116,7 +109,11 @@ class _RoadmapListViewState extends State<RoadmapListView> {
 
   Widget _buildBody() {
     if (_isLoading) {
-      return const Center(child: CircularProgressIndicator());
+      return const Center(
+        child: CircularProgressIndicator(
+          valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF8B5CF6)),
+        ),
+      );
     }
 
     if (_roadmaps.isEmpty) {
@@ -125,8 +122,10 @@ class _RoadmapListViewState extends State<RoadmapListView> {
 
     return RefreshIndicator(
       onRefresh: _loadRoadmaps,
+      color: const Color(0xFF8B5CF6),
       child: ListView.builder(
         padding: const EdgeInsets.all(16),
+        physics: const AlwaysScrollableScrollPhysics(),
         itemCount: _roadmaps.length,
         itemBuilder: (context, index) {
           return _buildRoadmapCard(_roadmaps[index]);
@@ -135,58 +134,94 @@ class _RoadmapListViewState extends State<RoadmapListView> {
     );
   }
 
+  /// Empty state when no roadmaps exist
   Widget _buildEmptyState() {
     return Center(
-      child: Padding(
+      child: SingleChildScrollView(
         padding: const EdgeInsets.all(32),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
+            // Illustration container
             Container(
-              padding: const EdgeInsets.all(24),
+              padding: const EdgeInsets.all(32),
               decoration: BoxDecoration(
                 color: const Color(0xFFEDE9FE),
-                borderRadius: BorderRadius.circular(20),
+                borderRadius: BorderRadius.circular(24),
+                boxShadow: [
+                  BoxShadow(
+                    color: const Color(0xFF8B5CF6).withOpacity(0.1),
+                    blurRadius: 20,
+                    offset: const Offset(0, 10),
+                  ),
+                ],
               ),
               child: const Icon(
                 Icons.map_outlined,
-                size: 80,
+                size: 100,
                 color: Color(0xFF8B5CF6),
               ),
             ),
-            const SizedBox(height: 24),
+            const SizedBox(height: 32),
+
+            // Title
             const Text(
               'No Career Roadmaps Yet',
               style: TextStyle(
-                fontSize: 22,
+                fontSize: 24,
                 fontWeight: FontWeight.bold,
                 color: Color(0xFF1E293B),
               ),
             ),
             const SizedBox(height: 12),
+
+            // Description
             Text(
-              'Create your first career roadmap to see your\nprogression path and skill gaps',
+              'Create your first career roadmap to:\n• View career progression stages\n• Identify skill gaps\n• Get learning recommendations',
               textAlign: TextAlign.center,
               style: TextStyle(
-                fontSize: 14,
+                fontSize: 15,
                 color: Colors.grey[600],
-                height: 1.5,
+                height: 1.6,
               ),
             ),
-            const SizedBox(height: 32),
+            const SizedBox(height: 40),
+
+            // Create roadmap button
             ElevatedButton.icon(
               onPressed: () => _navigateToCreateRoadmap(),
-              icon: const Icon(Icons.add),
-              label: const Text('Create Your First Roadmap'),
+              icon: const Icon(Icons.add_road, size: 24),
+              label: const Text(
+                'Create Roadmap',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
               style: ElevatedButton.styleFrom(
                 backgroundColor: const Color(0xFF8B5CF6),
+                foregroundColor: Colors.white,
                 padding: const EdgeInsets.symmetric(
-                  horizontal: 24,
+                  horizontal: 32,
                   vertical: 16,
                 ),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(12),
                 ),
+                elevation: 4,
+                shadowColor: const Color(0xFF8B5CF6).withOpacity(0.4),
+              ),
+            ),
+            const SizedBox(height: 16),
+
+            // Hint text
+            Text(
+              'Tip: Generate career suggestions first to get started',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 12,
+                color: Colors.grey[500],
+                fontStyle: FontStyle.italic,
               ),
             ),
           ],
@@ -195,11 +230,18 @@ class _RoadmapListViewState extends State<RoadmapListView> {
     );
   }
 
+  /// Roadmap card showing job title and basic info
   Widget _buildRoadmapCard(Map<String, dynamic> roadmapData) {
     final roadmapId = roadmapData['id'] as String;
     final jobTitle = roadmapData['jobTitle'] as String;
     final roadmapList = roadmapData['roadmap'] as List<dynamic>;
     final stageCount = roadmapList.length;
+
+    // Extract first and last stage for display
+    final firstStage = roadmapList.first as Map<String, dynamic>;
+    final lastStage = roadmapList.last as Map<String, dynamic>;
+    final firstJobTitle = firstStage['jobTitle'] as String;
+    final lastJobTitle = lastStage['jobTitle'] as String;
 
     return Card(
       margin: const EdgeInsets.only(bottom: 16),
@@ -215,6 +257,7 @@ class _RoadmapListViewState extends State<RoadmapListView> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              // Header with icon and title
               Row(
                 children: [
                   Container(
@@ -259,14 +302,18 @@ class _RoadmapListViewState extends State<RoadmapListView> {
                         _deleteRoadmap(roadmapId, jobTitle);
                       }
                     },
+                    icon: Icon(Icons.more_vert, color: Colors.grey[600]),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
                     itemBuilder: (context) => [
                       const PopupMenuItem(
                         value: 'delete',
                         child: Row(
                           children: [
-                            Icon(Icons.delete, color: Colors.red, size: 20),
+                            Icon(Icons.delete_outline, color: Colors.red, size: 20),
                             SizedBox(width: 8),
-                            Text('Delete'),
+                            Text('Delete Roadmap'),
                           ],
                         ),
                       ),
@@ -275,8 +322,90 @@ class _RoadmapListViewState extends State<RoadmapListView> {
                 ],
               ),
               const SizedBox(height: 16),
+
+              // Career progression indicator
               _buildProgressIndicator(roadmapList),
+
               const SizedBox(height: 12),
+
+              // Career path summary
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF8FAFC),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(
+                    color: const Color(0xFFE2E8F0),
+                    width: 1,
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Start:',
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: Colors.grey[600],
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            firstJobTitle,
+                            style: const TextStyle(
+                              fontSize: 12,
+                              color: Color(0xFF1E293B),
+                              fontWeight: FontWeight.w600,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ],
+                      ),
+                    ),
+                    const Icon(
+                      Icons.arrow_forward,
+                      size: 16,
+                      color: Color(0xFF8B5CF6),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Goal:',
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: Colors.grey[600],
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            lastJobTitle,
+                            style: const TextStyle(
+                              fontSize: 12,
+                              color: Color(0xFF1E293B),
+                              fontWeight: FontWeight.w600,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
+              const SizedBox(height: 12),
+
+              // Action chips
               Row(
                 children: [
                   _buildInfoChip(
@@ -287,7 +416,7 @@ class _RoadmapListViewState extends State<RoadmapListView> {
                   const SizedBox(width: 8),
                   _buildInfoChip(
                     Icons.school,
-                    'See Skills',
+                    'Skill Gaps',
                     const Color(0xFF10B981),
                   ),
                 ],
@@ -299,6 +428,7 @@ class _RoadmapListViewState extends State<RoadmapListView> {
     );
   }
 
+  /// Progress indicator showing career stages
   Widget _buildProgressIndicator(List<dynamic> stages) {
     return Row(
       children: List.generate(stages.length, (index) {
@@ -332,6 +462,7 @@ class _RoadmapListViewState extends State<RoadmapListView> {
     );
   }
 
+  /// Info chip widget
   Widget _buildInfoChip(IconData icon, String label, Color color) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
@@ -357,6 +488,7 @@ class _RoadmapListViewState extends State<RoadmapListView> {
     );
   }
 
+  /// Navigate to create roadmap view
   Future<void> _navigateToCreateRoadmap() async {
     final result = await Navigator.push(
       context,
@@ -365,26 +497,36 @@ class _RoadmapListViewState extends State<RoadmapListView> {
       ),
     );
 
+    // Reload roadmaps if a new one was created
     if (result == true) {
       _loadRoadmaps();
     }
   }
 
+  /// View specific roadmap details
   Future<void> _viewRoadmap(String roadmapId, String jobTitle) async {
     final viewModel = context.read<CareerRoadmapViewModel>();
 
-    // Show loading
+    // Show loading dialog
     showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (context) => const Center(child: CircularProgressIndicator()),
+      builder: (context) => const Center(
+        child: CircularProgressIndicator(
+          valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF8B5CF6)),
+        ),
+      ),
     );
 
     final success = await viewModel.loadRoadmapById(roadmapId);
 
-    Navigator.pop(context); // Close loading
+    // Close loading dialog
+    if (mounted) {
+      Navigator.pop(context);
+    }
 
     if (success && mounted) {
+      // Navigate to detail view
       Navigator.push(
         context,
         MaterialPageRoute(
@@ -392,22 +534,38 @@ class _RoadmapListViewState extends State<RoadmapListView> {
         ),
       );
     } else if (mounted) {
+      // Show error message
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(viewModel.errorMessage ?? 'Failed to load roadmap'),
           backgroundColor: Colors.red,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(8),
+          ),
         ),
       );
     }
   }
 
+  /// Delete roadmap with confirmation
   Future<void> _deleteRoadmap(String roadmapId, String jobTitle) async {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Delete Roadmap'),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+        ),
+        title: const Row(
+          children: [
+            Icon(Icons.warning_amber_rounded, color: Colors.orange),
+            SizedBox(width: 8),
+            Text('Delete Roadmap'),
+          ],
+        ),
         content: Text(
-          'Are you sure you want to delete the roadmap for "$jobTitle"? This action cannot be undone.',
+          'Are you sure you want to delete the roadmap for "$jobTitle"?\n\nThis will also delete:\n• Associated skill gaps\n• Learning resources\n\nThis action cannot be undone.',
+          style: const TextStyle(height: 1.5),
         ),
         actions: [
           TextButton(
@@ -418,6 +576,10 @@ class _RoadmapListViewState extends State<RoadmapListView> {
             onPressed: () => Navigator.pop(context, true),
             style: ElevatedButton.styleFrom(
               backgroundColor: Colors.red,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
             ),
             child: const Text('Delete'),
           ),
@@ -429,25 +591,63 @@ class _RoadmapListViewState extends State<RoadmapListView> {
 
     final viewModel = context.read<CareerRoadmapViewModel>();
 
+    // Show loading
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => const Center(
+        child: CircularProgressIndicator(
+          valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF8B5CF6)),
+        ),
+      ),
+    );
+
     // Load the roadmap first
     await viewModel.loadRoadmapById(roadmapId);
 
     // Delete it
     final success = await viewModel.deleteCurrentRoadmap();
 
+    // Close loading
+    if (mounted) {
+      Navigator.pop(context);
+    }
+
     if (success && mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Roadmap deleted successfully'),
+        SnackBar(
+          content: const Row(
+            children: [
+              Icon(Icons.check_circle, color: Colors.white),
+              SizedBox(width: 8),
+              Text('Roadmap deleted successfully'),
+            ],
+          ),
           backgroundColor: Colors.green,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(8),
+          ),
         ),
       );
       _loadRoadmaps();
     } else if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(viewModel.errorMessage ?? 'Failed to delete roadmap'),
+          content: Row(
+            children: [
+              const Icon(Icons.error, color: Colors.white),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(viewModel.errorMessage ?? 'Failed to delete roadmap'),
+              ),
+            ],
+          ),
           backgroundColor: Colors.red,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(8),
+          ),
         ),
       );
     }

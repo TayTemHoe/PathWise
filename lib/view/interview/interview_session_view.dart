@@ -1,9 +1,11 @@
 // lib/view/interview/interview_session_page.dart
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:path_wise/viewmodel/interview_view_model.dart';
+import 'package:path_wise/ViewModel/interview_view_model.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'dart:async';
+
+import '../../ViewModel/profile_view_model.dart';
 
 class InterviewSessionPage extends StatefulWidget {
   const InterviewSessionPage({Key? key}) : super(key: key);
@@ -15,7 +17,7 @@ class InterviewSessionPage extends StatefulWidget {
 class _InterviewSessionPageState extends State<InterviewSessionPage> {
   final TextEditingController _answerController = TextEditingController();
   Timer? _timer;
-  int _questionStartTime = 0;
+  bool _hasShownTimeWarning = false;
 
   @override
   void initState() {
@@ -32,37 +34,46 @@ class _InterviewSessionPageState extends State<InterviewSessionPage> {
 
   void _startTimer() {
     _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (!mounted) return;
+
       setState(() {});
 
       final interviewVM = Provider.of<InterviewViewModel>(context, listen: false);
 
-      // Check for timeout
+      // Check for timeout (session exceeded time limit)
       if (interviewVM.hasTimedOut()) {
         _handleTimeout();
+        return;
       }
 
-      // Show warning at 5 minutes
-      if (interviewVM.shouldShowTimeWarning() &&
-          interviewVM.getRemainingTimeMinutes() == 5 &&
-          _questionStartTime == 0) {
+      // Show warning at 5 minutes remaining (M5) - only once
+      if (interviewVM.shouldShowTimeWarning() && !_hasShownTimeWarning) {
         _showTimeWarning();
-        _questionStartTime = 1;
+        _hasShownTimeWarning = true;
       }
     });
   }
 
   void _showTimeWarning() {
+    if (!mounted) return;
+
+    final interviewVM = Provider.of<InterviewViewModel>(context, listen: false);
+    final remaining = interviewVM.getRemainingTimeMinutes();
+
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('⚠️ 5 minutes remaining in your interview session'),
+      SnackBar(
+        content: Text('⚠️ $remaining minutes remaining in your interview session'),
         backgroundColor: Colors.orange,
-        duration: Duration(seconds: 4),
+        duration: const Duration(seconds: 4),
       ),
     );
   }
 
   void _handleTimeout() {
     _timer?.cancel();
+
+    if (!mounted) return;
+
     showDialog(
       context: context,
       barrierDismissible: false,
@@ -75,9 +86,12 @@ class _InterviewSessionPageState extends State<InterviewSessionPage> {
           ElevatedButton(
             onPressed: () {
               Navigator.pop(context);
-              _finishInterview();
+              _finishInterview(isTimeout: true);
             },
-            child: const Text('Continue to Results'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF8B5CF6),
+            ),
+            child: const Text('Continue to Evaluation'),
           ),
         ],
       ),
@@ -88,24 +102,7 @@ class _InterviewSessionPageState extends State<InterviewSessionPage> {
   Widget build(BuildContext context) {
     return WillPopScope(
       onWillPop: () async {
-        final shouldPop = await showDialog<bool>(
-          context: context,
-          builder: (context) => AlertDialog(
-            title: const Text('Exit Interview?'),
-            content: const Text('Your progress will be lost if you exit now.'),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context, false),
-                child: const Text('Cancel'),
-              ),
-              ElevatedButton(
-                onPressed: () => Navigator.pop(context, true),
-                style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
-                child: const Text('Exit'),
-              ),
-            ],
-          ),
-        );
+        final shouldPop = await _showExitDialog();
         return shouldPop ?? false;
       },
       child: Scaffold(
@@ -113,8 +110,10 @@ class _InterviewSessionPageState extends State<InterviewSessionPage> {
         body: SafeArea(
           child: Consumer<InterviewViewModel>(
             builder: (context, interviewVM, child) {
-              if (interviewVM.currentQuestion == null) {
-                return const Center(child: CircularProgressIndicator());
+              if (interviewVM.currentQuestion == null || interviewVM.currentSession == null) {
+                return const Center(
+                  child: CircularProgressIndicator(color: Colors.white),
+                );
               }
 
               return Column(
@@ -158,6 +157,7 @@ class _InterviewSessionPageState extends State<InterviewSessionPage> {
     final progress = interviewVM.currentQuestionIndex + 1;
     final total = interviewVM.totalQuestions;
     final remainingTime = interviewVM.getRemainingTimeMinutes();
+    final isLowTime = remainingTime <= 5;
 
     return Container(
       padding: const EdgeInsets.all(20),
@@ -168,25 +168,8 @@ class _InterviewSessionPageState extends State<InterviewSessionPage> {
               IconButton(
                 icon: const Icon(Icons.arrow_back, color: Colors.white),
                 onPressed: () async {
-                  final shouldPop = await showDialog<bool>(
-                    context: context,
-                    builder: (context) => AlertDialog(
-                      title: const Text('Exit Interview?'),
-                      content: const Text('Your progress will be lost.'),
-                      actions: [
-                        TextButton(
-                          onPressed: () => Navigator.pop(context, false),
-                          child: const Text('Cancel'),
-                        ),
-                        ElevatedButton(
-                          onPressed: () => Navigator.pop(context, true),
-                          style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
-                          child: const Text('Exit'),
-                        ),
-                      ],
-                    ),
-                  );
-                  if (shouldPop == true) {
+                  final shouldExit = await _showExitDialog();
+                  if (shouldExit == true && mounted) {
                     Navigator.pop(context);
                   }
                 },
@@ -204,9 +187,10 @@ class _InterviewSessionPageState extends State<InterviewSessionPage> {
                       ),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
+                      textAlign: TextAlign.center,
                     ),
                     Text(
-                      '${session.difficultyLevel} level',
+                      '${session.difficultyLevel} Level',
                       style: const TextStyle(
                         color: Colors.white70,
                         fontSize: 13,
@@ -218,17 +202,23 @@ class _InterviewSessionPageState extends State<InterviewSessionPage> {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                 decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.2),
+                  color: isLowTime
+                      ? Colors.orange.withOpacity(0.3)
+                      : Colors.white.withOpacity(0.2),
                   borderRadius: BorderRadius.circular(20),
                 ),
                 child: Row(
                   children: [
-                    const Icon(Icons.access_time, color: Colors.white, size: 16),
+                    Icon(
+                      Icons.access_time,
+                      color: isLowTime ? Colors.orange[100] : Colors.white,
+                      size: 16,
+                    ),
                     const SizedBox(width: 4),
                     Text(
                       '$remainingTime:00',
-                      style: const TextStyle(
-                        color: Colors.white,
+                      style: TextStyle(
+                        color: isLowTime ? Colors.orange[100] : Colors.white,
                         fontSize: 14,
                         fontWeight: FontWeight.bold,
                       ),
@@ -248,12 +238,9 @@ class _InterviewSessionPageState extends State<InterviewSessionPage> {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text(
+                const Text(
                   'Progress',
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 13,
-                  ),
+                  style: TextStyle(color: Colors.white, fontSize: 13),
                 ),
                 Text(
                   '$progress of $total',
@@ -267,11 +254,14 @@ class _InterviewSessionPageState extends State<InterviewSessionPage> {
             ),
           ),
           const SizedBox(height: 12),
-          LinearProgressIndicator(
-            value: progress / total,
-            backgroundColor: Colors.white.withOpacity(0.3),
-            valueColor: const AlwaysStoppedAnimation<Color>(Colors.white),
-            minHeight: 6,
+          ClipRRect(
+            borderRadius: BorderRadius.circular(10),
+            child: LinearProgressIndicator(
+              value: progress / total,
+              backgroundColor: Colors.white.withOpacity(0.3),
+              valueColor: const AlwaysStoppedAnimation<Color>(Colors.white),
+              minHeight: 6,
+            ),
           ),
         ],
       ),
@@ -319,11 +309,7 @@ class _InterviewSessionPageState extends State<InterviewSessionPage> {
                   ),
                   child: Row(
                     children: [
-                      const Icon(
-                        Icons.access_time,
-                        size: 14,
-                        color: Colors.black54,
-                      ),
+                      const Icon(Icons.access_time, size: 14, color: Colors.black54),
                       const SizedBox(width: 4),
                       Text(
                         _formatTime(questionTime),
@@ -360,15 +346,11 @@ class _InterviewSessionPageState extends State<InterviewSessionPage> {
             const SizedBox(height: 16),
             Row(
               children: [
-                Icon(
-                  Icons.lightbulb_outline,
-                  size: 16,
-                  color: Colors.grey[600],
-                ),
+                Icon(Icons.lightbulb_outline, size: 16, color: Colors.grey[600]),
                 const SizedBox(width: 6),
                 Expanded(
                   child: Text(
-                    'Suggested limit: 4 minutes',
+                    'Suggested time limit: 3-4 minutes per question',
                     style: TextStyle(
                       fontSize: 12,
                       color: Colors.grey[600],
@@ -405,9 +387,10 @@ class _InterviewSessionPageState extends State<InterviewSessionPage> {
         TextField(
           controller: _answerController,
           maxLines: 10,
-          maxLength: maxWords * 6, // Approximate char limit
+          maxLength: maxWords * 6,
           decoration: InputDecoration(
-            hintText: 'Click here to start answering...',
+            hintText: 'Click here to start answering...\n\nTake your time to provide a thoughtful response.',
+            hintStyle: TextStyle(color: Colors.grey[400]),
             filled: true,
             fillColor: Colors.grey[50],
             border: OutlineInputBorder(
@@ -441,7 +424,9 @@ class _InterviewSessionPageState extends State<InterviewSessionPage> {
               style: TextStyle(
                 fontSize: 12,
                 fontWeight: FontWeight.w600,
-                color: wordCount >= minRecommended ? Colors.green : Colors.orange,
+                color: wordCount >= minRecommended
+                    ? Colors.green
+                    : (wordCount > 0 ? Colors.orange : Colors.grey),
               ),
             ),
           ],
@@ -450,11 +435,8 @@ class _InterviewSessionPageState extends State<InterviewSessionPage> {
           Padding(
             padding: const EdgeInsets.only(top: 4),
             child: Text(
-              '⚠️ ${wordCount - maxWords} more words recommended',
-              style: const TextStyle(
-                fontSize: 12,
-                color: Colors.red,
-              ),
+              '⚠️ Word limit exceeded by ${wordCount - maxWords} words',
+              style: const TextStyle(fontSize: 12, color: Colors.red),
             ),
           ),
       ],
@@ -463,16 +445,28 @@ class _InterviewSessionPageState extends State<InterviewSessionPage> {
 
   Widget _buildActionButtons(InterviewViewModel interviewVM) {
     final hasAnswer = _answerController.text.trim().isNotEmpty;
+    final isLastQuestion = interviewVM.isLastQuestion;
 
     return Column(
       children: [
+        // Submit/Finish button
         SizedBox(
           width: double.infinity,
           height: 52,
-          child: ElevatedButton(
-            onPressed: hasAnswer
-                ? () => _submitAnswer(interviewVM)
-                : null,
+          child: ElevatedButton.icon(
+            onPressed: hasAnswer ? () => _submitAnswer(interviewVM) : null,
+            icon: Icon(
+              isLastQuestion ? Icons.check_circle : Icons.arrow_forward,
+              size: 20,
+            ),
+            label: Text(
+              isLastQuestion ? 'Submit Answer & Finish' : 'Submit Answer & Continue',
+              style: const TextStyle(
+                fontSize: 15,
+                fontWeight: FontWeight.bold,
+                color: Colors.white,
+              ),
+            ),
             style: ElevatedButton.styleFrom(
               backgroundColor: const Color(0xFF8B5CF6),
               disabledBackgroundColor: Colors.grey[300],
@@ -480,24 +474,16 @@ class _InterviewSessionPageState extends State<InterviewSessionPage> {
                 borderRadius: BorderRadius.circular(12),
               ),
             ),
-            child: Text(
-              interviewVM.isLastQuestion
-                  ? 'Submit Answer & Finish'
-                  : 'Submit Answer & Continue',
-              style: const TextStyle(
-                fontSize: 15,
-                fontWeight: FontWeight.bold,
-                color: Colors.white,
-              ),
-            ),
           ),
         ),
         const SizedBox(height: 12),
+
+        // Repeat & Skip buttons
         Row(
           children: [
             Expanded(
               child: OutlinedButton.icon(
-                onPressed: () => _repeatQuestion(),
+                onPressed: () => _repeatQuestion(interviewVM),
                 icon: const Icon(Icons.refresh, size: 18),
                 label: const Text('Repeat Question'),
                 style: OutlinedButton.styleFrom(
@@ -561,6 +547,29 @@ class _InterviewSessionPageState extends State<InterviewSessionPage> {
     return '${minutes.toString().padLeft(2, '0')}:${secs.toString().padLeft(2, '0')}';
   }
 
+  Future<bool?> _showExitDialog() {
+    return showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Exit Interview?'),
+        content: const Text('Your progress will be lost if you exit now. Are you sure?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            child: const Text('Exit'),
+          ),
+        ],
+      ),
+    );
+  }
+
+// Replace _submitAnswer and _skipQuestion methods in interview_session_view.dart
+
   void _submitAnswer(InterviewViewModel interviewVM) async {
     final answer = _answerController.text.trim();
 
@@ -574,25 +583,42 @@ class _InterviewSessionPageState extends State<InterviewSessionPage> {
       return;
     }
 
+    // Check if this is the last question BEFORE submitting
+    final isLastQuestion = interviewVM.isLastQuestion;
+
+    // Submit answer to ViewModel
     await interviewVM.submitAnswer(answer);
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Your answer has been saved. Moving to the next question.'),
-        duration: Duration(seconds: 2),
-        backgroundColor: Colors.green,
-      ),
-    );
-
+    // Clear answer box for next question
     _answerController.clear();
 
-    if (interviewVM.isLastQuestion) {
-      // All questions answered - go to evaluation
-      _finishInterview();
-    } else {
-      setState(() {
-        _questionStartTime = 0;
-      });
+    // Show success message
+    if (mounted) {
+      if (isLastQuestion) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Last answer saved! Preparing evaluation...'),
+            duration: Duration(seconds: 2),
+            backgroundColor: Colors.green,
+          ),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Your answer has been saved. Moving to the next question.'),
+            duration: Duration(seconds: 2),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    }
+
+    // If it was the last question, finish interview
+    if (isLastQuestion) {
+      await Future.delayed(const Duration(milliseconds: 800));
+      if (mounted) {
+        _finishInterview();
+      }
     }
   }
 
@@ -601,7 +627,9 @@ class _InterviewSessionPageState extends State<InterviewSessionPage> {
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Skip Question?'),
-        content: const Text('Question skipped. This will be noted in your final evaluation.'),
+        content: const Text(
+          'This question will be marked as skipped and noted in your final evaluation. Your score for this question will be 0.',
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
@@ -616,26 +644,49 @@ class _InterviewSessionPageState extends State<InterviewSessionPage> {
       ),
     );
 
-    if (confirm == true) {
+    if (confirm == true && mounted) {
+      // Check if this is the last question BEFORE skipping
+      final isLastQuestion = interviewVM.isLastQuestion;
+
+      // Skip question (saves empty answer)
       await interviewVM.skipQuestion();
+
+      // Clear answer box
       _answerController.clear();
 
-      if (interviewVM.isLastQuestion) {
-        _finishInterview();
-      } else {
-        setState(() {
-          _questionStartTime = 0;
-        });
+      // Show message
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              isLastQuestion
+                  ? 'Last question skipped. Preparing evaluation...'
+                  : 'Question skipped. This will be noted in your final evaluation.',
+            ),
+            backgroundColor: Colors.orange,
+            duration: const Duration(seconds: 2),
+          ),
+        );
+      }
+
+      // If it was the last question, finish interview
+      if (isLastQuestion) {
+        await Future.delayed(const Duration(milliseconds: 800));
+        if (mounted) {
+          _finishInterview();
+        }
       }
     }
   }
 
-  void _repeatQuestion() {
+  void _repeatQuestion(InterviewViewModel interviewVM) {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Repeat Question?'),
-        content: const Text('This will clear your current answer and restart the timer for this question.'),
+        content: const Text(
+          'This will clear your current answer and restart the timer for this question. Your previous answer will be lost.',
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
@@ -644,19 +695,26 @@ class _InterviewSessionPageState extends State<InterviewSessionPage> {
           ElevatedButton(
             onPressed: () {
               Navigator.pop(context);
-              final interviewVM = Provider.of<InterviewViewModel>(context, listen: false);
+
+              // Clear answer in ViewModel
               interviewVM.repeatQuestion();
+
+              // Clear text field
               _answerController.clear();
-              setState(() {
-                _questionStartTime = 0;
-              });
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('Question timer restarted'),
-                  backgroundColor: Colors.blue,
-                ),
-              );
+
+              if (mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Question timer restarted. Answer cleared.'),
+                    backgroundColor: Colors.blue,
+                    duration: Duration(seconds: 2),
+                  ),
+                );
+              }
             },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF8B5CF6),
+            ),
             child: const Text('Repeat'),
           ),
         ],
@@ -664,84 +722,106 @@ class _InterviewSessionPageState extends State<InterviewSessionPage> {
     );
   }
 
-  void _finishInterview() async {
-    final user = FirebaseAuth.instance.currentUser;
-    if (user == null) return;
+  // Replace the existing _finishInterview and _proceedToEvaluation methods in interview_session_view.dart
+
+  void _finishInterview({bool isTimeout = false}) async {
+    final profileVM = context.read<ProfileViewModel>();
+    final userId = profileVM.uid;
 
     final interviewVM = Provider.of<InterviewViewModel>(context, listen: false);
 
-    // Check completion percentage (A5)
+    // Check completion percentage (A5 - Incomplete Session)
     final completionRate = interviewVM.answeredQuestionsCount / interviewVM.totalQuestions;
-    if (completionRate < 0.5) {
-      showDialog(
+
+    if (completionRate < 0.5 && !isTimeout) {
+      final shouldContinue = await showDialog<bool>(
         context: context,
         builder: (context) => AlertDialog(
           title: const Text('Incomplete Session'),
           content: const Text(
-            'Complete more questions for comprehensive feedback and accurate scoring. Continue anyway?',
+            'You have completed less than 50% of the questions. Complete more questions for comprehensive feedback and accurate scoring.\n\nContinue to evaluation anyway?',
           ),
           actions: [
             TextButton(
-              onPressed: () => Navigator.pop(context),
+              onPressed: () => Navigator.pop(context, false),
               child: const Text('Go Back'),
             ),
             ElevatedButton(
-              onPressed: () {
-                Navigator.pop(context);
-                _proceedToEvaluation(user.uid);
-              },
-              child: const Text('Continue'),
+              onPressed: () => Navigator.pop(context, true),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF8B5CF6),
+              ),
+              child: const Text('Continue Anyway'),
             ),
           ],
         ),
       );
-      return;
+
+      if (shouldContinue != true) return;
     }
 
-    _proceedToEvaluation(user.uid);
+    // Proceed to evaluation
+    _proceedToEvaluation(userId);
   }
 
   void _proceedToEvaluation(String userId) async {
-    // Show evaluation loading
+    // Show evaluation loading dialog
     showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (context) => const AlertDialog(
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            CircularProgressIndicator(),
-            SizedBox(height: 20),
-            Text(
-              'Analyzing your responses...\nThis may take 5-8 seconds.',
-              textAlign: TextAlign.center,
-            ),
-          ],
+      builder: (context) => WillPopScope(
+        onWillPop: () async => false,
+        child: const AlertDialog(
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              CircularProgressIndicator(),
+              SizedBox(height: 20),
+              Text(
+                'Analyzing Your Responses...',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                textAlign: TextAlign.center,
+              ),
+              SizedBox(height: 8),
+              Text(
+                'This may take 5-10 seconds',
+                style: TextStyle(fontSize: 13, color: Colors.grey),
+                textAlign: TextAlign.center,
+              ),
+            ],
+          ),
         ),
       ),
     );
 
     try {
       final interviewVM = Provider.of<InterviewViewModel>(context, listen: false);
+
+      // Evaluate interview via AI (this will also save to Firestore)
       final success = await interviewVM.evaluateInterview(userId);
 
       // Close loading dialog
-      Navigator.pop(context);
+      if (mounted) Navigator.pop(context);
 
-      if (success) {
-        // Navigate to results
+      if (success && mounted) {
+        // Navigate to results page
         Navigator.pushReplacementNamed(context, '/interview-results');
       } else {
-        throw Exception('Evaluation failed');
+        throw Exception(interviewVM.errorMessage ?? 'Evaluation failed');
       }
     } catch (e) {
-      Navigator.pop(context);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Error: ${e.toString()}'),
-          backgroundColor: Colors.red,
-        ),
-      );
+      // Close loading dialog
+      if (mounted) Navigator.pop(context);
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error evaluating interview: ${e.toString()}'),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 4),
+          ),
+        );
+      }
     }
   }
 }
