@@ -4,8 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
-import 'package:path_wise/viewmodel/profile_view_model.dart';
-import 'package:path_wise/model/user_profile.dart';
+import 'package:path_wise/ViewModel/profile_view_model.dart';
 
 class EditPersonalInfoScreen extends StatefulWidget {
   const EditPersonalInfoScreen({super.key});

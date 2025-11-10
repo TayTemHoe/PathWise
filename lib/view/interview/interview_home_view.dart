@@ -34,66 +34,91 @@ class _InterviewHomePageState extends State<InterviewHomePage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.grey[50],
-      body: Consumer<InterviewViewModel>(
-        builder: (context, interviewVM, child) {
-          if (interviewVM.isLoading) {
-            return const Center(child: CircularProgressIndicator());
-          }
+      body: Container(
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [Color(0xFF8B5CF6), Color(0xFF3B82F6)],
+          ),
+        ),
+        child: SafeArea(
+          child: Column(
+            children: [
+              _buildHeader(),
+              Expanded(
+                child: Container(
+                  decoration: const BoxDecoration(
+                    color: Color(0xFFF5F5F5),
+                    borderRadius: BorderRadius.only(
+                      topLeft: Radius.circular(30),
+                      topRight: Radius.circular(30),
+                    ),
+                  ),
+                  child: Consumer<InterviewViewModel>(
+                    builder: (context, interviewVM, child) {
+                      if (interviewVM.isLoading) {
+                        return const Center(child: CircularProgressIndicator());
+                      }
 
-          final stats = interviewVM.getStatistics();
+                      final stats = interviewVM.getStatistics();
 
-          return RefreshIndicator(
-            onRefresh: _loadData,
-            child: SingleChildScrollView(
-              physics: const AlwaysScrollableScrollPhysics(),
-              child: Column(
-                children: [
-                  // Header Section
-                  _buildHeader(),
+                      return RefreshIndicator(
+                        onRefresh: _loadData,
+                        child: SingleChildScrollView(
+                          physics: const AlwaysScrollableScrollPhysics(),
+                          child: Column(
+                            children: [
+                              const SizedBox(height: 20), // Add top padding
+                              // Statistics Cards
+                              _buildStatisticsCards(stats),
 
-                  // Statistics Cards
-                  _buildStatisticsCards(stats),
+                              // Action Cards
+                              _buildActionCards(context),
 
-                  // Action Cards
-                  _buildActionCards(context),
+                              // Recent Performance
+                              _buildRecentPerformance(interviewVM),
 
-                  // Recent Performance
-                  _buildRecentPerformance(interviewVM),
-
-                  const SizedBox(height: 24),
-                ],
+                              const SizedBox(height: 24),
+                            ],
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                ),
               ),
-            ),
-          );
-        },
+            ],
+          ),
+        ),
       ),
     );
   }
 
   Widget _buildHeader() {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(24),
-      decoration: const BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [Color(0xFF8B5CF6), Color(0xFF3B82F6)],
-        ),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: const [
-          Text(
-            'Interview Simulator',
-            style: TextStyle(
-              color: Colors.white,
-              fontSize: 24,
-              fontWeight: FontWeight.bold,
+    return Padding(
+      padding: const EdgeInsets.all(20),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          const SizedBox(width: 40), // Balance the space
+          const Expanded(
+            child: Text(
+              'Interview Simulator',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 28,
+                fontWeight: FontWeight.bold,
+                color: Colors.white,
+              ),
             ),
           ),
-          SizedBox(height: 8),
+          IconButton(
+            icon: const Icon(Icons.help_outline, color: Colors.white),
+            onPressed: () {
+              _showHelpDialog(context);
+            },
+          ),
         ],
       ),
     );
@@ -512,5 +537,76 @@ class _InterviewHomePageState extends State<InterviewHomePage> {
 
   void _viewHistory(BuildContext context) {
     Navigator.pushNamed(context, '/interview-history');
+  }
+
+  void _showHelpDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Row(
+          children: [
+            Icon(Icons.help_outline, color: Color(0xFF8B5CF6)),
+            SizedBox(width: 12),
+            Text('How to use Interview Simulator', style: TextStyle(fontSize: 17)),
+          ],
+        ),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _buildHelpStep('1', 'Complete your career analysis to get personalized questions'),
+              _buildHelpStep('2', 'Click "Start New Interview" to configure settings'),
+              _buildHelpStep('3', 'Practice with AI-powered interview questions'),
+              _buildHelpStep('4', 'Review your performance and feedback'),
+              _buildHelpStep('5', 'Track your progress over multiple sessions'),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Got it!'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildHelpStep(String number, String text) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: 24,
+            height: 24,
+            decoration: const BoxDecoration(
+              color: Color(0xFF8B5CF6),
+              shape: BoxShape.circle,
+            ),
+            child: Center(
+              child: Text(
+                number,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 12,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              text,
+              style: const TextStyle(fontSize: 13, height: 1.4),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }

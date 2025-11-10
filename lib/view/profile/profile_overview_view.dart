@@ -9,6 +9,7 @@ import 'package:path_wise/model/user_profile.dart';
 class ProfileOverviewScreen extends StatelessWidget {
   const ProfileOverviewScreen({super.key});
 
+  // Replace the Scaffold's body structure:
   @override
   Widget build(BuildContext context) {
     return Consumer<ProfileViewModel>(
@@ -19,161 +20,166 @@ class ProfileOverviewScreen extends StatelessWidget {
         final exps = vm.experience;
 
         return Scaffold(
-          backgroundColor: const Color(0xFFF7F8FC),
-          body: RefreshIndicator(
-            onRefresh: vm.loadAll,
-            child: CustomScrollView(
-              physics: const AlwaysScrollableScrollPhysics(),
-              slivers: [
-                // =======  header =======
-                SliverAppBar(
-                  pinned: true,
-                  expandedHeight: 105,
-                  elevation: 0,
-                  backgroundColor: Colors.transparent,
-                  flexibleSpace: Container(
-                    decoration: const BoxDecoration(
-                      gradient: LinearGradient(
-                        colors: [Color(0xFF8B5CF6), Color(0xFF3B82F6)],
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                      ),
-                    ),
-                    child: FlexibleSpaceBar(
-                      titlePadding: const EdgeInsetsDirectional.only(
-                        start: 16, bottom: 16, end: 16,
-                      ),
-                      title: const Text(
-                        'My Profile',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.w800,
-                          fontSize: 18,
-                        ),
-                      ),
-                      background: SafeArea(
-                        bottom: false,
-                        child: Padding(
-                          padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-                          child: Align(
-                            alignment: Alignment.bottomLeft,
-                            child: Text(
-                              '',
-                              style: TextStyle(
-                                color: Colors.white.withOpacity(.9),
-                                fontSize: 13,
-                              ),
+          body: Container(
+            decoration: const BoxDecoration(
+              gradient: LinearGradient(
+                colors: [Color(0xFF8B5CF6), Color(0xFF3B82F6)],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+            ),
+            child: SafeArea(
+              child: Column(
+                children: [
+                  // Header
+                  Padding(
+                    padding: const EdgeInsets.all(20),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const SizedBox(width: 40),
+                        const Expanded(
+                          child: Text(
+                            'My Profile',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              fontSize: 28,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.white,
                             ),
                           ),
                         ),
-                      ),
-                    ),
-                  ),
-                ),
-
-                // ======= Content =======
-                SliverToBoxAdapter(
-                  child: vm.isLoading
-                      ? const Padding(
-                    padding: EdgeInsets.only(top: 100),
-                    child: Center(child: CircularProgressIndicator()),
-                  )
-                      : Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
-                    child: Column(
-                      children: [
-                        _HeaderCard(
-                          name: p?.name ?? '-',
-                          location: _composeLocation(p),
-                          lastUpdated: _formatDate(p?.lastUpdated),
-                          photoUrl: p?.profilePictureUrl,
-                          onChangePhoto: () {
-                            // TODO: open picker → vm.uploadProfilePicture(file)
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text('Open photo picker...'),
-                              ),
-                            );
+                        IconButton(
+                          icon: const Icon(Icons.help_outline, color: Colors.white),
+                          onPressed: () {
+                            _showHelpDialog(context);
                           },
-                        ),
-                        const SizedBox(height: 12),
-                        _CompletionCard(
-                          percent: (p?.completionPercent ?? 0)
-                              .clamp(0, 100)
-                              .toDouble(),
-                        ),
-                        const SizedBox(height: 12),
-
-                        // ======= Sections =======
-                        _SectionCard(
-                          icon: Icons.person_outline,
-                          iconBg: const Color(0xFFEFF4FF),
-                          iconColor: const Color(0xFF4F46E5),
-                          title: 'Personal Information',
-                          subtitle:
-                          'Basic details and contact information',
-                          isComplete: _isPersonalComplete(p),
-                          onTap: () => Navigator.pushNamed(
-                              context, AppRoutes.editPersonal),
-                        ),
-                        _SectionCard(
-                          icon: Icons.star_border_rounded,
-                          iconBg: const Color(0xFFEFF6FF),
-                          iconColor: const Color(0xFF3B82F6),
-                          title: 'Skills & Expertise',
-                          subtitle:
-                          '${skills.length} ${skills.length == 1 ? 'skill' : 'skills'} across categories',
-                          isComplete: skills.isNotEmpty,
-                          onTap: () => Navigator.pushNamed(
-                              context, AppRoutes.editSkills),
-                        ),
-                        _SectionCard(
-                          icon: Icons.school_outlined,
-                          iconBg: const Color(0xFFECFDF5),
-                          iconColor: const Color(0xFF10B981),
-                          title: 'Education',
-                          subtitle:
-                          '${edus.length} education entr${edus.length == 1 ? 'y' : 'ies'}',
-                          isComplete: edus.isNotEmpty,
-                          onTap: () => Navigator.pushNamed(
-                              context, AppRoutes.editEducation),
-                        ),
-                        _SectionCard(
-                          icon: Icons.work_outline_rounded,
-                          iconBg: const Color(0xFFFDF2F8),
-                          iconColor: const Color(0xFFEC4899),
-                          title: 'Work Experience',
-                          subtitle:
-                          '${exps.length} work experience${exps.length == 1 ? '' : 's'}',
-                          isComplete: exps.isNotEmpty,
-                          onTap: () => Navigator.pushNamed(
-                              context, AppRoutes.editExperience),
-                        ),
-                        _SectionCard(
-                          icon: Icons.settings_suggest_outlined,
-                          iconBg: const Color(0xFFFFFBEB),
-                          iconColor: const Color(0xFFF59E0B),
-                          title: 'Career Preferences',
-                          subtitle: _prefsSummary(p),
-                          isComplete: _hasPreferences(p),
-                          onTap: () => Navigator.pushNamed(
-                              context, AppRoutes.editPreferences),
-                        ),
-                        _SectionCard(
-                          icon: Icons.psychology_alt_outlined,
-                          iconBg: const Color(0xFFF5F3FF),
-                          iconColor: const Color(0xFF8B5CF6),
-                          title: 'Personality Assessment',
-                          subtitle: _personalitySummary(p),
-                          isComplete: _hasPersonality(p),
-                          onTap: () => Navigator.pushNamed(
-                              context, AppRoutes.editPersonality),
                         ),
                       ],
                     ),
                   ),
-                ),
-              ],
+
+                  // Content with rounded corners
+                  Expanded(
+                    child: Container(
+                      decoration: const BoxDecoration(
+                        color: Color(0xFFF7F8FC),
+                        borderRadius: BorderRadius.only(
+                          topLeft: Radius.circular(30),
+                          topRight: Radius.circular(30),
+                        ),
+                      ),
+                      child: RefreshIndicator(
+                        onRefresh: vm.loadAll,
+                        child: CustomScrollView(
+                          physics: const AlwaysScrollableScrollPhysics(),
+                          slivers: [
+                            SliverToBoxAdapter(
+                              child: vm.isLoading
+                                  ? const Padding(
+                                padding: EdgeInsets.only(top: 100),
+                                child: Center(child: CircularProgressIndicator()),
+                              )
+                                  : Padding(
+                                padding: const EdgeInsets.fromLTRB(16, 20, 16, 24),
+                                child: Column(
+                                  children: [
+                                    _HeaderCard(
+                                      name: p?.name ?? '-',
+                                      location: _composeLocation(p),
+                                      lastUpdated: _formatDate(p?.lastUpdated),
+                                      photoUrl: p?.profilePictureUrl,
+                                      onChangePhoto: () {
+                                        ScaffoldMessenger.of(context).showSnackBar(
+                                          const SnackBar(
+                                            content: Text('Open photo picker...'),
+                                          ),
+                                        );
+                                      },
+                                    ),
+                                    const SizedBox(height: 12),
+                                    _CompletionCard(
+                                      percent: (p?.completionPercent ?? 0)
+                                          .clamp(0, 100)
+                                          .toDouble(),
+                                    ),
+                                    const SizedBox(height: 12),
+
+                                    // ======= Sections =======
+                                    _SectionCard(
+                                      icon: Icons.person_outline,
+                                      iconBg: const Color(0xFFEFF4FF),
+                                      iconColor: const Color(0xFF4F46E5),
+                                      title: 'Personal Information',
+                                      subtitle: 'Basic details and contact information',
+                                      isComplete: _isPersonalComplete(p),
+                                      onTap: () => Navigator.pushNamed(
+                                          context, AppRoutes.editPersonal),
+                                    ),
+                                    _SectionCard(
+                                      icon: Icons.star_border_rounded,
+                                      iconBg: const Color(0xFFEFF6FF),
+                                      iconColor: const Color(0xFF3B82F6),
+                                      title: 'Skills & Expertise',
+                                      subtitle:
+                                      '${skills.length} ${skills.length == 1 ? 'skill' : 'skills'} across categories',
+                                      isComplete: skills.isNotEmpty,
+                                      onTap: () => Navigator.pushNamed(
+                                          context, AppRoutes.editSkills),
+                                    ),
+                                    _SectionCard(
+                                      icon: Icons.school_outlined,
+                                      iconBg: const Color(0xFFECFDF5),
+                                      iconColor: const Color(0xFF10B981),
+                                      title: 'Education',
+                                      subtitle:
+                                      '${edus.length} education entr${edus.length == 1 ? 'y' : 'ies'}',
+                                      isComplete: edus.isNotEmpty,
+                                      onTap: () => Navigator.pushNamed(
+                                          context, AppRoutes.editEducation),
+                                    ),
+                                    _SectionCard(
+                                      icon: Icons.work_outline_rounded,
+                                      iconBg: const Color(0xFFFDF2F8),
+                                      iconColor: const Color(0xFFEC4899),
+                                      title: 'Work Experience',
+                                      subtitle:
+                                      '${exps.length} work experience${exps.length == 1 ? '' : 's'}',
+                                      isComplete: exps.isNotEmpty,
+                                      onTap: () => Navigator.pushNamed(
+                                          context, AppRoutes.editExperience),
+                                    ),
+                                    _SectionCard(
+                                      icon: Icons.settings_suggest_outlined,
+                                      iconBg: const Color(0xFFFFFBEB),
+                                      iconColor: const Color(0xFFF59E0B),
+                                      title: 'Career Preferences',
+                                      subtitle: _prefsSummary(p),
+                                      isComplete: _hasPreferences(p),
+                                      onTap: () => Navigator.pushNamed(
+                                          context, AppRoutes.editPreferences),
+                                    ),
+                                    _SectionCard(
+                                      icon: Icons.psychology_alt_outlined,
+                                      iconBg: const Color(0xFFF5F3FF),
+                                      iconColor: const Color(0xFF8B5CF6),
+                                      title: 'Personality Assessment',
+                                      subtitle: _personalitySummary(p),
+                                      isComplete: _hasPersonality(p),
+                                      onTap: () => Navigator.pushNamed(
+                                          context, AppRoutes.editPersonality),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
         );
@@ -268,6 +274,79 @@ class ProfileOverviewScreen extends StatelessWidget {
   static bool _hasPersonality(UserProfile? p) {
     return (p?.mbti ?? '').isNotEmpty || (p?.riasec?.isNotEmpty == true);
   }
+
+  void _showHelpDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Row(
+          children: [
+            Icon(Icons.help_outline, color: Color(0xFF8B5CF6)),
+            SizedBox(width: 12),
+            Text('How to complete your profile', style: TextStyle(fontSize: 18)),
+          ],
+        ),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _buildHelpStep('1', 'Fill in your personal information and contact details'),
+              _buildHelpStep('2', 'Add your skills and areas of expertise'),
+              _buildHelpStep('3', 'Include your education background'),
+              _buildHelpStep('4', 'Add your work experience history'),
+              _buildHelpStep('5', 'Set your career preferences and goals'),
+              _buildHelpStep('6', 'Complete personality assessments (MBTI, RIASEC)'),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Got it!'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildHelpStep(String number, String text) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: 24,
+            height: 24,
+            decoration: const BoxDecoration(
+              color: Color(0xFF8B5CF6),
+              shape: BoxShape.circle,
+            ),
+            child: Center(
+              child: Text(
+                number,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 12,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              text,
+              style: const TextStyle(fontSize: 13, height: 1.4),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
 }
 
 // ===============================

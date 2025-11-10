@@ -92,35 +92,26 @@ class _ResumeListPageState extends State<ResumeListPage> {
   Widget _buildHeader() {
     return Padding(
       padding: const EdgeInsets.all(20),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              const Text(
-                'Resume Builder',
-                style: TextStyle(
-                  fontSize: 28,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.white,
-                ),
+          const SizedBox(width: 40), // Balance the space
+          const Expanded(
+            child: Text(
+              'Resume Builder',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 28,
+                fontWeight: FontWeight.bold,
+                color: Colors.white,
               ),
-              IconButton(
-                icon: const Icon(Icons.help_outline, color: Colors.white),
-                onPressed: () {
-                  _showHelpDialog(context);
-                },
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          const Text(
-            'Create professional resumes in minutes',
-            style: TextStyle(
-              fontSize: 14,
-              color: Colors.white70,
             ),
+          ),
+          IconButton(
+            icon: const Icon(Icons.help_outline, color: Colors.white),
+            onPressed: () {
+              _showHelpDialog(context);
+            },
           ),
         ],
       ),
@@ -790,7 +781,7 @@ class _ResumeListPageState extends State<ResumeListPage> {
             Icon(Icons.help_outline, color: Color(0xFF7C3AED)),
             SizedBox(width: 12),
             Text('How to use Resume Builder',
-                style: const TextStyle(fontSize: 20)),
+                style: const TextStyle(fontSize: 18)),
           ],
         ),
         content: SingleChildScrollView(

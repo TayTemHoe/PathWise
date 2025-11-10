@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import 'package:path_wise/ViewModel/profile_view_model.dart';
 import 'package:provider/provider.dart';
 import 'package:path_wise/ViewModel/interview_view_model.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:intl/intl.dart';
 
 class InterviewHistoryPage extends StatefulWidget {

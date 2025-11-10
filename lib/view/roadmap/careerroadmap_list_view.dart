@@ -81,26 +81,26 @@ class _RoadmapListViewState extends State<RoadmapListView> {
   Widget _buildHeader() {
     return Padding(
       padding: const EdgeInsets.all(20),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          const Text(
-            'Career Roadmaps',
-            style: TextStyle(
-              fontSize: 28,
-              fontWeight: FontWeight.bold,
-              color: Colors.white,
+          const SizedBox(width: 40), // Balance the space
+          Expanded(
+            child: Text(
+              'Career Roadmaps',
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                fontSize: 28,
+                fontWeight: FontWeight.bold,
+                color: Colors.white,
+              ),
             ),
           ),
-          const SizedBox(height: 8),
-          Text(
-            _roadmaps.isEmpty
-                ? 'Start planning your career journey'
-                : 'Your career progression paths',
-            style: const TextStyle(
-              fontSize: 14,
-              color: Colors.white70,
-            ),
+          IconButton(
+            icon: const Icon(Icons.help_outline, color: Colors.white),
+            onPressed: () {
+              _showHelpDialog(context);
+            },
           ),
         ],
       ),
@@ -651,5 +651,76 @@ class _RoadmapListViewState extends State<RoadmapListView> {
         ),
       );
     }
+  }
+
+  void _showHelpDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Row(
+          children: [
+            Icon(Icons.help_outline, color: Color(0xFF8B5CF6)),
+            SizedBox(width: 12),
+            Text('How to use Career Roadmaps', style: TextStyle(fontSize: 18)),
+          ],
+        ),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _buildHelpStep('1', 'Generate career suggestions in the Career tab first'),
+              _buildHelpStep('2', 'Click "Create Roadmap" to select a career path'),
+              _buildHelpStep('3', 'View career progression stages and requirements'),
+              _buildHelpStep('4', 'Identify skill gaps and get learning resources'),
+              _buildHelpStep('5', 'Track your progress through each career stage'),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Got it!'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildHelpStep(String number, String text) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: 24,
+            height: 24,
+            decoration: const BoxDecoration(
+              color: Color(0xFF8B5CF6),
+              shape: BoxShape.circle,
+            ),
+            child: Center(
+              child: Text(
+                number,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 12,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              text,
+              style: const TextStyle(fontSize: 13, height: 1.4),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }
