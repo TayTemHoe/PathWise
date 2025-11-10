@@ -61,9 +61,7 @@ class _CareerDiscoveryViewState extends State<CareerDiscoveryView>
     return Container(
       decoration: BoxDecoration(
         gradient: LinearGradient(
-          colors: [
-            Color(0xFF7C3AED), Color(0xFF9F7AEA)
-          ],
+          colors: [Color(0xFF8B5CF6), Color(0xFF3B82F6)],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),

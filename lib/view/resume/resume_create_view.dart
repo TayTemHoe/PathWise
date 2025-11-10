@@ -1203,6 +1203,7 @@ class _TemplateSelectionPageState extends State<TemplateSelectionPage> {
                               style: TextStyle(
                                 fontSize: 14,
                                 fontWeight: FontWeight.bold,
+                                color: Colors.white
                               ),
                             ),
                           ],
@@ -1266,7 +1267,12 @@ class _TemplateSelectionPageState extends State<TemplateSelectionPage> {
                 borderRadius: BorderRadius.circular(8),
               ),
             ),
-            child: const Text('Continue'),
+            child: const Text(
+              'Continue',
+              style: TextStyle(
+              color: Colors.white,
+              ),
+            ),
           ),
         ],
       ),

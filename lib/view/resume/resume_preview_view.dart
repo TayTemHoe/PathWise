@@ -1,10 +1,12 @@
-// lib/views/resume_builder/preview_resume_page.dart
+// lib/view/resume/resume_preview_view.dart
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:path_wise/ViewModel/resume_view_model.dart';
 import 'package:path_wise/ViewModel/profile_view_model.dart';
 import 'package:path_wise/model/resume_model.dart';
 import 'package:path_wise/model/user_profile.dart';
+import 'package:intl/intl.dart';
 
 class PreviewResumePage extends StatelessWidget {
   final ResumeDoc resume;
@@ -65,11 +67,11 @@ class PreviewResumePage extends StatelessWidget {
             onPressed: () => Navigator.pop(context),
           ),
           const SizedBox(width: 12),
-          const Expanded(
+          Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
+                const Text(
                   'Resume Preview',
                   style: TextStyle(
                     fontSize: 24,
@@ -77,10 +79,10 @@ class PreviewResumePage extends StatelessWidget {
                     color: Colors.white,
                   ),
                 ),
-                SizedBox(height: 4),
+                const SizedBox(height: 4),
                 Text(
-                  'Review your resume before downloading',
-                  style: TextStyle(
+                  resume.title,
+                  style: const TextStyle(
                     fontSize: 13,
                     color: Colors.white70,
                   ),
@@ -135,20 +137,23 @@ class PreviewResumePage extends StatelessWidget {
       ) {
     switch (resume.template) {
       case ResumeTemplateType.tech:
-        return _buildTechTemplate(profile, skills, experience);
+        return _buildTechTemplate(profile, skills, education, experience);
       case ResumeTemplateType.business:
-        return _buildBusinessTemplate(profile, experience);
+        return _buildBusinessTemplate(profile, skills, education, experience);
       case ResumeTemplateType.creative:
-        return _buildCreativeTemplate(profile, experience);
+        return _buildCreativeTemplate(profile, skills, education, experience);
       case ResumeTemplateType.academic:
-        return _buildAcademicTemplate(profile, education);
+        return _buildAcademicTemplate(profile, skills, education, experience);
     }
   }
 
-  // ========== TECH TEMPLATE ==========
+  // ========================================
+  // TECH MODERN TEMPLATE - Clean & Modern
+  // ========================================
   Widget _buildTechTemplate(
       UserProfile profile,
       List<Skill> skills,
+      List<Education> education,
       List<Experience> experience,
       ) {
     final primaryColor = _parseColor(resume.theme.primaryColorHex);
@@ -158,13 +163,15 @@ class PreviewResumePage extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Header with gradient
+          // Header with gradient background
           Container(
             width: double.infinity,
-            padding: const EdgeInsets.all(28),
+            padding: const EdgeInsets.all(32),
             decoration: BoxDecoration(
               gradient: LinearGradient(
-                colors: [primaryColor, primaryColor.withOpacity(0.8)],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [primaryColor, primaryColor.withOpacity(0.7)],
               ),
             ),
             child: Column(
@@ -177,93 +184,175 @@ class PreviewResumePage extends StatelessWidget {
                     fontWeight: FontWeight.bold,
                     color: Colors.white,
                     fontFamily: resume.font.fontFamily,
+                    letterSpacing: 0.5,
                   ),
                 ),
                 const SizedBox(height: 8),
                 Text(
                   resume.title,
                   style: TextStyle(
-                    fontSize: resume.font.header2FontSize.toDouble() + 2,
-                    color: Colors.white.withOpacity(0.9),
+                    fontSize: resume.font.header2FontSize.toDouble() + 4,
+                    color: Colors.white.withOpacity(0.95),
                     fontFamily: resume.font.fontFamily,
+                    fontWeight: FontWeight.w500,
                   ),
                 ),
                 if (resume.sections.personalInfo) ...[
-                  const SizedBox(height: 16),
-                  _buildContactRow(profile, Colors.white.withOpacity(0.9)),
+                  const SizedBox(height: 20),
+                  Wrap(
+                    spacing: 20,
+                    runSpacing: 12,
+                    children: [
+                      if (profile.email != null)
+                        _buildContactItem(
+                          Icons.email_outlined,
+                          profile.email!,
+                          Colors.white.withOpacity(0.95),
+                        ),
+                      if (profile.phone != null)
+                        _buildContactItem(
+                          Icons.phone_outlined,
+                          profile.phone!,
+                          Colors.white.withOpacity(0.95),
+                        ),
+                      if (profile.city != null || profile.country != null)
+                        _buildContactItem(
+                          Icons.location_on_outlined,
+                          '${profile.city ?? ''}${profile.city != null && profile.country != null ? ', ' : ''}${profile.country ?? ''}',
+                          Colors.white.withOpacity(0.95),
+                        ),
+                    ],
+                  ),
                 ],
               ],
             ),
           ),
 
+          // Content
           Padding(
-            padding: const EdgeInsets.all(28),
+            padding: const EdgeInsets.all(32),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 // About Me
                 if (resume.sections.aboutMe && resume.aboutMe != null) ...[
-                  _buildSectionTitle('About Me', secondaryColor),
+                  _buildSectionHeader('PROFESSIONAL SUMMARY', secondaryColor),
                   const SizedBox(height: 12),
                   Text(
                     resume.aboutMe!,
                     style: TextStyle(
                       fontSize: resume.font.contentFontSize.toDouble(),
                       fontFamily: resume.font.fontFamily,
-                      height: 1.5,
+                      height: 1.6,
+                      color: const Color(0xFF374151),
                     ),
                   ),
-                  const SizedBox(height: 24),
+                  const SizedBox(height: 28),
                 ],
 
                 // Skills
                 if (resume.sections.skills && skills.isNotEmpty) ...[
-                  _buildSectionTitle('Skills', secondaryColor),
-                  const SizedBox(height: 12),
+                  _buildSectionHeader('SKILLS', secondaryColor),
+                  const SizedBox(height: 16),
                   Wrap(
-                    spacing: 10,
-                    runSpacing: 10,
+                    spacing: 12,
+                    runSpacing: 12,
                     children: skills.map((skill) {
                       return Container(
                         padding: const EdgeInsets.symmetric(
                           horizontal: 16,
-                          vertical: 8,
+                          vertical: 10,
                         ),
                         decoration: BoxDecoration(
                           color: secondaryColor.withOpacity(0.1),
-                          borderRadius: BorderRadius.circular(20),
+                          borderRadius: BorderRadius.circular(8),
                           border: Border.all(
                             color: secondaryColor.withOpacity(0.3),
+                            width: 1,
                           ),
                         ),
-                        child: Text(
-                          skill.name ?? '',
-                          style: TextStyle(
-                            fontSize: resume.font.contentFontSize.toDouble(),
-                            color: secondaryColor,
-                            fontWeight: FontWeight.w600,
-                            fontFamily: resume.font.fontFamily,
-                          ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              skill.name ?? '',
+                              style: TextStyle(
+                                fontSize: resume.font.contentFontSize.toDouble(),
+                                color: secondaryColor,
+                                fontWeight: FontWeight.w600,
+                                fontFamily: resume.font.fontFamily,
+                              ),
+                            ),
+                            if (skill.level != null) ...[
+                              const SizedBox(width: 8),
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 6,
+                                  vertical: 2,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: secondaryColor,
+                                  borderRadius: BorderRadius.circular(4),
+                                ),
+                                child: Text(
+                                  'Lv ${skill.level}',
+                                  style: TextStyle(
+                                    fontSize: resume.font.contentFontSize.toDouble() - 2,
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ),
+                            ] else if (skill.levelText != null) ...[
+                              const SizedBox(width: 8),
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 6,
+                                  vertical: 2,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: secondaryColor,
+                                  borderRadius: BorderRadius.circular(4),
+                                ),
+                                child: Text(
+                                  skill.levelText!,
+                                  style: TextStyle(
+                                    fontSize: resume.font.contentFontSize.toDouble() - 2,
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ],
                         ),
                       );
                     }).toList(),
                   ),
-                  const SizedBox(height: 24),
+                  const SizedBox(height: 28),
                 ],
 
                 // Experience
                 if (resume.sections.experience && experience.isNotEmpty) ...[
-                  _buildSectionTitle('Experience', secondaryColor),
-                  const SizedBox(height: 12),
-                  ...experience.map((exp) => _buildExperienceItem(exp, secondaryColor)),
+                  _buildSectionHeader('WORK EXPERIENCE', secondaryColor),
+                  const SizedBox(height: 16),
+                  ...experience.map((exp) => _buildTechExperience(exp, secondaryColor)),
+                  const SizedBox(height: 28),
+                ],
+
+                // Education
+                if (resume.sections.education && education.isNotEmpty) ...[
+                  _buildSectionHeader('EDUCATION', secondaryColor),
+                  const SizedBox(height: 16),
+                  ...education.map((edu) => _buildTechEducation(edu, secondaryColor)),
+                  const SizedBox(height: 28),
                 ],
 
                 // References
                 if (resume.sections.references && resume.references.isNotEmpty) ...[
-                  const SizedBox(height: 24),
-                  _buildSectionTitle('References', secondaryColor),
-                  const SizedBox(height: 12),
-                  ...resume.references.map((ref) => _buildReferenceItem(ref)),
+                  _buildSectionHeader('REFERENCES', secondaryColor),
+                  const SizedBox(height: 16),
+                  ...resume.references.map((ref) => _buildTechReference(ref)),
                 ],
               ],
             ),
@@ -273,42 +362,291 @@ class PreviewResumePage extends StatelessWidget {
     );
   }
 
-  // ========== BUSINESS TEMPLATE ==========
+  Widget _buildTechExperience(Experience exp, Color color) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                width: 8,
+                height: 8,
+                margin: const EdgeInsets.only(top: 6),
+                decoration: BoxDecoration(
+                  color: color,
+                  shape: BoxShape.circle,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      exp.jobTitle ?? '',
+                      style: TextStyle(
+                        fontSize: resume.font.contentFontSize.toDouble() + 2,
+                        fontWeight: FontWeight.bold,
+                        fontFamily: resume.font.fontFamily,
+                        color: const Color(0xFF111827),
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Row(
+                      children: [
+                        Text(
+                          exp.company ?? '',
+                          style: TextStyle(
+                            fontSize: resume.font.contentFontSize.toDouble(),
+                            color: color,
+                            fontWeight: FontWeight.w600,
+                            fontFamily: resume.font.fontFamily,
+                          ),
+                        ),
+                        if (exp.employmentType != null) ...[
+                          Text(
+                            ' • ${exp.employmentType}',
+                            style: TextStyle(
+                              fontSize: resume.font.contentFontSize.toDouble(),
+                              color: const Color(0xFF6B7280),
+                              fontFamily: resume.font.fontFamily,
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                    if (exp.startDate != null || exp.endDate != null) ...[
+                      const SizedBox(height: 4),
+                      Text(
+                        _formatDateRange(exp.startDate, exp.endDate, exp.isCurrent),
+                        style: TextStyle(
+                          fontSize: resume.font.contentFontSize.toDouble() - 1,
+                          color: const Color(0xFF9CA3AF),
+                          fontFamily: resume.font.fontFamily,
+                        ),
+                      ),
+                    ],
+                    if (exp.city != null || exp.country != null) ...[
+                      const SizedBox(height: 2),
+                      Text(
+                        '${exp.city ?? ''}${exp.city != null && exp.country != null ? ', ' : ''}${exp.country ?? ''}',
+                        style: TextStyle(
+                          fontSize: resume.font.contentFontSize.toDouble() - 1,
+                          color: const Color(0xFF9CA3AF),
+                          fontFamily: resume.font.fontFamily,
+                        ),
+                      ),
+                    ],
+                    if (exp.description != null) ...[
+                      const SizedBox(height: 8),
+                      Text(
+                        exp.description!,
+                        style: TextStyle(
+                          fontSize: resume.font.contentFontSize.toDouble(),
+                          fontFamily: resume.font.fontFamily,
+                          height: 1.5,
+                          color: const Color(0xFF374151),
+                        ),
+                      ),
+                    ],
+                    if (exp.achievements?.skillsUsed != null &&
+                        exp.achievements!.skillsUsed!.isNotEmpty) ...[
+                      const SizedBox(height: 8),
+                      Wrap(
+                        spacing: 6,
+                        runSpacing: 6,
+                        children: exp.achievements!.skillsUsed!.map((skill) {
+                          return Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 4,
+                            ),
+                            decoration: BoxDecoration(
+                              color: Colors.grey[100],
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                            child: Text(
+                              skill,
+                              style: TextStyle(
+                                fontSize: resume.font.contentFontSize.toDouble() - 1,
+                                color: const Color(0xFF4B5563),
+                                fontFamily: resume.font.fontFamily,
+                              ),
+                            ),
+                          );
+                        }).toList(),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTechEducation(Education edu, Color color) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 16),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: 8,
+            height: 8,
+            margin: const EdgeInsets.only(top: 6),
+            decoration: BoxDecoration(
+              color: color,
+              shape: BoxShape.circle,
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  edu.institution ?? '',
+                  style: TextStyle(
+                    fontSize: resume.font.contentFontSize.toDouble() + 1,
+                    fontWeight: FontWeight.bold,
+                    fontFamily: resume.font.fontFamily,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  '${edu.degreeLevel ?? ''} in ${edu.fieldOfStudy ?? ''}',
+                  style: TextStyle(
+                    fontSize: resume.font.contentFontSize.toDouble(),
+                    fontFamily: resume.font.fontFamily,
+                    color: const Color(0xFF374151),
+                  ),
+                ),
+                if (edu.startDate != null || edu.endDate != null) ...[
+                  const SizedBox(height: 2),
+                  Text(
+                    _formatDateRange(edu.startDate, edu.endDate, edu.isCurrent),
+                    style: TextStyle(
+                      fontSize: resume.font.contentFontSize.toDouble() - 1,
+                      color: const Color(0xFF9CA3AF),
+                      fontFamily: resume.font.fontFamily,
+                    ),
+                  ),
+                ],
+                if (edu.gpa != null) ...[
+                  const SizedBox(height: 4),
+                  Text(
+                    'GPA: ${edu.gpa}',
+                    style: TextStyle(
+                      fontSize: resume.font.contentFontSize.toDouble(),
+                      color: color,
+                      fontWeight: FontWeight.w600,
+                      fontFamily: resume.font.fontFamily,
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTechReference(ResumeReference ref) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.grey[50],
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            ref.name,
+            style: TextStyle(
+              fontSize: resume.font.contentFontSize.toDouble(),
+              fontWeight: FontWeight.bold,
+              fontFamily: resume.font.fontFamily,
+            ),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            ref.position,
+            style: TextStyle(
+              fontSize: resume.font.contentFontSize.toDouble() - 1,
+              fontFamily: resume.font.fontFamily,
+              color: const Color(0xFF6B7280),
+            ),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            ref.contact,
+            style: TextStyle(
+              fontSize: resume.font.contentFontSize.toDouble() - 1,
+              color: const Color(0xFF9CA3AF),
+              fontFamily: resume.font.fontFamily,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ========================================
+  // BUSINESS PROFESSIONAL TEMPLATE - Classic & Formal
+  // ========================================
   Widget _buildBusinessTemplate(
       UserProfile profile,
+      List<Skill> skills,
+      List<Education> education,
       List<Experience> experience,
       ) {
     final primaryColor = _parseColor(resume.theme.primaryColorHex);
     final secondaryColor = _parseColor(resume.theme.secondaryColorHex);
 
     return SingleChildScrollView(
-      padding: const EdgeInsets.all(32),
+      padding: const EdgeInsets.all(36),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // Header with profile circle
           Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
+            crossAxisAlignment: CrossAxisAlignment.center,
             children: [
               Container(
-                width: 80,
-                height: 80,
+                width: 90,
+                height: 90,
                 decoration: BoxDecoration(
                   color: primaryColor,
                   shape: BoxShape.circle,
+                  boxShadow: [
+                    BoxShadow(
+                      color: primaryColor.withOpacity(0.3),
+                      blurRadius: 10,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
                 ),
                 child: Center(
                   child: Text(
-                    (profile.name ?? 'U')[0].toUpperCase(),
+                    _getInitials(profile.name ?? 'U'),
                     style: TextStyle(
                       fontSize: resume.font.header1FontSize.toDouble(),
                       fontWeight: FontWeight.bold,
                       color: Colors.white,
+                      fontFamily: resume.font.fontFamily,
                     ),
                   ),
                 ),
               ),
-              const SizedBox(width: 20),
+              const SizedBox(width: 24),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -319,6 +657,7 @@ class PreviewResumePage extends StatelessWidget {
                         fontSize: resume.font.header1FontSize.toDouble(),
                         fontWeight: FontWeight.bold,
                         fontFamily: resume.font.fontFamily,
+                        color: const Color(0xFF111827),
                       ),
                     ),
                     const SizedBox(height: 4),
@@ -328,6 +667,7 @@ class PreviewResumePage extends StatelessWidget {
                         fontSize: resume.font.header2FontSize.toDouble() + 2,
                         color: secondaryColor,
                         fontFamily: resume.font.fontFamily,
+                        fontWeight: FontWeight.w600,
                       ),
                     ),
                   ],
@@ -336,53 +676,423 @@ class PreviewResumePage extends StatelessWidget {
             ],
           ),
 
-          const SizedBox(height: 20),
-          Divider(color: primaryColor.withOpacity(0.3), thickness: 2),
-          const SizedBox(height: 20),
+          const SizedBox(height: 24),
+          Container(
+            height: 2,
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [primaryColor, primaryColor.withOpacity(0.1)],
+              ),
+            ),
+          ),
+          const SizedBox(height: 24),
 
           // Contact Info
           if (resume.sections.personalInfo) ...[
-            _buildContactRow(profile, Colors.black87),
-            const SizedBox(height: 24),
-          ],
-
-          // About Me
-          if (resume.sections.aboutMe && resume.aboutMe != null) ...[
-            _buildSectionTitle('Professional Summary', secondaryColor),
-            const SizedBox(height: 12),
-            Text(
-              resume.aboutMe!,
-              style: TextStyle(
-                fontSize: resume.font.contentFontSize.toDouble(),
-                fontFamily: resume.font.fontFamily,
-                height: 1.5,
-              ),
+            Wrap(
+              spacing: 24,
+              runSpacing: 12,
+              children: [
+                if (profile.email != null)
+                  _buildBusinessContact(
+                    Icons.email,
+                    profile.email!,
+                    primaryColor,
+                  ),
+                if (profile.phone != null)
+                  _buildBusinessContact(
+                    Icons.phone,
+                    profile.phone!,
+                    primaryColor,
+                  ),
+                if (profile.city != null || profile.country != null)
+                  _buildBusinessContact(
+                    Icons.location_on,
+                    '${profile.city ?? ''}${profile.city != null && profile.country != null ? ', ' : ''}${profile.country ?? ''}',
+                    primaryColor,
+                  ),
+              ],
             ),
-            const SizedBox(height: 24),
+            const SizedBox(height: 28),
           ],
 
-          // Experience
-          if (resume.sections.experience && experience.isNotEmpty) ...[
-            _buildSectionTitle('Professional Experience', secondaryColor),
-            const SizedBox(height: 12),
-            ...experience.map((exp) => _buildExperienceItem(exp, secondaryColor)),
-          ],
+          // Content sections
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // About Me
+              if (resume.sections.aboutMe && resume.aboutMe != null) ...[
+                _buildBusinessSection('PROFESSIONAL SUMMARY', secondaryColor),
+                const SizedBox(height: 12),
+                Text(
+                  resume.aboutMe!,
+                  style: TextStyle(
+                    fontSize: resume.font.contentFontSize.toDouble(),
+                    fontFamily: resume.font.fontFamily,
+                    height: 1.6,
+                    color: const Color(0xFF374151),
+                  ),
+                ),
+                const SizedBox(height: 28),
+              ],
 
-          // References
-          if (resume.sections.references && resume.references.isNotEmpty) ...[
-            const SizedBox(height: 24),
-            _buildSectionTitle('References', secondaryColor),
-            const SizedBox(height: 12),
-            ...resume.references.map((ref) => _buildReferenceItem(ref)),
-          ],
+              // Experience
+              if (resume.sections.experience && experience.isNotEmpty) ...[
+                _buildBusinessSection('PROFESSIONAL EXPERIENCE', secondaryColor),
+                const SizedBox(height: 16),
+                ...experience.map((exp) => _buildBusinessExperience(exp, primaryColor)),
+                const SizedBox(height: 28),
+              ],
+
+              // Education
+              if (resume.sections.education && education.isNotEmpty) ...[
+                _buildBusinessSection('EDUCATION', secondaryColor),
+                const SizedBox(height: 16),
+                ...education.map((edu) => _buildBusinessEducation(edu, primaryColor)),
+                const SizedBox(height: 28),
+              ],
+
+              // Skills
+              if (resume.sections.skills && skills.isNotEmpty) ...[
+                _buildBusinessSection('KEY SKILLS', secondaryColor),
+                const SizedBox(height: 16),
+                _buildBusinessSkills(skills, primaryColor),
+                const SizedBox(height: 28),
+              ],
+
+              // References
+              if (resume.sections.references && resume.references.isNotEmpty) ...[
+                _buildBusinessSection('REFERENCES', secondaryColor),
+                const SizedBox(height: 16),
+                ...resume.references.map((ref) => _buildBusinessReference(ref)),
+              ],
+            ],
+          ),
         ],
       ),
     );
   }
 
-  // ========== CREATIVE TEMPLATE ==========
+  Widget _buildBusinessContact(IconData icon, String text, Color color) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(icon, size: 16, color: color),
+        const SizedBox(width: 6),
+        Text(
+          text,
+          style: TextStyle(
+            fontSize: resume.font.contentFontSize.toDouble(),
+            fontFamily: resume.font.fontFamily,
+            color: const Color(0xFF374151),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildBusinessSection(String title, Color color) {
+    return Container(
+      padding: const EdgeInsets.only(bottom: 8),
+      decoration: BoxDecoration(
+        border: Border(
+          bottom: BorderSide(color: color, width: 2),
+        ),
+      ),
+      child: Text(
+        title,
+        style: TextStyle(
+          fontSize: resume.font.header2FontSize.toDouble(),
+          fontWeight: FontWeight.bold,
+          color: color,
+          fontFamily: resume.font.fontFamily,
+          letterSpacing: 1,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildBusinessExperience(Experience exp, Color color) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                margin: const EdgeInsets.only(top: 4),
+                padding: const EdgeInsets.all(6),
+                decoration: BoxDecoration(
+                  color: color.withOpacity(0.1),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(Icons.work, size: 14, color: color),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      exp.jobTitle ?? '',
+                      style: TextStyle(
+                        fontSize: resume.font.contentFontSize.toDouble() + 2,
+                        fontWeight: FontWeight.bold,
+                        fontFamily: resume.font.fontFamily,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      '${exp.company ?? ''}${exp.employmentType != null ? ' • ${exp.employmentType}' : ''}',
+                      style: TextStyle(
+                        fontSize: resume.font.contentFontSize.toDouble(),
+                        color: color,
+                        fontWeight: FontWeight.w600,
+                        fontFamily: resume.font.fontFamily,
+                      ),
+                    ),
+                    if (exp.startDate != null || exp.endDate != null) ...[
+                      const SizedBox(height: 2),
+                      Text(
+                        _formatDateRange(exp.startDate, exp.endDate, exp.isCurrent),
+                        style: TextStyle(
+                          fontSize: resume.font.contentFontSize.toDouble() - 1,
+                          color: const Color(0xFF6B7280),
+                          fontFamily: resume.font.fontFamily,
+                          fontStyle: FontStyle.italic,
+                        ),
+                      ),
+                    ],
+                    if (exp.description != null) ...[
+                      const SizedBox(height: 8),
+                      Text(
+                        exp.description!,
+                        style: TextStyle(
+                          fontSize: resume.font.contentFontSize.toDouble(),
+                          fontFamily: resume.font.fontFamily,
+                          height: 1.5,
+                          color: const Color(0xFF374151),
+                        ),
+                      ),
+                    ],
+                    if (exp.achievements?.description != null) ...[
+                      const SizedBox(height: 6),
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text('•  ',
+                              style: TextStyle(fontWeight: FontWeight.bold)),
+                          Expanded(
+                            child: Text(
+                              exp.achievements!.description!,
+                              style: TextStyle(
+                                fontSize: resume.font.contentFontSize.toDouble(),
+                                fontFamily: resume.font.fontFamily,
+                                height: 1.5,
+                                color: const Color(0xFF4B5563),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildBusinessEducation(Education edu, Color color) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 16),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            margin: const EdgeInsets.only(top: 4),
+            padding: const EdgeInsets.all(6),
+            decoration: BoxDecoration(
+              color: color.withOpacity(0.1),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(Icons.school, size: 14, color: color),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  edu.institution ?? '',
+                  style: TextStyle(
+                    fontSize: resume.font.contentFontSize.toDouble() + 1,
+                    fontWeight: FontWeight.bold,
+                    fontFamily: resume.font.fontFamily,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  '${edu.degreeLevel ?? ''} in ${edu.fieldOfStudy ?? ''}',
+                  style: TextStyle(
+                    fontSize: resume.font.contentFontSize.toDouble(),
+                    fontFamily: resume.font.fontFamily,
+                    color: const Color(0xFF374151),
+                  ),
+                ),
+                if (edu.startDate != null || edu.endDate != null) ...[
+                  const SizedBox(height: 2),
+                  Text(
+                    _formatDateRange(edu.startDate, edu.endDate, edu.isCurrent),
+                    style: TextStyle(
+                      fontSize: resume.font.contentFontSize.toDouble() - 1,
+                      color: const Color(0xFF6B7280),
+                      fontFamily: resume.font.fontFamily,
+                      fontStyle: FontStyle.italic,
+                    ),
+                  ),
+                ],
+                if (edu.gpa != null) ...[
+                  const SizedBox(height: 4),
+                  Text(
+                    'GPA: ${edu.gpa}',
+                    style: TextStyle(
+                      fontSize: resume.font.contentFontSize.toDouble(),
+                      color: color,
+                      fontWeight: FontWeight.w600,
+                      fontFamily: resume.font.fontFamily,
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildBusinessSkills(List<Skill> skills, Color color) {
+    return Column(
+      children: skills.map((skill) {
+        return Container(
+          margin: const EdgeInsets.only(bottom: 12),
+          child: Row(
+            children: [
+              Container(
+                width: 6,
+                height: 6,
+                decoration: BoxDecoration(
+                  color: color,
+                  shape: BoxShape.circle,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  skill.name ?? '',
+                  style: TextStyle(
+                    fontSize: resume.font.contentFontSize.toDouble(),
+                    fontFamily: resume.font.fontFamily,
+                    color: const Color(0xFF374151),
+                  ),
+                ),
+              ),
+              if (skill.level != null)
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: color.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: Text(
+                    'Level ${skill.level}/5',
+                    style: TextStyle(
+                      fontSize: resume.font.contentFontSize.toDouble() - 1,
+                      color: color,
+                      fontWeight: FontWeight.w600,
+                      fontFamily: resume.font.fontFamily,
+                    ),
+                  ),
+                )
+              else if (skill.levelText != null)
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: color.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: Text(
+                    skill.levelText!,
+                    style: TextStyle(
+                      fontSize: resume.font.contentFontSize.toDouble() - 1,
+                      color: color,
+                      fontWeight: FontWeight.w600,
+                      fontFamily: resume.font.fontFamily,
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        );
+      }).toList(),
+    );
+  }
+
+  Widget _buildBusinessReference(ResumeReference ref) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 16),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        border: Border.all(color: Colors.grey[300]!),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            ref.name,
+            style: TextStyle(
+              fontSize: resume.font.contentFontSize.toDouble() + 1,
+              fontWeight: FontWeight.bold,
+              fontFamily: resume.font.fontFamily,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            ref.position,
+            style: TextStyle(
+              fontSize: resume.font.contentFontSize.toDouble(),
+              fontFamily: resume.font.fontFamily,
+              color: const Color(0xFF6B7280),
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            ref.contact,
+            style: TextStyle(
+              fontSize: resume.font.contentFontSize.toDouble() - 1,
+              color: const Color(0xFF9CA3AF),
+              fontFamily: resume.font.fontFamily,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ========================================
+  // CREATIVE TEMPLATE - Bold & Unique
+  // ========================================
   Widget _buildCreativeTemplate(
       UserProfile profile,
+      List<Skill> skills,
+      List<Education> education,
       List<Experience> experience,
       ) {
     final primaryColor = _parseColor(resume.theme.primaryColorHex);
@@ -391,123 +1101,216 @@ class PreviewResumePage extends StatelessWidget {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Sidebar
+        // Left Sidebar
         Container(
-          width: 140,
+          width: 160,
           color: primaryColor,
-          padding: const EdgeInsets.all(20),
           child: Column(
             children: [
+              const SizedBox(height: 32),
+              // Profile Circle
               Container(
-                width: 80,
-                height: 80,
-                decoration: const BoxDecoration(
+                width: 100,
+                height: 100,
+                decoration: BoxDecoration(
                   color: Colors.white,
                   shape: BoxShape.circle,
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.2),
+                      blurRadius: 10,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
                 ),
                 child: Center(
                   child: Text(
-                    (profile.name ?? 'U')[0].toUpperCase(),
+                    _getInitials(profile.name ?? 'U'),
                     style: TextStyle(
-                      fontSize: resume.font.header1FontSize.toDouble(),
+                      fontSize: resume.font.header1FontSize.toDouble() + 4,
                       fontWeight: FontWeight.bold,
                       color: primaryColor,
+                      fontFamily: resume.font.fontFamily,
                     ),
                   ),
                 ),
               ),
-              const SizedBox(height: 24),
-              const Text(
-                'CONTACT',
-                style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.white,
-                  letterSpacing: 1.2,
-                ),
-              ),
-              const SizedBox(height: 16),
-              if (profile.email != null) ...[
-                Text(
-                  profile.email!,
-                  style: TextStyle(
-                    fontSize: resume.font.contentFontSize.toDouble() - 1,
-                    color: Colors.white.withOpacity(0.9),
+              const SizedBox(height: 28),
+
+              // Contact Info
+              if (resume.sections.personalInfo) ...[
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: Column(
+                    children: [
+                      const Text(
+                        'CONTACT',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white,
+                          letterSpacing: 1.5,
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      if (profile.email != null)
+                        _buildCreativeContact(
+                          Icons.email_outlined,
+                          profile.email!,
+                        ),
+                      if (profile.phone != null)
+                        _buildCreativeContact(
+                          Icons.phone_outlined,
+                          profile.phone!,
+                        ),
+                      if (profile.city != null || profile.country != null)
+                        _buildCreativeContact(
+                          Icons.location_on_outlined,
+                          '${profile.city ?? ''}${profile.city != null && profile.country != null ? '\n' : ''}${profile.country ?? ''}',
+                        ),
+                    ],
                   ),
-                  textAlign: TextAlign.center,
                 ),
-                const SizedBox(height: 8),
+                const SizedBox(height: 24),
               ],
-              if (profile.phone != null) ...[
-                Text(
-                  profile.phone!,
-                  style: TextStyle(
-                    fontSize: resume.font.contentFontSize.toDouble() - 1,
-                    color: Colors.white.withOpacity(0.9),
+
+              // Skills in Sidebar
+              if (resume.sections.skills && skills.isNotEmpty) ...[
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: Column(
+                    children: [
+                      const Text(
+                        'SKILLS',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white,
+                          letterSpacing: 1.5,
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      ...skills.take(8).map((skill) {
+                        return Container(
+                          margin: const EdgeInsets.only(bottom: 12),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                skill.name ?? '',
+                                style: TextStyle(
+                                  fontSize: resume.font.contentFontSize.toDouble() - 1,
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.w600,
+                                  fontFamily: resume.font.fontFamily,
+                                ),
+                              ),
+                              if (skill.level != null) ...[
+                                const SizedBox(height: 4),
+                                Row(
+                                  children: List.generate(5, (index) {
+                                    return Container(
+                                      width: 20,
+                                      height: 4,
+                                      margin: const EdgeInsets.only(right: 4),
+                                      decoration: BoxDecoration(
+                                        color: index < (skill.level ?? 0)
+                                            ? Colors.white
+                                            : Colors.white.withOpacity(0.3),
+                                        borderRadius: BorderRadius.circular(2),
+                                      ),
+                                    );
+                                  }),
+                                ),
+                              ] else if (skill.levelText != null) ...[
+                                const SizedBox(height: 2),
+                                Text(
+                                  skill.levelText!,
+                                  style: TextStyle(
+                                    fontSize: resume.font.contentFontSize.toDouble() - 2,
+                                    color: Colors.white.withOpacity(0.8),
+                                    fontFamily: resume.font.fontFamily,
+                                  ),
+                                ),
+                              ],
+                            ],
+                          ),
+                        );
+                      }),
+                    ],
                   ),
-                  textAlign: TextAlign.center,
                 ),
               ],
             ],
           ),
         ),
 
-        // Main content
+        // Main Content
         Expanded(
           child: SingleChildScrollView(
-            padding: const EdgeInsets.all(28),
+            padding: const EdgeInsets.all(32),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                // Name & Title
                 Text(
                   profile.name ?? 'Your Name',
                   style: TextStyle(
-                    fontSize: resume.font.header1FontSize.toDouble() + 4,
+                    fontSize: resume.font.header1FontSize.toDouble() + 6,
                     fontWeight: FontWeight.bold,
                     fontFamily: resume.font.fontFamily,
+                    color: const Color(0xFF111827),
                   ),
                 ),
-                const SizedBox(height: 4),
+                const SizedBox(height: 6),
                 Text(
                   resume.title,
                   style: TextStyle(
-                    fontSize: resume.font.header2FontSize.toDouble() + 2,
-                    color: primaryColor,
+                    fontSize: resume.font.header2FontSize.toDouble() + 4,
+                    color: secondaryColor,
                     fontWeight: FontWeight.w600,
                     fontFamily: resume.font.fontFamily,
                   ),
                 ),
-
                 const SizedBox(height: 24),
 
                 // About Me
                 if (resume.sections.aboutMe && resume.aboutMe != null) ...[
-                  _buildSectionTitle('About', secondaryColor),
+                  _buildCreativeSection('ABOUT', secondaryColor),
                   const SizedBox(height: 12),
                   Text(
                     resume.aboutMe!,
                     style: TextStyle(
                       fontSize: resume.font.contentFontSize.toDouble(),
                       fontFamily: resume.font.fontFamily,
-                      height: 1.5,
+                      height: 1.6,
+                      color: const Color(0xFF374151),
                     ),
                   ),
-                  const SizedBox(height: 24),
+                  const SizedBox(height: 28),
                 ],
 
                 // Experience
                 if (resume.sections.experience && experience.isNotEmpty) ...[
-                  _buildSectionTitle('Experience', secondaryColor),
-                  const SizedBox(height: 12),
-                  ...experience.map((exp) => _buildExperienceItem(exp, secondaryColor)),
+                  _buildCreativeSection('EXPERIENCE', secondaryColor),
+                  const SizedBox(height: 16),
+                  ...experience.map((exp) => _buildCreativeExperience(exp, secondaryColor)),
+                  const SizedBox(height: 28),
+                ],
+
+                // Education
+                if (resume.sections.education && education.isNotEmpty) ...[
+                  _buildCreativeSection('EDUCATION', secondaryColor),
+                  const SizedBox(height: 16),
+                  ...education.map((edu) => _buildCreativeEducation(edu, secondaryColor)),
+                  const SizedBox(height: 28),
                 ],
 
                 // References
                 if (resume.sections.references && resume.references.isNotEmpty) ...[
-                  const SizedBox(height: 24),
-                  _buildSectionTitle('References', secondaryColor),
-                  const SizedBox(height: 12),
-                  ...resume.references.map((ref) => _buildReferenceItem(ref)),
+                  _buildCreativeSection('REFERENCES', secondaryColor),
+                  const SizedBox(height: 16),
+                  ...resume.references.map((ref) => _buildCreativeReference(ref)),
                 ],
               ],
             ),
@@ -517,195 +1320,90 @@ class PreviewResumePage extends StatelessWidget {
     );
   }
 
-  // ========== ACADEMIC TEMPLATE ==========
-  Widget _buildAcademicTemplate(
-      UserProfile profile,
-      List<Education> education,
-      ) {
-    final primaryColor = _parseColor(resume.theme.primaryColorHex);
-    final secondaryColor = _parseColor(resume.theme.secondaryColorHex);
-
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(36),
-      child: Column(
+  Widget _buildCreativeContact(IconData icon, String text) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 16),
+      child: Row(
         children: [
-          // Centered header
-          Text(
-            profile.name ?? 'Your Name',
-            style: TextStyle(
-              fontSize: resume.font.header1FontSize.toDouble() + 2,
-              fontWeight: FontWeight.bold,
-              fontFamily: resume.font.fontFamily,
+          Icon(icon, size: 16, color: Colors.white),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              text,
+              style: TextStyle(
+                fontSize: resume.font.contentFontSize.toDouble() - 1,
+                color: Colors.white.withOpacity(0.95),
+                fontFamily: resume.font.fontFamily,
+                height: 1.3,
+              ),
             ),
-            textAlign: TextAlign.center,
-          ),
-          const SizedBox(height: 8),
-          Text(
-            resume.title,
-            style: TextStyle(
-              fontSize: resume.font.header2FontSize.toDouble() + 1,
-              color: Colors.grey[700],
-              fontFamily: resume.font.fontFamily,
-            ),
-            textAlign: TextAlign.center,
-          ),
-          if (resume.sections.personalInfo) ...[
-            const SizedBox(height: 12),
-            _buildContactRow(profile, Colors.black87, centered: true),
-          ],
-
-          const SizedBox(height: 24),
-          Divider(color: primaryColor, thickness: 2),
-          const SizedBox(height: 24),
-
-          // Content
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // About Me
-              if (resume.sections.aboutMe && resume.aboutMe != null) ...[
-                _buildSectionTitle('Summary', secondaryColor),
-                const SizedBox(height: 12),
-                Text(
-                  resume.aboutMe!,
-                  style: TextStyle(
-                    fontSize: resume.font.contentFontSize.toDouble(),
-                    fontFamily: resume.font.fontFamily,
-                    height: 1.5,
-                  ),
-                ),
-                const SizedBox(height: 24),
-              ],
-
-              // Education
-              if (resume.sections.education && education.isNotEmpty) ...[
-                _buildSectionTitle('Education', secondaryColor),
-                const SizedBox(height: 12),
-                ...education.map((edu) => _buildEducationItem(edu)),
-                const SizedBox(height: 24),
-              ],
-
-              // References
-              if (resume.sections.references && resume.references.isNotEmpty) ...[
-                _buildSectionTitle('References', secondaryColor),
-                const SizedBox(height: 12),
-                ...resume.references.map((ref) => _buildReferenceItem(ref)),
-              ],
-            ],
           ),
         ],
       ),
     );
   }
 
-  // ========== HELPER WIDGETS ==========
-  Widget _buildSectionTitle(String title, Color color) {
-    return Text(
-      title,
-      style: TextStyle(
-        fontSize: resume.font.header2FontSize.toDouble(),
-        fontWeight: FontWeight.bold,
-        color: color,
-        fontFamily: resume.font.fontFamily,
-        letterSpacing: 0.5,
-      ),
+  Widget _buildCreativeSection(String title, Color color) {
+    return Row(
+      children: [
+        Container(
+          width: 4,
+          height: 24,
+          decoration: BoxDecoration(
+            color: color,
+            borderRadius: BorderRadius.circular(2),
+          ),
+        ),
+        const SizedBox(width: 12),
+        Text(
+          title,
+          style: TextStyle(
+            fontSize: resume.font.header2FontSize.toDouble() + 2,
+            fontWeight: FontWeight.bold,
+            color: color,
+            fontFamily: resume.font.fontFamily,
+            letterSpacing: 1.2,
+          ),
+        ),
+      ],
     );
   }
 
-  Widget _buildContactRow(UserProfile profile, Color color, {bool centered = false}) {
-    final items = <Widget>[];
-
-    if (profile.email != null) {
-      items.add(
-        Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(Icons.email, size: 14, color: color),
-            const SizedBox(width: 6),
-            Text(
-              profile.email!,
-              style: TextStyle(
-                fontSize: resume.font.contentFontSize.toDouble(),
-                color: color,
-                fontFamily: resume.font.fontFamily,
-              ),
-            ),
-          ],
-        ),
-      );
-    }
-
-    if (profile.phone != null) {
-      items.add(
-        Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(Icons.phone, size: 14, color: color),
-            const SizedBox(width: 6),
-            Text(
-              profile.phone!,
-              style: TextStyle(
-                fontSize: resume.font.contentFontSize.toDouble(),
-                color: color,
-                fontFamily: resume.font.fontFamily,
-              ),
-            ),
-          ],
-        ),
-      );
-    }
-
-    if (profile.city != null || profile.country != null) {
-      items.add(
-        Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(Icons.location_on, size: 14, color: color),
-            const SizedBox(width: 6),
-            Text(
-              '${profile.city ?? ''}${profile.city != null && profile.country != null ? ', ' : ''}${profile.country ?? ''}',
-              style: TextStyle(
-                fontSize: resume.font.contentFontSize.toDouble(),
-                color: color,
-                fontFamily: resume.font.fontFamily,
-              ),
-            ),
-          ],
-        ),
-      );
-    }
-
-    return Wrap(
-      alignment: centered ? WrapAlignment.center : WrapAlignment.start,
-      spacing: 16,
-      runSpacing: 8,
-      children: items,
-    );
-  }
-
-  Widget _buildExperienceItem(Experience exp, Color color) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 20),
+  Widget _buildCreativeExperience(Experience exp, Color color) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 20),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
             exp.jobTitle ?? '',
             style: TextStyle(
-              fontSize: resume.font.contentFontSize.toDouble() + 1,
+              fontSize: resume.font.contentFontSize.toDouble() + 2,
               fontWeight: FontWeight.bold,
               fontFamily: resume.font.fontFamily,
             ),
           ),
           const SizedBox(height: 4),
           Text(
-            '${exp.company ?? ''} ${exp.employmentType != null ? '• ${exp.employmentType}' : ''}',
+            exp.company ?? '',
             style: TextStyle(
-              fontSize: resume.font.contentFontSize.toDouble(),
+              fontSize: resume.font.contentFontSize.toDouble() + 1,
               color: color,
+              fontWeight: FontWeight.w600,
               fontFamily: resume.font.fontFamily,
             ),
           ),
+          if (exp.startDate != null || exp.endDate != null) ...[
+            const SizedBox(height: 2),
+            Text(
+              '${_formatDateRange(exp.startDate, exp.endDate, exp.isCurrent)}${exp.employmentType != null ? ' • ${exp.employmentType}' : ''}',
+              style: TextStyle(
+                fontSize: resume.font.contentFontSize.toDouble() - 1,
+                color: const Color(0xFF6B7280),
+                fontFamily: resume.font.fontFamily,
+              ),
+            ),
+          ],
           if (exp.description != null) ...[
             const SizedBox(height: 8),
             Text(
@@ -714,6 +1412,7 @@ class PreviewResumePage extends StatelessWidget {
                 fontSize: resume.font.contentFontSize.toDouble(),
                 fontFamily: resume.font.fontFamily,
                 height: 1.5,
+                color: const Color(0xFF374151),
               ),
             ),
           ],
@@ -722,9 +1421,9 @@ class PreviewResumePage extends StatelessWidget {
     );
   }
 
-  Widget _buildEducationItem(Education edu) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 16),
+  Widget _buildCreativeEducation(Education edu, Color color) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -742,15 +1441,36 @@ class PreviewResumePage extends StatelessWidget {
             style: TextStyle(
               fontSize: resume.font.contentFontSize.toDouble(),
               fontFamily: resume.font.fontFamily,
+              color: const Color(0xFF374151),
             ),
           ),
-          if (edu.gpa != null) ...[
+          if (edu.startDate != null || edu.endDate != null) ...[
             const SizedBox(height: 2),
             Text(
-              'GPA: ${edu.gpa}',
+              _formatDateRange(edu.startDate, edu.endDate, edu.isCurrent),
               style: TextStyle(
-                fontSize: resume.font.contentFontSize.toDouble(),
+                fontSize: resume.font.contentFontSize.toDouble() - 1,
+                color: const Color(0xFF6B7280),
                 fontFamily: resume.font.fontFamily,
+              ),
+            ),
+          ],
+          if (edu.gpa != null) ...[
+            const SizedBox(height: 4),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              decoration: BoxDecoration(
+                color: color.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(4),
+              ),
+              child: Text(
+                'GPA: ${edu.gpa}',
+                style: TextStyle(
+                  fontSize: resume.font.contentFontSize.toDouble() - 1,
+                  color: color,
+                  fontWeight: FontWeight.w600,
+                  fontFamily: resume.font.fontFamily,
+                ),
               ),
             ),
           ],
@@ -759,9 +1479,9 @@ class PreviewResumePage extends StatelessWidget {
     );
   }
 
-  Widget _buildReferenceItem(ResumeReference ref) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
+  Widget _buildCreativeReference(ResumeReference ref) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -773,24 +1493,451 @@ class PreviewResumePage extends StatelessWidget {
               fontFamily: resume.font.fontFamily,
             ),
           ),
+          const SizedBox(height: 2),
           Text(
             ref.position,
             style: TextStyle(
-              fontSize: resume.font.contentFontSize.toDouble(),
+              fontSize: resume.font.contentFontSize.toDouble() - 1,
               fontFamily: resume.font.fontFamily,
+              color: const Color(0xFF6B7280),
             ),
           ),
           Text(
             ref.contact,
             style: TextStyle(
-              fontSize: resume.font.contentFontSize.toDouble(),
-              color: Colors.grey[600],
+              fontSize: resume.font.contentFontSize.toDouble() - 1,
+              color: const Color(0xFF9CA3AF),
               fontFamily: resume.font.fontFamily,
             ),
           ),
         ],
       ),
     );
+  }
+
+  // ========================================
+  // ACADEMIC TEMPLATE - Traditional & Scholarly
+  // ========================================
+  Widget _buildAcademicTemplate(
+      UserProfile profile,
+      List<Skill> skills,
+      List<Education> education,
+      List<Experience> experience,
+      ) {
+    final primaryColor = _parseColor(resume.theme.primaryColorHex);
+    final secondaryColor = _parseColor(resume.theme.secondaryColorHex);
+
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(40),
+      child: Column(
+        children: [
+          // Centered Header
+          Column(
+            children: [
+              Text(
+                profile.name ?? 'Your Name',
+                style: TextStyle(
+                  fontSize: resume.font.header1FontSize.toDouble() + 4,
+                  fontWeight: FontWeight.bold,
+                  fontFamily: resume.font.fontFamily,
+                  color: const Color(0xFF111827),
+                ),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 8),
+              Text(
+                resume.title,
+                style: TextStyle(
+                  fontSize: resume.font.header2FontSize.toDouble() + 2,
+                  color: const Color(0xFF6B7280),
+                  fontFamily: resume.font.fontFamily,
+                  fontWeight: FontWeight.w500,
+                ),
+                textAlign: TextAlign.center,
+              ),
+              if (resume.sections.personalInfo) ...[
+                const SizedBox(height: 16),
+                Wrap(
+                  alignment: WrapAlignment.center,
+                  spacing: 16,
+                  runSpacing: 8,
+                  children: [
+                    if (profile.email != null)
+                      Text(
+                        profile.email!,
+                        style: TextStyle(
+                          fontSize: resume.font.contentFontSize.toDouble(),
+                          fontFamily: resume.font.fontFamily,
+                          color: const Color(0xFF374151),
+                        ),
+                      ),
+                    if (profile.phone != null)
+                      Text(
+                        profile.phone!,
+                        style: TextStyle(
+                          fontSize: resume.font.contentFontSize.toDouble(),
+                          fontFamily: resume.font.fontFamily,
+                          color: const Color(0xFF374151),
+                        ),
+                      ),
+                    if (profile.city != null || profile.country != null)
+                      Text(
+                        '${profile.city ?? ''}${profile.city != null && profile.country != null ? ', ' : ''}${profile.country ?? ''}',
+                        style: TextStyle(
+                          fontSize: resume.font.contentFontSize.toDouble(),
+                          fontFamily: resume.font.fontFamily,
+                          color: const Color(0xFF374151),
+                        ),
+                      ),
+                  ],
+                ),
+              ],
+            ],
+          ),
+
+          const SizedBox(height: 28),
+          Container(
+            height: 2,
+            color: primaryColor,
+          ),
+          const SizedBox(height: 28),
+
+          // Content
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // About Me
+              if (resume.sections.aboutMe && resume.aboutMe != null) ...[
+                _buildAcademicSection('SUMMARY', secondaryColor),
+                const SizedBox(height: 12),
+                Text(
+                  resume.aboutMe!,
+                  style: TextStyle(
+                    fontSize: resume.font.contentFontSize.toDouble(),
+                    fontFamily: resume.font.fontFamily,
+                    height: 1.7,
+                    color: const Color(0xFF374151),
+                  ),
+                ),
+                const SizedBox(height: 28),
+              ],
+
+              // Education (Primary for Academic)
+              if (resume.sections.education && education.isNotEmpty) ...[
+                _buildAcademicSection('EDUCATION', secondaryColor),
+                const SizedBox(height: 16),
+                ...education.map((edu) => _buildAcademicEducation(edu, primaryColor)),
+                const SizedBox(height: 28),
+              ],
+
+              // Experience
+              if (resume.sections.experience && experience.isNotEmpty) ...[
+                _buildAcademicSection('PROFESSIONAL EXPERIENCE', secondaryColor),
+                const SizedBox(height: 16),
+                ...experience.map((exp) => _buildAcademicExperience(exp, primaryColor)),
+                const SizedBox(height: 28),
+              ],
+
+              // Skills
+              if (resume.sections.skills && skills.isNotEmpty) ...[
+                _buildAcademicSection('SKILLS & COMPETENCIES', secondaryColor),
+                const SizedBox(height: 16),
+                _buildAcademicSkills(skills),
+                const SizedBox(height: 28),
+              ],
+
+              // References
+              if (resume.sections.references && resume.references.isNotEmpty) ...[
+                _buildAcademicSection('REFERENCES', secondaryColor),
+                const SizedBox(height: 16),
+                ...resume.references.map((ref) => _buildAcademicReference(ref, primaryColor)),
+              ],
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAcademicSection(String title, Color color) {
+    return Text(
+      title,
+      style: TextStyle(
+        fontSize: resume.font.header2FontSize.toDouble() + 1,
+        fontWeight: FontWeight.bold,
+        color: color,
+        fontFamily: resume.font.fontFamily,
+        letterSpacing: 1.5,
+      ),
+    );
+  }
+
+  Widget _buildAcademicEducation(Education edu, Color color) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                margin: const EdgeInsets.only(top: 2),
+                width: 8,
+                height: 8,
+                decoration: BoxDecoration(
+                  color: color,
+                  shape: BoxShape.circle,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      '${edu.degreeLevel ?? ''} in ${edu.fieldOfStudy ?? ''}',
+                      style: TextStyle(
+                        fontSize: resume.font.contentFontSize.toDouble() + 2,
+                        fontWeight: FontWeight.bold,
+                        fontFamily: resume.font.fontFamily,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      edu.institution ?? '',
+                      style: TextStyle(
+                        fontSize: resume.font.contentFontSize.toDouble() + 1,
+                        fontFamily: resume.font.fontFamily,
+                        color: const Color(0xFF374151),
+                        fontStyle: FontStyle.italic,
+                      ),
+                    ),
+                    if (edu.startDate != null || edu.endDate != null) ...[
+                      const SizedBox(height: 4),
+                      Text(
+                        _formatDateRange(edu.startDate, edu.endDate, edu.isCurrent),
+                        style: TextStyle(
+                          fontSize: resume.font.contentFontSize.toDouble() - 1,
+                          color: const Color(0xFF6B7280),
+                          fontFamily: resume.font.fontFamily,
+                        ),
+                      ),
+                    ],
+                    if (edu.gpa != null) ...[
+                      const SizedBox(height: 4),
+                      Text(
+                        'GPA: ${edu.gpa}',
+                        style: TextStyle(
+                          fontSize: resume.font.contentFontSize.toDouble(),
+                          color: color,
+                          fontWeight: FontWeight.w600,
+                          fontFamily: resume.font.fontFamily,
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAcademicExperience(Experience exp, Color color) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 20),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            margin: const EdgeInsets.only(top: 2),
+            width: 8,
+            height: 8,
+            decoration: BoxDecoration(
+              color: color,
+              shape: BoxShape.circle,
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  exp.jobTitle ?? '',
+                  style: TextStyle(
+                    fontSize: resume.font.contentFontSize.toDouble() + 1,
+                    fontWeight: FontWeight.bold,
+                    fontFamily: resume.font.fontFamily,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  exp.company ?? '',
+                  style: TextStyle(
+                    fontSize: resume.font.contentFontSize.toDouble(),
+                    fontFamily: resume.font.fontFamily,
+                    color: const Color(0xFF374151),
+                  ),
+                ),
+                if (exp.startDate != null || exp.endDate != null) ...[
+                  const SizedBox(height: 2),
+                  Text(
+                    _formatDateRange(exp.startDate, exp.endDate, exp.isCurrent),
+                    style: TextStyle(
+                      fontSize: resume.font.contentFontSize.toDouble() - 1,
+                      color: const Color(0xFF6B7280),
+                      fontFamily: resume.font.fontFamily,
+                    ),
+                  ),
+                ],
+                if (exp.description != null) ...[
+                  const SizedBox(height: 8),
+                  Text(
+                    exp.description!,
+                    style: TextStyle(
+                      fontSize: resume.font.contentFontSize.toDouble(),
+                      fontFamily: resume.font.fontFamily,
+                      height: 1.6,
+                      color: const Color(0xFF4B5563),
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAcademicSkills(List<Skill> skills) {
+    return Wrap(
+      spacing: 8,
+      runSpacing: 8,
+      children: skills.map((skill) {
+        return Text(
+          '${skill.name ?? ''}${skill.level != null ? ' (Level ${skill.level})' : skill.levelText != null ? ' (${skill.levelText})' : ''} • ',
+          style: TextStyle(
+            fontSize: resume.font.contentFontSize.toDouble(),
+            fontFamily: resume.font.fontFamily,
+            color: const Color(0xFF374151),
+          ),
+        );
+      }).toList(),
+    );
+  }
+
+  Widget _buildAcademicReference(ResumeReference ref, Color color) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 16),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            margin: const EdgeInsets.only(top: 2),
+            width: 8,
+            height: 8,
+            decoration: BoxDecoration(
+              color: color,
+              shape: BoxShape.circle,
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  ref.name,
+                  style: TextStyle(
+                    fontSize: resume.font.contentFontSize.toDouble() + 1,
+                    fontWeight: FontWeight.bold,
+                    fontFamily: resume.font.fontFamily,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  ref.position,
+                  style: TextStyle(
+                    fontSize: resume.font.contentFontSize.toDouble(),
+                    fontFamily: resume.font.fontFamily,
+                    color: const Color(0xFF6B7280),
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  ref.contact,
+                  style: TextStyle(
+                    fontSize: resume.font.contentFontSize.toDouble() - 1,
+                    color: const Color(0xFF9CA3AF),
+                    fontFamily: resume.font.fontFamily,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ========================================
+  // SHARED HELPER WIDGETS & METHODS
+  // ========================================
+
+  Widget _buildSectionHeader(String title, Color color) {
+    return Text(
+      title,
+      style: TextStyle(
+        fontSize: resume.font.header2FontSize.toDouble(),
+        fontWeight: FontWeight.bold,
+        color: color,
+        fontFamily: resume.font.fontFamily,
+        letterSpacing: 1,
+      ),
+    );
+  }
+
+  Widget _buildContactItem(IconData icon, String text, Color color) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(icon, size: 16, color: color),
+        const SizedBox(width: 8),
+        Flexible(
+          child: Text(
+            text,
+            style: TextStyle(
+              fontSize: resume.font.contentFontSize.toDouble(),
+              color: color,
+              fontFamily: resume.font.fontFamily,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  String _getInitials(String name) {
+    final parts = name.trim().split(' ');
+    if (parts.isEmpty) return 'U';
+    if (parts.length == 1) return parts[0][0].toUpperCase();
+    return '${parts[0][0]}${parts[parts.length - 1][0]}'.toUpperCase();
+  }
+
+  String _formatDateRange(Timestamp? start, Timestamp? end, bool? isCurrent) {
+    final dateFormat = DateFormat('MMM yyyy');
+
+    if (start == null && end == null) return '';
+
+    final startStr = start != null ? dateFormat.format(start.toDate()) : 'Unknown';
+    final endStr = isCurrent == true ? 'Present' : (end != null ? dateFormat.format(end.toDate()) : 'Present');
+
+    return '$startStr - $endStr';
   }
 
   Color _parseColor(String hex) {
@@ -800,6 +1947,10 @@ class PreviewResumePage extends StatelessWidget {
     final b = int.parse(hexColor.substring(4, 6), radix: 16);
     return Color.fromRGBO(r, g, b, 1.0);
   }
+
+  // ========================================
+  // ACTION BUTTONS
+  // ========================================
 
   Widget _buildActionButtons(BuildContext context) {
     return Container(
@@ -821,6 +1972,49 @@ class PreviewResumePage extends StatelessWidget {
             child: Row(
               children: [
                 Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: viewModel.isSharing
+                        ? null
+                        : () async {
+                      await viewModel.shareResume(resume);
+                      if (viewModel.successMessage != null && context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text(viewModel.successMessage!),
+                            backgroundColor: Colors.green,
+                          ),
+                        );
+                      }
+                    },
+                    style: OutlinedButton.styleFrom(
+                      side: const BorderSide(color: Color(0xFF7C3AED)),
+                      minimumSize: const Size.fromHeight(52),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                    icon: viewModel.isSharing
+                        ? const SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: Color(0xFF7C3AED),
+                      ),
+                    )
+                        : const Icon(Icons.share, color: Color(0xFF7C3AED)),
+                    label: const Text(
+                      'Share',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF7C3AED),
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
                   child: Container(
                     decoration: BoxDecoration(
                       gradient: const LinearGradient(
@@ -833,6 +2027,21 @@ class PreviewResumePage extends StatelessWidget {
                           ? null
                           : () async {
                         await viewModel.downloadResume(resume);
+                        if (viewModel.successMessage != null && context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text(viewModel.successMessage!),
+                              backgroundColor: Colors.green,
+                            ),
+                          );
+                        } else if (viewModel.error != null && context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text(viewModel.error!),
+                              backgroundColor: Colors.red,
+                            ),
+                          );
+                        }
                       },
                       style: ElevatedButton.styleFrom(
                         backgroundColor: Colors.transparent,
@@ -859,41 +2068,6 @@ class PreviewResumePage extends StatelessWidget {
                           fontWeight: FontWeight.bold,
                           color: Colors.white,
                         ),
-                      ),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: OutlinedButton.icon(
-                    onPressed: viewModel.isSharing
-                        ? null
-                        : () async {
-                      await viewModel.shareResume(resume);
-                    },
-                    style: OutlinedButton.styleFrom(
-                      side: const BorderSide(color: Color(0xFF7C3AED)),
-                      minimumSize: const Size.fromHeight(52),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                    ),
-                    icon: viewModel.isSharing
-                        ? const SizedBox(
-                      width: 20,
-                      height: 20,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        color: Color(0xFF7C3AED),
-                      ),
-                    )
-                        : const Icon(Icons.share, color: Color(0xFF7C3AED)),
-                    label: const Text(
-                      'Share',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                        color: Color(0xFF7C3AED),
                       ),
                     ),
                   ),

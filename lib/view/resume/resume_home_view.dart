@@ -1,9 +1,11 @@
-// lib/views/resume_builder/resume_list_page.dart
+// lib/view/resume/resume_home_view.dart
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:path_wise/ViewModel/resume_view_model.dart';
 import 'package:path_wise/ViewModel/profile_view_model.dart';
 import 'package:path_wise/model/resume_model.dart';
+import 'package:path_wise/view/resume/resume_create_view.dart';
+import 'package:path_wise/view/resume/resume_customize_view.dart';
 import 'package:intl/intl.dart';
 
 class ResumeListPage extends StatefulWidget {
@@ -32,7 +34,7 @@ class _ResumeListPageState extends State<ResumeListPage> {
           gradient: LinearGradient(
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
-            colors: [Color(0xFF7C3AED), Color(0xFF9F7AEA)],
+            colors: [Color(0xFF8B5CF6), Color(0xFF3B82F6)],
           ),
         ),
         child: SafeArea(
@@ -104,16 +106,28 @@ class _ResumeListPageState extends State<ResumeListPage> {
                   color: Colors.white,
                 ),
               ),
+              IconButton(
+                icon: const Icon(Icons.help_outline, color: Colors.white),
+                onPressed: () {
+                  _showHelpDialog(context);
+                },
+              ),
             ],
           ),
           const SizedBox(height: 8),
+          const Text(
+            'Create professional resumes in minutes',
+            style: TextStyle(
+              fontSize: 14,
+              color: Colors.white70,
+            ),
+          ),
         ],
       ),
     );
   }
 
   Widget _buildCreateNewCard(BuildContext context, ProfileViewModel profileVM, ResumeViewModel resumeVM) {
-    final profile = profileVM.profile;
     final isProfileComplete = _isProfileComplete(profileVM);
 
     return Container(
@@ -135,7 +149,12 @@ class _ResumeListPageState extends State<ResumeListPage> {
             if (!isProfileComplete) {
               _showIncompleteProfileDialog(context, profileVM);
             } else {
-              Navigator.pushNamed(context, '/resume/template-selection');
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => const TemplateSelectionPage(),
+                ),
+              );
             }
           },
           borderRadius: BorderRadius.circular(16),
@@ -198,7 +217,12 @@ class _ResumeListPageState extends State<ResumeListPage> {
                       if (!isProfileComplete) {
                         _showIncompleteProfileDialog(context, profileVM);
                       } else {
-                        Navigator.pushNamed(context, '/resume/template-selection');
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => const TemplateSelectionPage(),
+                          ),
+                        );
                       }
                     },
                     style: ElevatedButton.styleFrom(
@@ -279,6 +303,7 @@ class _ResumeListPageState extends State<ResumeListPage> {
               fontSize: 13,
               color: Color(0xFF6B7280),
             ),
+            textAlign: TextAlign.center,
           ),
         ],
       ),
@@ -289,13 +314,26 @@ class _ResumeListPageState extends State<ResumeListPage> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
-          'Your Resumes',
-          style: TextStyle(
-            fontSize: 20,
-            fontWeight: FontWeight.bold,
-            color: Color(0xFF1F2937),
-          ),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            const Text(
+              'Your Resumes',
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+                color: Color(0xFF1F2937),
+              ),
+            ),
+            if (viewModel.hasResumes)
+              Text(
+                '${viewModel.resumeCount} ${viewModel.resumeCount == 1 ? 'resume' : 'resumes'}',
+                style: const TextStyle(
+                  fontSize: 13,
+                  color: Color(0xFF6B7280),
+                ),
+              ),
+          ],
         ),
         const SizedBox(height: 16),
         if (!viewModel.hasResumes)
@@ -404,6 +442,20 @@ class _ResumeListPageState extends State<ResumeListPage> {
                     ],
                   ),
                 ),
+                // Delete button in top-right corner
+                Container(
+                  decoration: BoxDecoration(
+                    color: Colors.red[50],
+                    shape: BoxShape.circle,
+                  ),
+                  child: IconButton(
+                    icon: const Icon(Icons.close, size: 20),
+                    color: Colors.red,
+                    padding: const EdgeInsets.all(8),
+                    constraints: const BoxConstraints(),
+                    onPressed: () => _confirmDelete(context, viewModel, resume),
+                  ),
+                ),
               ],
             ),
             const SizedBox(height: 12),
@@ -415,7 +467,15 @@ class _ResumeListPageState extends State<ResumeListPage> {
                   const Color(0xFF7C3AED),
                       () {
                     viewModel.setCurrentResume(resume);
-                    Navigator.pushNamed(context, '/resume/edit', arguments: resume);
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => CustomizeResumePage(
+                          resume: resume,
+                          isEditing: true,
+                        ),
+                      ),
+                    );
                   },
                 ),
                 const SizedBox(width: 8),
@@ -427,6 +487,14 @@ class _ResumeListPageState extends State<ResumeListPage> {
                       ? null
                       : () async {
                     await viewModel.downloadResume(resume);
+                    if (viewModel.successMessage != null && context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text(viewModel.successMessage!),
+                          backgroundColor: Colors.green,
+                        ),
+                      );
+                    }
                   },
                 ),
                 const SizedBox(width: 8),
@@ -438,6 +506,14 @@ class _ResumeListPageState extends State<ResumeListPage> {
                       ? null
                       : () async {
                     await viewModel.shareResume(resume);
+                    if (viewModel.successMessage != null && context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text(viewModel.successMessage!),
+                          backgroundColor: Colors.green,
+                        ),
+                      );
+                    }
                   },
                 ),
               ],
@@ -487,6 +563,129 @@ class _ResumeListPageState extends State<ResumeListPage> {
     );
   }
 
+  void _confirmDelete(BuildContext context, ResumeViewModel viewModel, ResumeDoc resume) {
+    showDialog(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Row(
+          children: [
+            Icon(Icons.warning_amber_rounded, color: Colors.red, size: 28),
+            SizedBox(width: 12),
+            Text('Delete Resume?'),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Are you sure you want to delete "${resume.title}"?',
+              style: const TextStyle(fontSize: 14),
+            ),
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.red[50],
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: const Row(
+                children: [
+                  Icon(Icons.info_outline, size: 18, color: Colors.red),
+                  SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'This action cannot be undone.',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.red,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              // Close confirmation dialog first
+              Navigator.pop(dialogContext);
+
+              // Show loading dialog
+              showDialog(
+                context: context,
+                barrierDismissible: false,
+                builder: (loadingContext) => WillPopScope(
+                  onWillPop: () async => false,
+                  child: const Center(
+                    child: CircularProgressIndicator(),
+                  ),
+                ),
+              );
+
+              try {
+                final success = await viewModel.deleteResume(resume.id);
+
+                // Always close loading dialog
+                if (context.mounted) {
+                  Navigator.of(context, rootNavigator: true).pop();
+                }
+
+                // Show result message
+                if (context.mounted) {
+                  if (success) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Resume deleted successfully'),
+                        backgroundColor: Colors.green,
+                        duration: Duration(seconds: 2),
+                      ),
+                    );
+                  } else {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text(viewModel.error ?? 'Failed to delete resume'),
+                        backgroundColor: Colors.red,
+                        duration: const Duration(seconds: 3),
+                      ),
+                    );
+                  }
+                }
+              } catch (e) {
+                // Ensure loading dialog is closed on error
+                if (context.mounted) {
+                  Navigator.of(context, rootNavigator: true).pop();
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('Error: ${e.toString()}'),
+                      backgroundColor: Colors.red,
+                      duration: const Duration(seconds: 3),
+                    ),
+                  );
+                }
+              }
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+            ),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+  }
+
   bool _isProfileComplete(ProfileViewModel vm) {
     final p = vm.profile;
     if (p == null) return false;
@@ -510,19 +709,26 @@ class _ResumeListPageState extends State<ResumeListPage> {
       context: context,
       builder: (context) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Text('Incomplete Profile'),
+        title: const Row(
+          children: [
+            Icon(Icons.info_outline, color: Color(0xFFF59E0B), size: 28),
+            SizedBox(width: 12),
+            Text('Incomplete Profile'),
+          ],
+        ),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const Text(
               'Some profile information is missing. Complete your profile for a better resume or continue with available data.',
+              style: TextStyle(fontSize: 14),
             ),
             if (missingFields.isNotEmpty) ...[
               const SizedBox(height: 16),
               const Text(
                 'Missing fields:',
-                style: TextStyle(fontWeight: FontWeight.bold),
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
               ),
               const SizedBox(height: 8),
               ...missingFields.map((field) => Padding(
@@ -531,7 +737,7 @@ class _ResumeListPageState extends State<ResumeListPage> {
                   children: [
                     const Icon(Icons.close, size: 16, color: Colors.red),
                     const SizedBox(width: 8),
-                    Text(field),
+                    Text(field, style: const TextStyle(fontSize: 13)),
                   ],
                 ),
               )),
@@ -546,7 +752,7 @@ class _ResumeListPageState extends State<ResumeListPage> {
           TextButton(
             onPressed: () {
               Navigator.pop(context);
-              // Navigate to profile page
+              // Navigate to profile page if you have the route
               // Navigator.pushNamed(context, '/profile');
             },
             child: const Text('Complete Profile'),
@@ -554,12 +760,91 @@ class _ResumeListPageState extends State<ResumeListPage> {
           ElevatedButton(
             onPressed: () {
               Navigator.pop(context);
-              Navigator.pushNamed(context, '/resume/template-selection');
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => const TemplateSelectionPage(),
+                ),
+              );
             },
             style: ElevatedButton.styleFrom(
               backgroundColor: const Color(0xFF7C3AED),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
             ),
             child: const Text('Continue Anyway'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showHelpDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Row(
+          children: [
+            Icon(Icons.help_outline, color: Color(0xFF7C3AED)),
+            SizedBox(width: 12),
+            Text('How to use Resume Builder'),
+          ],
+        ),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _buildHelpStep('1', 'Complete your profile with personal info, skills, education, and experience'),
+              _buildHelpStep('2', 'Click "Start Building" to choose a template'),
+              _buildHelpStep('3', 'Customize fonts, colors, and sections'),
+              _buildHelpStep('4', 'Preview and download your resume as PDF'),
+              _buildHelpStep('5', 'Edit or delete resumes anytime from the list'),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Got it!'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildHelpStep(String number, String text) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: 24,
+            height: 24,
+            decoration: const BoxDecoration(
+              color: Color(0xFF7C3AED),
+              shape: BoxShape.circle,
+            ),
+            child: Center(
+              child: Text(
+                number,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 12,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              text,
+              style: const TextStyle(fontSize: 13, height: 1.4),
+            ),
           ),
         ],
       ),

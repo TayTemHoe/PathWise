@@ -79,7 +79,7 @@ class _InterviewHomePageState extends State<InterviewHomePage> {
         gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: [Color(0xFF7C3AED), Color(0xFF9F7AEA)],
+          colors: [Color(0xFF8B5CF6), Color(0xFF3B82F6)],
         ),
       ),
       child: Column(

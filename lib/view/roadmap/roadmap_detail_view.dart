@@ -847,7 +847,10 @@ class _RoadmapDetailViewState extends State<RoadmapDetailView> {
                     borderRadius: BorderRadius.circular(8),
                   ),
                 ),
-                child: const Text('Start Learning'),
+                child: const Text('Start Learning',
+                  style: TextStyle(
+                  color: Colors.white,
+                ),),
               ),
             ),
           ],
