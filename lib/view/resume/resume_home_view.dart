@@ -789,7 +789,8 @@ class _ResumeListPageState extends State<ResumeListPage> {
           children: [
             Icon(Icons.help_outline, color: Color(0xFF7C3AED)),
             SizedBox(width: 12),
-            Text('How to use Resume Builder'),
+            Text('How to use Resume Builder',
+                style: const TextStyle(fontSize: 20)),
           ],
         ),
         content: SingleChildScrollView(
