@@ -238,13 +238,20 @@ class EditExperienceScreen extends StatelessWidget {
                                           ? employmentType
                                           : null,
                                       items: _employmentTypes
-                                          .map((e) =>
-                                          DropdownMenuItem(value: e, child: Text(e)))
+                                          .map((e) => DropdownMenuItem(
+                                        value: e,
+                                        child: Text(
+                                          e,
+                                          overflow: TextOverflow.ellipsis,
+                                          maxLines: 1,
+                                        ),
+                                      ))
                                           .toList(),
                                       onChanged: (v) => setState(() => employmentType = v),
                                       validator: (v) =>
                                       (v == null || v.isEmpty) ? 'Required' : null,
                                       decoration: _inputDecoration(hint: 'Select type'),
+                                      isExpanded: true, // Add this line
                                     ),
                                   ],
                                 ),
@@ -259,14 +266,20 @@ class EditExperienceScreen extends StatelessWidget {
                                     DropdownButtonFormField<String>(
                                       value: _industries.contains(industry) ? industry : null,
                                       items: _industries
-                                          .map((e) =>
-                                          DropdownMenuItem(value: e, child: Text(e)))
+                                          .map((e) => DropdownMenuItem(
+                                        value: e,
+                                        child: Text(
+                                          e,
+                                          overflow: TextOverflow.ellipsis,
+                                          maxLines: 1,
+                                        ),
+                                      ))
                                           .toList(),
                                       onChanged: (v) => setState(() => industry = v),
                                       validator: (v) =>
                                       (v == null || v.isEmpty) ? 'Required' : null,
-                                      decoration:
-                                      _inputDecoration(hint: 'Select industry'),
+                                      decoration: _inputDecoration(hint: 'Select industry'),
+                                      isExpanded: true, // Add this line
                                     ),
                                   ],
                                 ),

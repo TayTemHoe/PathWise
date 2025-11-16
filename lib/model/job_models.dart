@@ -366,12 +366,14 @@ class JobModel {
 }
 
 /// JobFilters class for search filtering
+/// JobFilters class for search filtering
 class JobFilters {
   final String? query; // keyword (title/company/skills)
   final String? location; // "Kuala Lumpur, Malaysia"
+  final String? country; // NEW: Country code (my, us, uk, sg, etc.)
   final String? remote; // "Remote" | "Hybrid" | "On-site"
-  final int? minSalary; // MYR
-  final int? maxSalary; // MYR
+  final int? minSalary; // MYR or other currency
+  final int? maxSalary; // MYR or other currency
   final List<String>? industries; // Company types/industries
   final List<String>? employmentTypes; // "FULLTIME", "CONTRACTOR", "PARTTIME", "INTERN"
   final String? experienceLevel; // "Internship", "Entry level", "Associate", "Mid-Senior level"
@@ -381,6 +383,7 @@ class JobFilters {
   JobFilters({
     this.query,
     this.location,
+    this.country, // NEW
     this.remote,
     this.minSalary,
     this.maxSalary,
@@ -398,6 +401,7 @@ class JobFilters {
   JobFilters copyWith({
     String? query,
     String? location,
+    String? country, // NEW
     String? remote,
     int? minSalary,
     int? maxSalary,
@@ -410,6 +414,7 @@ class JobFilters {
     return JobFilters(
       query: query ?? this.query,
       location: location ?? this.location,
+      country: country ?? this.country, // NEW
       remote: remote ?? this.remote,
       minSalary: minSalary ?? this.minSalary,
       maxSalary: maxSalary ?? this.maxSalary,
@@ -427,6 +432,7 @@ class JobFilters {
 
     if (query != null && query!.isNotEmpty) map['q'] = query!;
     if (location != null && location!.isNotEmpty) map['location'] = location!;
+    if (country != null && country!.isNotEmpty) map['country'] = country!; // NEW
     if (remote != null && remote!.isNotEmpty) map['remote'] = remote!;
     if (minSalary != null) map['minSalary'] = minSalary.toString();
     if (maxSalary != null) map['maxSalary'] = maxSalary.toString();
@@ -452,6 +458,7 @@ class JobFilters {
   bool get hasActiveFilters {
     return (query != null && query!.isNotEmpty) ||
         (location != null && location!.isNotEmpty) ||
+        (country != null && country!.isNotEmpty) || // NEW
         remote != null ||
         minSalary != null ||
         maxSalary != null ||
@@ -466,6 +473,7 @@ class JobFilters {
     int count = 0;
     if (query != null && query!.isNotEmpty) count++;
     if (location != null && location!.isNotEmpty) count++;
+    if (country != null && country!.isNotEmpty) count++; // NEW
     if (remote != null) count++;
     if (minSalary != null || maxSalary != null) count++;
     if (industries != null && industries!.isNotEmpty) count++;

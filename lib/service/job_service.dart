@@ -4,16 +4,18 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart';
 import 'package:path_wise/model/job_models.dart';
 
+
 class JobService {
-  final String apiKey = 'e41d8eaff2msh041a382f6bb1904p194aecjsn715ac6c5b487'; // Replace with your actual RapidAPI Key
+  final String apiKey = 'e41d8eaff2msh041a382f6bb1904p194aecjsn715ac6c5b487';
   final String apiHost = 'jsearch.p.rapidapi.com';
   final String searchEndpoint = 'https://jsearch.p.rapidapi.com/search';
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
-  /// Fetch jobs from JSearch API with proper filtering
+  /// Fetch jobs from JSearch API with proper filtering and multi-country support
   Future<List<JobModel>> fetchJobs({
     String? query,
     String? location,
+    String? country, // NEW: Country code parameter (us, uk, my, sg, etc.)
     JobFilters? filters,
     int page = 1,
   }) async {
@@ -22,6 +24,7 @@ class JobService {
       final queryParams = _buildQueryParams(
         query: query,
         location: location,
+        country: country,
         filters: filters,
         page: page,
       );
@@ -33,8 +36,8 @@ class JobService {
       final response = await http.get(
         uri,
         headers: {
-          'X-RapidAPI-Host': apiHost,
-          'X-RapidAPI-Key': apiKey,
+          'x-rapidapi-key': apiKey,
+          'x-rapidapi-host': apiHost,
         },
       );
 
@@ -64,25 +67,43 @@ class JobService {
   Map<String, String> _buildQueryParams({
     String? query,
     String? location,
+    String? country,
     JobFilters? filters,
     int page = 1,
   }) {
     final params = <String, String>{};
 
-    // Main search query
+    // Main search query - combine job title with location if provided
+    String searchQuery = '';
+
     if (query != null && query.isNotEmpty) {
-      params['query'] = query;
+      searchQuery = query;
     } else if (filters?.query != null && filters!.query!.isNotEmpty) {
-      params['query'] = filters.query!;
+      searchQuery = filters.query!;
     } else {
-      params['query'] = 'Software Developer'; // Default query
+      searchQuery = 'Software Developer'; // Default query
     }
 
-    // Location
-    if (location != null && location.isNotEmpty) {
-      params['location'] = 'my';
-    } else if (filters?.location != null && filters!.location!.isNotEmpty) {
-      params['location'] = filters.location!;
+    // Add location to query if provided (e.g., "Software Developer in Kuala Lumpur")
+    if (location != null && location.isNotEmpty && location.toLowerCase() != 'malaysia') {
+      searchQuery += ' in $location';
+    }
+
+    params['query'] = searchQuery;
+
+    // Country code (IMPORTANT: This filters jobs by country)
+    // Supported codes: us, uk, ca, au, sg, my, in, de, fr, etc.
+    if (country != null && country.isNotEmpty) {
+      params['country'] = country.toLowerCase();
+    } else if (filters?.location != null) {
+      // Try to extract country code from filters
+      final countryCode = _extractCountryCode(filters!.location!);
+      if (countryCode != null) {
+        params['country'] = countryCode;
+      }
+    } else {
+      // Default to Malaysia
+      params['country'] = 'my';
     }
 
     // Remote jobs filter
@@ -92,14 +113,14 @@ class JobService {
       }
     }
 
-    // Employment types (Full-time, Part-time, Contract, Internship)
+    // Employment types (FULLTIME, CONTRACTOR, PARTTIME, INTERN)
     if (filters?.employmentTypes != null && filters!.employmentTypes!.isNotEmpty) {
       params['employment_types'] = filters.employmentTypes!.join(',');
     }
 
-    // Date posted filter
+    // Date posted filter (all, today, 3days, week, month)
     if (filters?.dateRange != null && filters!.dateRange!.isNotEmpty) {
-      params['date_posted'] = filters.dateRange!; // all, today, 3days, week, month
+      params['date_posted'] = filters.dateRange!;
     }
 
     // Pagination
@@ -107,6 +128,54 @@ class JobService {
     params['num_pages'] = '1';
 
     return params;
+  }
+
+  /// Extract country code from location string
+  /// Examples: "Kuala Lumpur, Malaysia" -> "my", "New York, USA" -> "us"
+  String? _extractCountryCode(String location) {
+    final locationLower = location.toLowerCase();
+
+    // Map of country names/keywords to their codes
+    final countryMap = {
+      'malaysia': 'my',
+      'singapore': 'sg',
+      'united states': 'us',
+      'usa': 'us',
+      'america': 'us',
+      'united kingdom': 'uk',
+      'uk': 'uk',
+      'england': 'uk',
+      'canada': 'ca',
+      'australia': 'au',
+      'india': 'in',
+      'indonesia': 'id',
+      'philippines': 'ph',
+      'thailand': 'th',
+      'vietnam': 'vn',
+      'germany': 'de',
+      'france': 'fr',
+      'spain': 'es',
+      'italy': 'it',
+      'netherlands': 'nl',
+      'japan': 'jp',
+      'south korea': 'kr',
+      'china': 'cn',
+      'hong kong': 'hk',
+      'taiwan': 'tw',
+      'new zealand': 'nz',
+      'brazil': 'br',
+      'mexico': 'mx',
+      'argentina': 'ar',
+    };
+
+    // Check if location contains any country keyword
+    for (var entry in countryMap.entries) {
+      if (locationLower.contains(entry.key)) {
+        return entry.value;
+      }
+    }
+
+    return null; // Return null if no country code found
   }
 
   /// Parse jobs response from JSearch API
@@ -132,11 +201,13 @@ class JobService {
   Future<List<JobModel>> searchJobsByCareerSuggestion({
     required String jobTitle,
     String? location,
+    String? country,
     int page = 1,
   }) async {
     return fetchJobs(
       query: jobTitle,
-      location: location ?? 'Malaysia',
+      location: location,
+      country: country ?? 'my',
       page: page,
     );
   }
@@ -333,6 +404,7 @@ class JobService {
   Future<List<JobModel>> searchJobsWithFilters({
     required String query,
     String? location,
+    String? country,
     required JobFilters filters,
     int page = 1,
   }) async {
@@ -340,6 +412,7 @@ class JobService {
     final jobs = await fetchJobs(
       query: query,
       location: location,
+      country: country,
       filters: filters,
       page: page,
     );
@@ -367,5 +440,36 @@ class JobService {
         }
       }).whereType<JobModel>().toList();
     });
+  }
+
+  /// Get list of supported countries with their codes
+  static Map<String, String> getSupportedCountries() {
+    return {
+      'my': 'Malaysia',
+      'sg': 'Singapore',
+      'us': 'United States',
+      'uk': 'United Kingdom',
+      'ca': 'Canada',
+      'au': 'Australia',
+      'in': 'India',
+      'id': 'Indonesia',
+      'ph': 'Philippines',
+      'th': 'Thailand',
+      'vn': 'Vietnam',
+      'de': 'Germany',
+      'fr': 'France',
+      'es': 'Spain',
+      'it': 'Italy',
+      'nl': 'Netherlands',
+      'jp': 'Japan',
+      'kr': 'South Korea',
+      'cn': 'China',
+      'hk': 'Hong Kong',
+      'tw': 'Taiwan',
+      'nz': 'New Zealand',
+      'br': 'Brazil',
+      'mx': 'Mexico',
+      'ar': 'Argentina',
+    };
   }
 }

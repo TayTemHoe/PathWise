@@ -63,7 +63,7 @@ class ProfileOverviewScreen extends StatelessWidget {
                   Expanded(
                     child: Container(
                       decoration: const BoxDecoration(
-                        color: Color(0xFFF7F8FC),
+                        color: Color(0xFFF5F5F5),
                         borderRadius: BorderRadius.only(
                           topLeft: Radius.circular(30),
                           topRight: Radius.circular(30),
@@ -384,6 +384,7 @@ class _HeaderCard extends StatelessWidget {
     return Card(
       elevation: 0,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      color: Color(0xFFFFFFFF),
       child: Padding(
         padding: const EdgeInsets.all(14),
         child: Row(
@@ -490,6 +491,7 @@ class _CompletionCard extends StatelessWidget {
     return Card(
       elevation: 0,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      color: Color(0xFFFFFFFF),
       child: Padding(
         padding: const EdgeInsets.fromLTRB(14, 14, 14, 16),
         child: Column(
@@ -560,6 +562,7 @@ class _SectionCard extends StatelessWidget {
     return Card(
       elevation: 0,
       margin: const EdgeInsets.only(top: 10),
+      color: Color(0xFFFFFFFF),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       child: InkWell(
         borderRadius: BorderRadius.circular(16),

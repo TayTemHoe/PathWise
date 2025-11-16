@@ -124,7 +124,10 @@ class _JobViewState extends State<JobView> with AutomaticKeepAliveClientMixin {
       body: Column(
         children: [
           _buildSearchHeader(),
-          if (_showFilters) _buildFilterPanel(),
+          if (_showFilters)
+            Flexible(  // Changed: Wrap filter panel in Flexible
+              child: _buildFilterPanel(),
+            ),
           Expanded(child: _buildJobListings()),
         ],
       ),
@@ -281,33 +284,41 @@ class _JobViewState extends State<JobView> with AutomaticKeepAliveClientMixin {
       builder: (context, jobVM, _) {
         return Container(
           color: Colors.white,
-          padding: EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          constraints: BoxConstraints(
+            maxHeight: MediaQuery.of(context).size.height * 0.6, // Max 60% of screen height
+          ),
+          child: SingleChildScrollView(  // Add scrolling capability
+            child: Padding(
+              padding: EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min, // Add this
                 children: [
-                  Text(
-                    'Filters',
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                    ),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        'Filters',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      TextButton(
+                        onPressed: () {
+                          jobVM.clearFilters();
+                        },
+                        child: Text('Clear All'),
+                      ),
+                    ],
                   ),
-                  TextButton(
-                    onPressed: () {
-                      jobVM.clearFilters();
-                    },
-                    child: Text('Clear All'),
-                  ),
+                  SizedBox(height: 16),
+                  _buildFilterChips(jobVM),
+                  SizedBox(height: 12),
+                  _buildAdvancedFilters(jobVM),
                 ],
               ),
-              SizedBox(height: 16),
-              _buildFilterChips(jobVM),
-              SizedBox(height: 12),
-              _buildAdvancedFilters(jobVM),
-            ],
+            ),
           ),
         );
       },
@@ -345,119 +356,147 @@ class _JobViewState extends State<JobView> with AutomaticKeepAliveClientMixin {
   }
 
   Widget _buildAdvancedFilters(JobViewModel jobVM) {
-    return ExpansionTile(
-      title: Text('Advanced Filters', style: TextStyle(fontWeight: FontWeight.w600)),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
       children: [
+        Text(
+          'Advanced Filters',
+          style: TextStyle(fontWeight: FontWeight.w600, fontSize: 16),
+        ),
+        SizedBox(height: 12),
         _buildSalaryRangeFilter(jobVM),
+        SizedBox(height: 8),
         _buildExperienceLevelFilter(jobVM),
+        SizedBox(height: 8),
         _buildIndustryFilter(jobVM),
       ],
     );
   }
 
   Widget _buildSalaryRangeFilter(JobViewModel jobVM) {
-    return ListTile(
-      title: Text('Salary Range', style: TextStyle(fontSize: 14)),
-      subtitle: Row(
-        children: [
-          Expanded(
-            child: TextField(
-              decoration: InputDecoration(
-                labelText: 'Min (RM)',
-                isDense: true,
-                border: OutlineInputBorder(),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text('Salary Range', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500)),
+        SizedBox(height: 8),
+        Row(
+          children: [
+            Expanded(
+              child: TextField(
+                decoration: InputDecoration(
+                  labelText: 'Min (RM)',
+                  isDense: true,
+                  border: OutlineInputBorder(),
+                  contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                ),
+                keyboardType: TextInputType.number,
+                onChanged: (value) {
+                  final minSalary = int.tryParse(value);
+                  if (minSalary != null) {
+                    final newFilters = jobVM.currentFilters.copyWith(
+                      minSalary: minSalary,
+                    );
+                    jobVM.applyFilters(newFilters);
+                  }
+                },
               ),
-              keyboardType: TextInputType.number,
-              onChanged: (value) {
-                final minSalary = int.tryParse(value);
-                if (minSalary != null) {
-                  final newFilters = jobVM.currentFilters.copyWith(
-                    minSalary: minSalary,
-                  );
-                  jobVM.applyFilters(newFilters);
-                }
-              },
             ),
-          ),
-          SizedBox(width: 8),
-          Text('-'),
-          SizedBox(width: 8),
-          Expanded(
-            child: TextField(
-              decoration: InputDecoration(
-                labelText: 'Max (RM)',
-                isDense: true,
-                border: OutlineInputBorder(),
+            Padding(
+              padding: EdgeInsets.symmetric(horizontal: 8),
+              child: Text('-'),
+            ),
+            Expanded(
+              child: TextField(
+                decoration: InputDecoration(
+                  labelText: 'Max (RM)',
+                  isDense: true,
+                  border: OutlineInputBorder(),
+                  contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                ),
+                keyboardType: TextInputType.number,
+                onChanged: (value) {
+                  final maxSalary = int.tryParse(value);
+                  if (maxSalary != null) {
+                    final newFilters = jobVM.currentFilters.copyWith(
+                      maxSalary: maxSalary,
+                    );
+                    jobVM.applyFilters(newFilters);
+                  }
+                },
               ),
-              keyboardType: TextInputType.number,
-              onChanged: (value) {
-                final maxSalary = int.tryParse(value);
-                if (maxSalary != null) {
-                  final newFilters = jobVM.currentFilters.copyWith(
-                    maxSalary: maxSalary,
-                  );
-                  jobVM.applyFilters(newFilters);
-                }
-              },
             ),
-          ),
-        ],
-      ),
+          ],
+        ),
+      ],
     );
   }
 
   Widget _buildExperienceLevelFilter(JobViewModel jobVM) {
     final levels = ['Internship', 'Entry level', 'Mid-Senior level', 'Director'];
-    return ListTile(
-      title: Text('Experience Level', style: TextStyle(fontSize: 14)),
-      subtitle: Wrap(
-        spacing: 8,
-        children: levels.map((level) {
-          final isSelected = jobVM.currentFilters.experienceLevel == level;
-          return ChoiceChip(
-            label: Text(level, style: TextStyle(fontSize: 12)),
-            selected: isSelected,
-            onSelected: (selected) {
-              final newFilters = jobVM.currentFilters.copyWith(
-                experienceLevel: selected ? level : null,
-              );
-              jobVM.applyFilters(newFilters);
-            },
-            selectedColor: Color(0xFF7C3AED).withOpacity(0.2),
-          );
-        }).toList(),
-      ),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text('Experience Level', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500)),
+        SizedBox(height: 8),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: levels.map((level) {
+            final isSelected = jobVM.currentFilters.experienceLevel == level;
+            return ChoiceChip(
+              label: Text(level, style: TextStyle(fontSize: 12)),
+              selected: isSelected,
+              onSelected: (selected) {
+                final newFilters = jobVM.currentFilters.copyWith(
+                  experienceLevel: selected ? level : null,
+                );
+                jobVM.applyFilters(newFilters);
+              },
+              selectedColor: Color(0xFF7C3AED).withOpacity(0.2),
+            );
+          }).toList(),
+        ),
+      ],
     );
   }
 
   Widget _buildIndustryFilter(JobViewModel jobVM) {
     final industries = ['Technology', 'Finance', 'Healthcare', 'Education', 'Marketing'];
-    return ListTile(
-      title: Text('Industry', style: TextStyle(fontSize: 14)),
-      subtitle: Wrap(
-        spacing: 8,
-        children: industries.map((industry) {
-          final isSelected = jobVM.currentFilters.industries?.contains(industry) ?? false;
-          return FilterChip(
-            label: Text(industry, style: TextStyle(fontSize: 12)),
-            selected: isSelected,
-            onSelected: (selected) {
-              final currentIndustries = List<String>.from(jobVM.currentFilters.industries ?? []);
-              if (selected) {
-                currentIndustries.add(industry);
-              } else {
-                currentIndustries.remove(industry);
-              }
-              final newFilters = jobVM.currentFilters.copyWith(
-                industries: currentIndustries.isEmpty ? null : currentIndustries,
-              );
-              jobVM.applyFilters(newFilters);
-            },
-            selectedColor: Color(0xFF7C3AED).withOpacity(0.2),
-            checkmarkColor: Color(0xFF7C3AED),
-          );
-        }).toList(),
-      ),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text('Industry', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500)),
+        SizedBox(height: 8),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: industries.map((industry) {
+            final isSelected = jobVM.currentFilters.industries?.contains(industry) ?? false;
+            return FilterChip(
+              label: Text(industry, style: TextStyle(fontSize: 12)),
+              selected: isSelected,
+              onSelected: (selected) {
+                final currentIndustries = List<String>.from(jobVM.currentFilters.industries ?? []);
+                if (selected) {
+                  currentIndustries.add(industry);
+                } else {
+                  currentIndustries.remove(industry);
+                }
+                final newFilters = jobVM.currentFilters.copyWith(
+                  industries: currentIndustries.isEmpty ? null : currentIndustries,
+                );
+                jobVM.applyFilters(newFilters);
+              },
+              selectedColor: Color(0xFF7C3AED).withOpacity(0.2),
+              checkmarkColor: Color(0xFF7C3AED),
+            );
+          }).toList(),
+        ),
+      ],
     );
   }
 
@@ -687,6 +726,7 @@ class _JobViewState extends State<JobView> with AutomaticKeepAliveClientMixin {
             padding: EdgeInsets.all(16),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min, // Add this to prevent overflow
               children: [
                 // Header with company logo and save button
                 Row(
@@ -716,6 +756,7 @@ class _JobViewState extends State<JobView> with AutomaticKeepAliveClientMixin {
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min, // Add this
                         children: [
                           Text(
                             job.companyName,
@@ -777,17 +818,20 @@ class _JobViewState extends State<JobView> with AutomaticKeepAliveClientMixin {
                   overflow: TextOverflow.ellipsis,
                 ),
                 SizedBox(height: 8),
-                // Tags
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: [
-                    if (job.isRemote)
-                      _buildTag('Remote', Colors.green),
-                    _buildTag(job.requiredExperience.experienceLevel ?? 'Entry level', Colors.blue),
-                    if (job.jobEmploymentTypes.isNotEmpty)
-                      _buildTag(job.jobEmploymentTypes.first, Colors.orange),
-                  ],
+                // Tags - Wrapped in Flexible to prevent overflow
+                Flexible(
+                  fit: FlexFit.loose, // Add Flexible wrapper
+                  child: Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      if (job.isRemote)
+                        _buildTag('Remote', Colors.green),
+                      _buildTag(job.requiredExperience.experienceLevel ?? 'Entry level', Colors.blue),
+                      if (job.jobEmploymentTypes.isNotEmpty)
+                        _buildTag(job.jobEmploymentTypes.first, Colors.orange),
+                    ],
+                  ),
                 ),
                 SizedBox(height: 12),
                 // Salary and Posted Date
@@ -809,9 +853,13 @@ class _JobViewState extends State<JobView> with AutomaticKeepAliveClientMixin {
                     ),
                     Icon(Icons.access_time, size: 14, color: Colors.grey[500]),
                     SizedBox(width: 4),
-                    Text(
-                      job.getTimeSincePosted(),
-                      style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                    Flexible( // Changed from implicit flex to explicit Flexible
+                      child: Text(
+                        job.getTimeSincePosted(),
+                        style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
                     ),
                   ],
                 ),
@@ -834,6 +882,7 @@ class _JobViewState extends State<JobView> with AutomaticKeepAliveClientMixin {
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(8),
                       ),
+                      padding: EdgeInsets.symmetric(vertical: 12), // Reduced padding slightly
                     ),
                     child: Text('View Details'),
                   ),

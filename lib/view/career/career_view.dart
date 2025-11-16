@@ -59,26 +59,35 @@ class _CareerDiscoveryViewState extends State<CareerDiscoveryView>
 
   Widget _buildHeader() {
     return Container(
-      decoration: BoxDecoration(
+      decoration: const BoxDecoration(
         gradient: LinearGradient(
           colors: [Color(0xFF8B5CF6), Color(0xFF3B82F6)],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
       ),
-      padding: EdgeInsets.fromLTRB(20, 40, 20, 20),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      padding: const EdgeInsets.fromLTRB(20, 40, 20, 20),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(
-            'Career Discovery',
-            style: TextStyle(
-              fontSize: 28,
-              fontWeight: FontWeight.bold,
-              color: Colors.white,
+          const SizedBox(width: 40), // Balance the space
+          const Expanded(
+            child: Text(
+              'Career Discovery',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 28,
+                fontWeight: FontWeight.bold,
+                color: Colors.white,
+              ),
             ),
           ),
-          SizedBox(height: 8),
+          IconButton(
+            icon: const Icon(Icons.help_outline, color: Colors.white),
+            onPressed: () {
+              _showHelpDialog(context);
+            },
+          ),
         ],
       ),
     );
@@ -263,7 +272,7 @@ class _CareerDiscoveryViewState extends State<CareerDiscoveryView>
               color: Colors.grey[600],
             ),
           ),
-          SizedBox(height: 10),
+          SizedBox(height: 2),
           ElevatedButton.icon(
             onPressed: isEnabled
                 ? () async {
@@ -699,6 +708,77 @@ class _CareerDiscoveryViewState extends State<CareerDiscoveryView>
           TextButton(
             onPressed: () => Navigator.pop(context),
             child: Text('OK'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showHelpDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Row(
+          children: [
+            Icon(Icons.help_outline, color: Color(0xFF7C3AED)),
+            SizedBox(width: 12),
+            Text('How to use Career Discovery', style: TextStyle(fontSize: 18)),
+          ],
+        ),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _buildHelpStep('1', 'Complete your profile with personality assessments (MBTI, RIASEC) and skills'),
+              _buildHelpStep('2', 'Click "Get My Career Suggestions" to generate AI-powered career matches'),
+              _buildHelpStep('3', 'Review your career matches with fit scores and detailed information'),
+              _buildHelpStep('4', 'View job descriptions, required skills, and career growth potential'),
+              _buildHelpStep('5', 'Explore job matching to find available positions for each career'),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Got it!'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildHelpStep(String number, String text) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: 24,
+            height: 24,
+            decoration: const BoxDecoration(
+              color: Color(0xFF7C3AED),
+              shape: BoxShape.circle,
+            ),
+            child: Center(
+              child: Text(
+                number,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 12,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              text,
+              style: const TextStyle(fontSize: 13, height: 1.4),
+            ),
           ),
         ],
       ),

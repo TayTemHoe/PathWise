@@ -408,19 +408,35 @@ class _PreferencesFormState extends State<_PreferencesForm> {
         const SizedBox(height: 6),
 
         // two dropdowns kept inside a Row with Expanded -> safe
+        // Replace the Row containing Currency + Type dropdowns (around line 407-432)
+// with this fixed version:
+
         Row(
           children: [
             Expanded(
               child: DropdownButtonFormField<String>(
                 value: salaryCurrency,
                 items: const [
-                  DropdownMenuItem(value: 'MYR', child: Text('MYR (Ringgit)')),
-                  DropdownMenuItem(value: 'SGD', child: Text('SGD')),
-                  DropdownMenuItem(value: 'USD', child: Text('USD')),
-                  DropdownMenuItem(value: 'EUR', child: Text('EUR')),
+                  DropdownMenuItem(
+                    value: 'MYR',
+                    child: Text('MYR (Ringgit)', overflow: TextOverflow.ellipsis),
+                  ),
+                  DropdownMenuItem(
+                    value: 'SGD',
+                    child: Text('SGD', overflow: TextOverflow.ellipsis),
+                  ),
+                  DropdownMenuItem(
+                    value: 'USD',
+                    child: Text('USD', overflow: TextOverflow.ellipsis),
+                  ),
+                  DropdownMenuItem(
+                    value: 'EUR',
+                    child: Text('EUR', overflow: TextOverflow.ellipsis),
+                  ),
                 ],
                 onChanged: (v) => setState(() => salaryCurrency = v),
                 decoration: _input('Currency (optional)'),
+                isExpanded: true, // Add this line
               ),
             ),
             const SizedBox(width: 12),
@@ -428,11 +444,18 @@ class _PreferencesFormState extends State<_PreferencesForm> {
               child: DropdownButtonFormField<String>(
                 value: salaryType,
                 items: const [
-                  DropdownMenuItem(value: 'Monthly', child: Text('Monthly')),
-                  DropdownMenuItem(value: 'Annual', child: Text('Annual')),
+                  DropdownMenuItem(
+                    value: 'Monthly',
+                    child: Text('Monthly', overflow: TextOverflow.ellipsis),
+                  ),
+                  DropdownMenuItem(
+                    value: 'Annual',
+                    child: Text('Annual', overflow: TextOverflow.ellipsis),
+                  ),
                 ],
                 onChanged: (v) => setState(() => salaryType = v ?? 'Monthly'),
                 decoration: _input('Type'),
+                isExpanded: true, // Add this line
               ),
             ),
           ],

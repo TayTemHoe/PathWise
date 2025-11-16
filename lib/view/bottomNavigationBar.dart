@@ -89,12 +89,11 @@ class _BottomNavScreenState extends State<BottomNavScreen> {
         if (_currentIndex == index)
           Positioned(
             bottom: -8,
-            left: 15,
             child: Container(
-              width: 6,
-              height: 6,
+              width: 40,
+              height: 3,
               decoration: BoxDecoration(
-                shape: BoxShape.circle,
+                shape: BoxShape.rectangle,
                 color: Colors.blue,
               ),
             ),

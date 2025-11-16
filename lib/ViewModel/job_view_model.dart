@@ -80,9 +80,13 @@ class JobViewModel extends ChangeNotifier {
   }
 
   /// Search jobs with query and location
+  // Key changes needed in job_view_model.dart
+
+// Update searchJobs method to accept country parameter:
   Future<bool> searchJobs({
     required String query,
     String? location,
+    String? country, // NEW: Add country parameter
     bool clearPrevious = true,
   }) async {
     try {
@@ -98,11 +102,12 @@ class JobViewModel extends ChangeNotifier {
       _lastSearchQuery = query;
       _lastSearchLocation = location ?? 'my';
 
-      debugPrint('🔍 Searching jobs: $query in $_lastSearchLocation');
+      debugPrint('🔍 Searching jobs: $query in $_lastSearchLocation (Country: ${country ?? "my"})');
 
       final results = await _jobService.fetchJobs(
         query: query,
         location: _lastSearchLocation,
+        country: country ?? 'my', // Pass country to service
         filters: _currentFilters,
         page: _currentPage,
       );
@@ -125,16 +130,7 @@ class JobViewModel extends ChangeNotifier {
     }
   }
 
-  /// Search jobs from career suggestion
-  Future<bool> searchJobsByCareerSuggestion({
-    required String jobTitle,
-    String? location,
-  }) async {
-    debugPrint('🎯 Searching jobs for career suggestion: $jobTitle');
-    return searchJobs(query: jobTitle, location: location);
-  }
-
-  /// Apply filters and search
+// Update applyFilters to handle country
   Future<bool> applyFilters(JobFilters filters) async {
     try {
       _setSearching(true);
@@ -149,6 +145,7 @@ class JobViewModel extends ChangeNotifier {
         final results = await _jobService.searchJobsWithFilters(
           query: _lastSearchQuery,
           location: _lastSearchLocation,
+          country: filters.country ?? 'my', // Use country from filters
           filters: _currentFilters,
           page: _currentPage,
         );
@@ -170,19 +167,6 @@ class JobViewModel extends ChangeNotifier {
     }
   }
 
-  /// Clear all filters
-  Future<bool> clearFilters() async {
-    _currentFilters = JobFilters.empty();
-    debugPrint('🧹 Cleared all filters');
-
-    // Re-search without filters
-    if (_lastSearchQuery.isNotEmpty) {
-      return searchJobs(query: _lastSearchQuery, location: _lastSearchLocation);
-    }
-    return true;
-  }
-
-  /// Load more jobs (pagination)
   Future<bool> loadMoreJobs() async {
     if (!_hasMorePages || _isLoadingMore) {
       return false;
@@ -198,7 +182,9 @@ class JobViewModel extends ChangeNotifier {
       final results = await _jobService.fetchJobs(
         query: _lastSearchQuery,
         location: _lastSearchLocation,
+        country: _currentFilters.country ?? 'my', // Use country from filters
         filters: _currentFilters,
+
         page: _currentPage,
       );
 
@@ -218,6 +204,18 @@ class JobViewModel extends ChangeNotifier {
       notifyListeners();
       return false;
     }
+  }
+
+  /// Clear all filters
+  Future<bool> clearFilters() async {
+    _currentFilters = JobFilters.empty();
+    debugPrint('🧹 Cleared all filters');
+
+    // Re-search without filters
+    if (_lastSearchQuery.isNotEmpty) {
+      return searchJobs(query: _lastSearchQuery, location: _lastSearchLocation);
+    }
+    return true;
   }
 
   /// Save/bookmark a job
