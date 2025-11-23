@@ -3,7 +3,6 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
-import 'package:printing/printing.dart';
 import 'package:flutter/services.dart' show rootBundle;
 import 'dart:io';
 import 'package:path_provider/path_provider.dart';
@@ -161,9 +160,16 @@ class ResumeService {
     try {
       final pdf = pw.Document();
 
-      // Load custom font if needed
-      final fontData = await rootBundle.load("assets/fonts/Roboto-Regular.ttf");
-      final ttf = pw.Font.ttf(fontData);
+      // Load custom font with fallback
+      pw.Font? customFont;
+      try {
+        final fontData = await rootBundle.load("assets/fonts/Roboto-Regular.ttf");
+        customFont = pw.Font.ttf(fontData);
+        print('[ResumeService] Custom font loaded successfully');
+      } catch (e) {
+        print('[ResumeService] Warning: Could not load custom font, using default: $e');
+        // customFont will remain null, and we'll use default fonts
+      }
 
       // Parse colors
       final primaryColor = _parseColor(resume.theme.primaryColorHex);
@@ -172,16 +178,16 @@ class ResumeService {
       // Build PDF based on template
       switch (resume.template) {
         case ResumeTemplateType.tech:
-          _buildTechTemplate(pdf, resume, profile, ttf, primaryColor, secondaryColor);
+          _buildTechTemplate(pdf, resume, profile, customFont, primaryColor, secondaryColor);
           break;
         case ResumeTemplateType.business:
-          _buildBusinessTemplate(pdf, resume, profile, ttf, primaryColor, secondaryColor);
+          _buildBusinessTemplate(pdf, resume, profile, customFont!, primaryColor, secondaryColor);
           break;
         case ResumeTemplateType.creative:
-          _buildCreativeTemplate(pdf, resume, profile, ttf, primaryColor, secondaryColor);
+          _buildCreativeTemplate(pdf, resume, profile, customFont!, primaryColor, secondaryColor);
           break;
         case ResumeTemplateType.academic:
-          _buildAcademicTemplate(pdf, resume, profile, ttf, primaryColor, secondaryColor);
+          _buildAcademicTemplate(pdf, resume, profile, customFont!, primaryColor, secondaryColor);
           break;
       }
 
@@ -190,6 +196,7 @@ class ResumeService {
       final file = File('${output.path}/resume_${resume.id}_${DateTime.now().millisecondsSinceEpoch}.pdf');
       await file.writeAsBytes(await pdf.save());
 
+      print('[ResumeService] PDF generated successfully at: ${file.path}');
       return file;
     } catch (e) {
       print('[ResumeService] generateResumePDF error: $e');
@@ -203,17 +210,165 @@ class ResumeService {
     required UserProfile profile,
   }) async {
     try {
-      final file = await generateResumePDF(resume: resume, profile: profile);
+      print('[ResumeService] Starting download process...');
 
-      // Move to downloads directory
-      final directory = await getApplicationDocumentsDirectory();
-      final fileName = '${resume.title.replaceAll(' ', '_')}_${DateTime.now().millisecondsSinceEpoch}.pdf';
-      final savedFile = File('${directory.path}/$fileName');
-      await file.copy(savedFile.path);
+      // Generate the PDF first
+      final pdfFile = await generateResumePDF(resume: resume, profile: profile);
+      print('[ResumeService] PDF generated at: ${pdfFile.path}');
 
-      return savedFile.path;
+      // Get the public directory based on platform
+      Directory? publicDirectory;
+
+      if (Platform.isAndroid) {
+        // For Android, use Downloads directory
+        publicDirectory = Directory('/storage/emulated/0/Download');
+
+        // If that doesn't exist, try alternative
+        if (!await publicDirectory.exists()) {
+          publicDirectory = Directory('/storage/emulated/0/Downloads');
+        }
+
+        // If still doesn't exist, use external storage
+        if (!await publicDirectory.exists()) {
+          publicDirectory = await getExternalStorageDirectory();
+          if (publicDirectory != null) {
+            // Navigate to Downloads folder
+            final pathParts = publicDirectory.path.split('/');
+            final downloadsPath = '/${pathParts[1]}/${pathParts[2]}/Download';
+            publicDirectory = Directory(downloadsPath);
+          }
+        }
+      } else if (Platform.isIOS) {
+        // For iOS, use Documents directory (iOS doesn't have a Downloads folder)
+        publicDirectory = await getApplicationDocumentsDirectory();
+      } else {
+        // Fallback
+        publicDirectory = await getApplicationDocumentsDirectory();
+      }
+
+      // Ensure directory exists
+      if (publicDirectory != null && !await publicDirectory.exists()) {
+        await publicDirectory.create(recursive: true);
+      }
+
+      if (publicDirectory == null) {
+        throw Exception('Could not access storage directory');
+      }
+
+      // Create filename with sanitized resume title
+      final sanitizedTitle = resume.title
+          .replaceAll(RegExp(r'[^\w\s-]'), '')
+          .replaceAll(RegExp(r'\s+'), '_');
+      final timestamp = DateTime.now().millisecondsSinceEpoch;
+      final fileName = '${sanitizedTitle}_$timestamp.pdf';
+
+      // Full path for the downloaded file
+      final downloadPath = '${publicDirectory.path}/$fileName';
+      final downloadFile = File(downloadPath);
+
+      // Copy the PDF to the public directory
+      await pdfFile.copy(downloadPath);
+
+      // Delete the temporary file
+      await pdfFile.delete();
+
+      print('[ResumeService] PDF downloaded successfully to: $downloadPath');
+      return downloadPath;
     } catch (e) {
       print('[ResumeService] downloadResumePDF error: $e');
+      rethrow;
+    }
+  }
+
+  /// Alternative: Save to app's Documents directory (easier to access)
+  Future<String> downloadResumeToDocuments({
+    required ResumeDoc resume,
+    required UserProfile profile,
+  }) async {
+    try {
+      print('[ResumeService] Starting download to documents...');
+
+      // Generate the PDF
+      final pdfFile = await generateResumePDF(resume: resume, profile: profile);
+
+      // Get Documents directory
+      final directory = await getApplicationDocumentsDirectory();
+
+      // Create a 'Resumes' subfolder
+      final resumesFolder = Directory('${directory.path}/Resumes');
+      if (!await resumesFolder.exists()) {
+        await resumesFolder.create(recursive: true);
+      }
+
+      // Create filename
+      final sanitizedTitle = resume.title
+          .replaceAll(RegExp(r'[^\w\s-]'), '')
+          .replaceAll(RegExp(r'\s+'), '_');
+      final timestamp = DateTime.now().millisecondsSinceEpoch;
+      final fileName = '${sanitizedTitle}_$timestamp.pdf';
+
+      // Save path
+      final savePath = '${resumesFolder.path}/$fileName';
+      final savedFile = File(savePath);
+
+      // Copy file
+      await pdfFile.copy(savePath);
+      await pdfFile.delete();
+
+      print('[ResumeService] PDF saved to: $savePath');
+      return savePath;
+    } catch (e) {
+      print('[ResumeService] downloadResumeToDocuments error: $e');
+      rethrow;
+    }
+  }
+
+  /// Best option: Use MediaStore for Android 10+ (Scoped Storage)
+  Future<String> downloadResumeWithMediaStore({
+    required ResumeDoc resume,
+    required UserProfile profile,
+  }) async {
+    try {
+      print('[ResumeService] Starting MediaStore download...');
+
+      // Generate the PDF
+      final pdfFile = await generateResumePDF(resume: resume, profile: profile);
+
+      if (Platform.isAndroid) {
+        // For Android 10+ (API 29+), use platform channel or external storage
+        final directory = await getExternalStorageDirectory();
+
+        if (directory != null) {
+          // Navigate to public Downloads
+          // Path is like: /storage/emulated/0/Android/data/com.example.app/files
+          // We want: /storage/emulated/0/Download
+          final pathComponents = directory.path.split('/');
+          final publicDownloadPath = '/storage/emulated/0/Download';
+          final publicDownload = Directory(publicDownloadPath);
+
+          if (await publicDownload.exists()) {
+            final sanitizedTitle = resume.title
+                .replaceAll(RegExp(r'[^\w\s-]'), '')
+                .replaceAll(RegExp(r'\s+'), '_');
+            final timestamp = DateTime
+                .now()
+                .millisecondsSinceEpoch;
+            final fileName = '${sanitizedTitle}_$timestamp.pdf';
+
+            final downloadPath = '$publicDownloadPath/$fileName';
+            await pdfFile.copy(downloadPath);
+            await pdfFile.delete();
+
+            print('[ResumeService] PDF downloaded to: $downloadPath');
+            return downloadPath;
+          }
+        }
+      }
+
+      // Fallback to documents directory
+      return await downloadResumeToDocuments(resume: resume, profile: profile);
+    } catch (e) {
+      print('[ResumeService] downloadResumeWithMediaStore error: $e');
       rethrow;
     }
   }
@@ -244,86 +399,261 @@ class ResumeService {
       pw.Document pdf,
       ResumeDoc resume,
       UserProfile profile,
-      pw.Font font,
+      pw.Font? font,
       PdfColor primaryColor,
       PdfColor secondaryColor,
       ) {
     pdf.addPage(
       pw.Page(
         pageFormat: PdfPageFormat.a4,
+        margin: pw.EdgeInsets.zero,
         build: (context) {
           return pw.Column(
             crossAxisAlignment: pw.CrossAxisAlignment.start,
             children: [
-              // Header
+              // Header Section with colored background
               pw.Container(
-                padding: const pw.EdgeInsets.all(20),
-                color: primaryColor,
+                width: double.infinity,
+                padding: const pw.EdgeInsets.all(32),
+                decoration: pw.BoxDecoration(
+                  gradient: pw.LinearGradient(
+                    colors: [primaryColor, primaryColor.shade(0.3)],
+                    begin: pw.Alignment.topLeft,
+                    end: pw.Alignment.bottomRight,
+                  ),
+                ),
                 child: pw.Column(
                   crossAxisAlignment: pw.CrossAxisAlignment.start,
                   children: [
+                    // Name
                     pw.Text(
                       profile.name ?? 'Your Name',
                       style: pw.TextStyle(
                         font: font,
                         fontSize: resume.font.header1FontSize.toDouble(),
-                        color: PdfColors.white,
                         fontWeight: pw.FontWeight.bold,
+                        color: PdfColors.white,
+                        letterSpacing: 0.5,
                       ),
                     ),
-                    pw.SizedBox(height: 5),
+                    pw.SizedBox(height: 8),
+                    // Job Title
                     pw.Text(
                       resume.title,
                       style: pw.TextStyle(
                         font: font,
-                        fontSize: resume.font.header2FontSize.toDouble(),
+                        fontSize: resume.font.header2FontSize.toDouble() + 2,
                         color: PdfColors.white,
                       ),
                     ),
+                    // Contact Information
+                    if (resume.sections.personalInfo) ...[
+                      pw.SizedBox(height: 20),
+                      pw.Wrap(
+                        spacing: 20,
+                        runSpacing: 8,
+                        children: [
+                          if (profile.email != null)
+                            _buildContactItem(
+                              '✉',
+                              profile.email!,
+                              font,
+                              resume.font.contentFontSize.toDouble() - 1,
+                            ),
+                          if (profile.phone != null)
+                            _buildContactItem(
+                              '📞',
+                              profile.phone!,
+                              font,
+                              resume.font.contentFontSize.toDouble() - 1,
+                            ),
+                          if (profile.city != null || profile.country != null)
+                            _buildContactItem(
+                              '📍',
+                              '${profile.city ?? ''}${profile.city != null && profile.country != null ? ', ' : ''}${profile.country ?? ''}',
+                              font,
+                              resume.font.contentFontSize.toDouble() - 1,
+                            ),
+                        ],
+                      ),
+                    ],
                   ],
                 ),
               ),
 
-              pw.SizedBox(height: 20),
+              // Content Section
+              pw.Padding(
+                padding: const pw.EdgeInsets.all(32),
+                child: pw.Column(
+                  crossAxisAlignment: pw.CrossAxisAlignment.start,
+                  children: [
+                    // About Me / Professional Summary
+                    if (resume.sections.aboutMe && resume.aboutMe != null) ...[
+                      _buildSectionHeader('PROFESSIONAL SUMMARY', secondaryColor, font, resume.font.header2FontSize.toDouble()),
+                      pw.SizedBox(height: 12),
+                      pw.Text(
+                        resume.aboutMe!,
+                        style: pw.TextStyle(
+                          font: font,
+                          fontSize: resume.font.contentFontSize.toDouble(),
+                          height: 1.6,
+                          color: PdfColor.fromHex('#374151'),
+                        ),
+                      ),
+                      pw.SizedBox(height: 24),
+                    ],
 
-              // Personal Info Section
-              if (resume.sections.personalInfo) ...[
-                _buildPersonalInfoSection(resume, profile, font, secondaryColor),
-                pw.SizedBox(height: 15),
-              ],
+                    // Skills Section
+                    if (resume.sections.skills && profile.skills != null && profile.skills!.isNotEmpty) ...[
+                      _buildSectionHeader('SKILLS', secondaryColor, font, resume.font.header2FontSize.toDouble()),
+                      pw.SizedBox(height: 12),
+                      pw.Wrap(
+                        spacing: 10,
+                        runSpacing: 10,
+                        children: profile.skills!.map((skill) {
+                          return pw.Container(
+                            padding: const pw.EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                            decoration: pw.BoxDecoration(
+                              color: secondaryColor.shade(0.9),
+                              borderRadius: pw.BorderRadius.circular(6),
+                              border: pw.Border.all(
+                                color: secondaryColor.shade(0.7),
+                                width: 1,
+                              ),
+                            ),
+                            child: pw.Row(
+                              mainAxisSize: pw.MainAxisSize.min,
+                              children: [
+                                pw.Text(
+                                  skill.name ?? '',
+                                  style: pw.TextStyle(
+                                    font: font,
+                                    fontSize: resume.font.contentFontSize.toDouble(),
+                                    color: secondaryColor,
+                                    fontWeight: pw.FontWeight.bold,
+                                  ),
+                                ),
+                                if (skill.level != null) ...[
+                                  pw.SizedBox(width: 6),
+                                  pw.Container(
+                                    padding: const pw.EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                                    decoration: pw.BoxDecoration(
+                                      color: secondaryColor,
+                                      borderRadius: pw.BorderRadius.circular(3),
+                                    ),
+                                    child: pw.Text(
+                                      'Lv ${skill.level}',
+                                      style: pw.TextStyle(
+                                        font: font,
+                                        fontSize: resume.font.contentFontSize.toDouble() - 2,
+                                        color: PdfColors.white,
+                                        fontWeight: pw.FontWeight.bold,
+                                      ),
+                                    ),
+                                  ),
+                                ] else if (skill.levelText != null) ...[
+                                  pw.SizedBox(width: 6),
+                                  pw.Container(
+                                    padding: const pw.EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                                    decoration: pw.BoxDecoration(
+                                      color: secondaryColor,
+                                      borderRadius: pw.BorderRadius.circular(3),
+                                    ),
+                                    child: pw.Text(
+                                      skill.levelText!,
+                                      style: pw.TextStyle(
+                                        font: font,
+                                        fontSize: resume.font.contentFontSize.toDouble() - 2,
+                                        color: PdfColors.white,
+                                        fontWeight: pw.FontWeight.bold,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ],
+                            ),
+                          );
+                        }).toList(),
+                      ),
+                      pw.SizedBox(height: 24),
+                    ],
 
-              // About Me Section
-              if (resume.sections.aboutMe && resume.aboutMe != null) ...[
-                _buildSection('About Me', resume.aboutMe!, resume, font, secondaryColor),
-                pw.SizedBox(height: 15),
-              ],
+                    // Work Experience Section
+                    if (resume.sections.experience && profile.experience != null && profile.experience!.isNotEmpty) ...[
+                      _buildSectionHeader('WORK EXPERIENCE', secondaryColor, font, resume.font.header2FontSize.toDouble()),
+                      pw.SizedBox(height: 12),
+                      ...profile.experience!.map((exp) => _buildStyledExperience(exp, secondaryColor, font, resume)),
+                    ],
 
-              // Skills Section
-              if (resume.sections.skills && profile.skills != null) ...[
-                _buildSkillsSection(profile.skills!, resume, font, secondaryColor),
-                pw.SizedBox(height: 15),
-              ],
+                    // Education Section
+                    if (resume.sections.education && profile.education != null && profile.education!.isNotEmpty) ...[
+                      _buildSectionHeader('EDUCATION', secondaryColor, font, resume.font.header2FontSize.toDouble()),
+                      pw.SizedBox(height: 12),
+                      ...profile.education!.map((edu) => _buildStyledEducation(edu, secondaryColor, font, resume)),
+                    ],
 
-              // Education Section
-              if (resume.sections.education && profile.education != null) ...[
-                _buildEducationSection(profile.education!, resume, font, secondaryColor),
-                pw.SizedBox(height: 15),
-              ],
-
-              // Experience Section
-              if (resume.sections.experience && profile.experience != null) ...[
-                _buildExperienceSection(profile.experience!, resume, font, secondaryColor),
-                pw.SizedBox(height: 15),
-              ],
-
-              // References Section
-              if (resume.sections.references && resume.references.isNotEmpty) ...[
-                _buildReferencesSection(resume.references, resume, font, secondaryColor),
-              ],
+                    // References Section
+                    if (resume.sections.references && resume.references.isNotEmpty) ...[
+                      _buildSectionHeader('REFERENCES', secondaryColor, font, resume.font.header2FontSize.toDouble()),
+                      pw.SizedBox(height: 12),
+                      ...resume.references.map((ref) => _buildStyledReference(ref, font, resume)),
+                    ],
+                  ],
+                ),
+              ),
             ],
           );
         },
       ),
+    );
+  }
+
+  // Helper: Build contact item for header
+  pw.Widget _buildContactItem(String icon, String text, pw.Font? font, double fontSize) {
+    return pw.Row(
+      mainAxisSize: pw.MainAxisSize.min,
+      children: [
+        pw.Text(
+          icon,
+          style: pw.TextStyle(fontSize: fontSize + 2),
+        ),
+        pw.SizedBox(width: 6),
+        pw.Text(
+          text,
+          style: pw.TextStyle(
+            font: font,
+            fontSize: fontSize,
+            color: PdfColors.white,
+          ),
+        ),
+      ],
+    );
+  }
+
+  // Helper: Build section header
+  pw.Widget _buildSectionHeader(String title, PdfColor color, pw.Font? font, double fontSize) {
+    return pw.Row(
+      children: [
+        pw.Container(
+          width: 4,
+          height: 20,
+          decoration: pw.BoxDecoration(
+            color: color,
+            borderRadius: pw.BorderRadius.circular(2),
+          ),
+        ),
+        pw.SizedBox(width: 10),
+        pw.Text(
+          title,
+          style: pw.TextStyle(
+            font: font,
+            fontSize: fontSize,
+            fontWeight: pw.FontWeight.bold,
+            color: color,
+            letterSpacing: 1,
+          ),
+        ),
+      ],
     );
   }
 
@@ -367,237 +697,286 @@ class ResumeService {
   // Section Builders
   // =============================
 
-  pw.Widget _buildPersonalInfoSection(
-      ResumeDoc resume,
-      UserProfile profile,
-      pw.Font font,
+  pw.Widget _buildStyledExperience(
+      Experience exp,
       PdfColor color,
+      pw.Font? font,
+      ResumeDoc resume,
       ) {
-    return pw.Column(
-      crossAxisAlignment: pw.CrossAxisAlignment.start,
-      children: [
-        pw.Text(
-          'Contact Information',
-          style: pw.TextStyle(
-            font: font,
-            fontSize: resume.font.header2FontSize.toDouble(),
-            color: color,
-            fontWeight: pw.FontWeight.bold,
+    return pw.Container(
+      margin: const pw.EdgeInsets.only(bottom: 16),
+      child: pw.Row(
+        crossAxisAlignment: pw.CrossAxisAlignment.start,
+        children: [
+          // Bullet point
+          pw.Container(
+            width: 8,
+            height: 8,
+            margin: const pw.EdgeInsets.only(top: 6),
+            decoration: pw.BoxDecoration(
+              color: color,
+              shape: pw.BoxShape.circle,
+            ),
           ),
+          pw.SizedBox(width: 12),
+          // Content
+          pw.Expanded(
+            child: pw.Column(
+              crossAxisAlignment: pw.CrossAxisAlignment.start,
+              children: [
+                // Job Title
+                pw.Text(
+                  exp.jobTitle ?? '',
+                  style: pw.TextStyle(
+                    font: font,
+                    fontSize: resume.font.contentFontSize.toDouble() + 2,
+                    fontWeight: pw.FontWeight.bold,
+                    color: PdfColor.fromHex('#111827'),
+                  ),
+                ),
+                pw.SizedBox(height: 4),
+                // Company & Employment Type
+                pw.Row(
+                  children: [
+                    pw.Text(
+                      exp.company ?? '',
+                      style: pw.TextStyle(
+                        font: font,
+                        fontSize: resume.font.contentFontSize.toDouble(),
+                        color: color,
+                        fontWeight: pw.FontWeight.bold,
+                      ),
+                    ),
+                    if (exp.employmentType != null) ...[
+                      pw.Text(
+                        ' • ${exp.employmentType}',
+                        style: pw.TextStyle(
+                          font: font,
+                          fontSize: resume.font.contentFontSize.toDouble(),
+                          color: PdfColor.fromHex('#6B7280'),
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+                // Date & Location
+                if (exp.startDate != null || exp.endDate != null || exp.city != null) ...[
+                  pw.SizedBox(height: 2),
+                  pw.Text(
+                    '${_formatDateRange(exp.startDate, exp.endDate, exp.isCurrent)}${(exp.city != null || exp.country != null) ? ' • ${exp.city ?? ''}${exp.city != null && exp.country != null ? ', ' : ''}${exp.country ?? ''}' : ''}',
+                    style: pw.TextStyle(
+                      font: font,
+                      fontSize: resume.font.contentFontSize.toDouble() - 1,
+                      color: PdfColor.fromHex('#9CA3AF'),
+                    ),
+                  ),
+                ],
+                // Description
+                if (exp.description != null) ...[
+                  pw.SizedBox(height: 8),
+                  pw.Text(
+                    exp.description!,
+                    style: pw.TextStyle(
+                      font: font,
+                      fontSize: resume.font.contentFontSize.toDouble(),
+                      height: 1.5,
+                      color: PdfColor.fromHex('#374151'),
+                    ),
+                  ),
+                ],
+                // Skills Used
+                if (exp.achievements?.skillsUsed != null && exp.achievements!.skillsUsed!.isNotEmpty) ...[
+                  pw.SizedBox(height: 8),
+                  pw.Wrap(
+                    spacing: 6,
+                    runSpacing: 6,
+                    children: exp.achievements!.skillsUsed!.map((skill) {
+                      return pw.Container(
+                        padding: const pw.EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        decoration: pw.BoxDecoration(
+                          color: PdfColor.fromHex('#F3F4F6'),
+                          borderRadius: pw.BorderRadius.circular(4),
+                        ),
+                        child: pw.Text(
+                          skill,
+                          style: pw.TextStyle(
+                            font: font,
+                            fontSize: resume.font.contentFontSize.toDouble() - 1,
+                            color: PdfColor.fromHex('#4B5563'),
+                          ),
+                        ),
+                      );
+                    }).toList(),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // Helper: Build styled education entry
+  pw.Widget _buildStyledEducation(
+      Education edu,
+      PdfColor color,
+      pw.Font? font,
+      ResumeDoc resume,
+      ) {
+    return pw.Container(
+      margin: const pw.EdgeInsets.only(bottom: 14),
+      child: pw.Row(
+        crossAxisAlignment: pw.CrossAxisAlignment.start,
+        children: [
+          // Bullet point
+          pw.Container(
+            width: 8,
+            height: 8,
+            margin: const pw.EdgeInsets.only(top: 6),
+            decoration: pw.BoxDecoration(
+              color: color,
+              shape: pw.BoxShape.circle,
+            ),
+          ),
+          pw.SizedBox(width: 12),
+          // Content
+          pw.Expanded(
+            child: pw.Column(
+              crossAxisAlignment: pw.CrossAxisAlignment.start,
+              children: [
+                // Institution
+                pw.Text(
+                  edu.institution ?? '',
+                  style: pw.TextStyle(
+                    font: font,
+                    fontSize: resume.font.contentFontSize.toDouble() + 1,
+                    fontWeight: pw.FontWeight.bold,
+                    color: PdfColor.fromHex('#111827'),
+                  ),
+                ),
+                pw.SizedBox(height: 4),
+                // Degree
+                pw.Text(
+                  '${edu.degreeLevel ?? ''} in ${edu.fieldOfStudy ?? ''}',
+                  style: pw.TextStyle(
+                    font: font,
+                    fontSize: resume.font.contentFontSize.toDouble(),
+                    color: PdfColor.fromHex('#374151'),
+                  ),
+                ),
+                // Date
+                if (edu.startDate != null || edu.endDate != null) ...[
+                  pw.SizedBox(height: 2),
+                  pw.Text(
+                    _formatDateRange(edu.startDate, edu.endDate, edu.isCurrent),
+                    style: pw.TextStyle(
+                      font: font,
+                      fontSize: resume.font.contentFontSize.toDouble() - 1,
+                      color: PdfColor.fromHex('#9CA3AF'),
+                    ),
+                  ),
+                ],
+                // GPA
+                if (edu.gpa != null) ...[
+                  pw.SizedBox(height: 4),
+                  pw.Container(
+                    padding: const pw.EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: pw.BoxDecoration(
+                      color: color.shade(0.9),
+                      borderRadius: pw.BorderRadius.circular(4),
+                    ),
+                    child: pw.Text(
+                      'GPA: ${edu.gpa}',
+                      style: pw.TextStyle(
+                        font: font,
+                        fontSize: resume.font.contentFontSize.toDouble() - 1,
+                        color: color,
+                        fontWeight: pw.FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+// Helper: Build styled reference entry
+  pw.Widget _buildStyledReference(
+      ResumeReference ref,
+      pw.Font? font,
+      ResumeDoc resume,
+      ) {
+    return pw.Container(
+      margin: const pw.EdgeInsets.only(bottom: 10),
+      padding: const pw.EdgeInsets.all(12),
+      decoration: pw.BoxDecoration(
+        color: PdfColor.fromHex('#F9FAFB'),
+        borderRadius: pw.BorderRadius.circular(6),
+        border: pw.Border.all(
+          color: PdfColor.fromHex('#E5E7EB'),
+          width: 1,
         ),
-        pw.SizedBox(height: 5),
-        if (profile.email != null)
-          pw.Text('Email: ${profile.email}', style: pw.TextStyle(font: font, fontSize: resume.font.contentFontSize.toDouble())),
-        if (profile.phone != null)
-          pw.Text('Phone: ${profile.phone}', style: pw.TextStyle(font: font, fontSize: resume.font.contentFontSize.toDouble())),
-        if (profile.city != null || profile.country != null)
+      ),
+      child: pw.Column(
+        crossAxisAlignment: pw.CrossAxisAlignment.start,
+        children: [
           pw.Text(
-            'Location: ${profile.city ?? ''}${profile.city != null && profile.country != null ? ', ' : ''}${profile.country ?? ''}',
-            style: pw.TextStyle(font: font, fontSize: resume.font.contentFontSize.toDouble()),
+            ref.name,
+            style: pw.TextStyle(
+              font: font,
+              fontSize: resume.font.contentFontSize.toDouble(),
+              fontWeight: pw.FontWeight.bold,
+              color: PdfColor.fromHex('#111827'),
+            ),
           ),
-      ],
+          pw.SizedBox(height: 2),
+          pw.Text(
+            ref.position,
+            style: pw.TextStyle(
+              font: font,
+              fontSize: resume.font.contentFontSize.toDouble() - 1,
+              color: PdfColor.fromHex('#6B7280'),
+            ),
+          ),
+          pw.SizedBox(height: 2),
+          pw.Text(
+            ref.contact,
+            style: pw.TextStyle(
+              font: font,
+              fontSize: resume.font.contentFontSize.toDouble() - 1,
+              color: PdfColor.fromHex('#9CA3AF'),
+            ),
+          ),
+        ],
+      ),
     );
   }
 
-  pw.Widget _buildSection(
-      String title,
-      String content,
-      ResumeDoc resume,
-      pw.Font font,
-      PdfColor color,
-      ) {
-    return pw.Column(
-      crossAxisAlignment: pw.CrossAxisAlignment.start,
-      children: [
-        pw.Text(
-          title,
-          style: pw.TextStyle(
-            font: font,
-            fontSize: resume.font.header2FontSize.toDouble(),
-            color: color,
-            fontWeight: pw.FontWeight.bold,
-          ),
-        ),
-        pw.SizedBox(height: 5),
-        pw.Text(
-          content,
-          style: pw.TextStyle(font: font, fontSize: resume.font.contentFontSize.toDouble()),
-        ),
-      ],
-    );
-  }
+  // Helper: Format date range
+  String _formatDateRange(dynamic start, dynamic end, bool? isCurrent) {
+    String formatDate(dynamic date) {
+      if (date == null) return '';
+      if (date is Timestamp) {
+        final dt = date.toDate();
+        final months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+        return '${months[dt.month - 1]} ${dt.year}';
+      }
+      return date.toString();
+    }
 
-  pw.Widget _buildSkillsSection(
-      List<Skill> skills,
-      ResumeDoc resume,
-      pw.Font font,
-      PdfColor color,
-      ) {
-    return pw.Column(
-      crossAxisAlignment: pw.CrossAxisAlignment.start,
-      children: [
-        pw.Text(
-          'Skills',
-          style: pw.TextStyle(
-            font: font,
-            fontSize: resume.font.header2FontSize.toDouble(),
-            color: color,
-            fontWeight: pw.FontWeight.bold,
-          ),
-        ),
-        pw.SizedBox(height: 5),
-        ...skills.map((skill) => pw.Padding(
-          padding: const pw.EdgeInsets.only(bottom: 3),
-          child: pw.Text(
-            '• ${skill.name} ${skill.levelText != null ? '(${skill.levelText})' : ''}',
-            style: pw.TextStyle(font: font, fontSize: resume.font.contentFontSize.toDouble()),
-          ),
-        )),
-      ],
-    );
-  }
+    final startStr = formatDate(start);
+    final endStr = isCurrent == true ? 'Present' : formatDate(end);
 
-  pw.Widget _buildEducationSection(
-      List<Education> education,
-      ResumeDoc resume,
-      pw.Font font,
-      PdfColor color,
-      ) {
-    return pw.Column(
-      crossAxisAlignment: pw.CrossAxisAlignment.start,
-      children: [
-        pw.Text(
-          'Education',
-          style: pw.TextStyle(
-            font: font,
-            fontSize: resume.font.header2FontSize.toDouble(),
-            color: color,
-            fontWeight: pw.FontWeight.bold,
-          ),
-        ),
-        pw.SizedBox(height: 5),
-        ...education.map((edu) => pw.Padding(
-          padding: const pw.EdgeInsets.only(bottom: 8),
-          child: pw.Column(
-            crossAxisAlignment: pw.CrossAxisAlignment.start,
-            children: [
-              pw.Text(
-                edu.institution ?? '',
-                style: pw.TextStyle(
-                  font: font,
-                  fontSize: resume.font.contentFontSize.toDouble(),
-                  fontWeight: pw.FontWeight.bold,
-                ),
-              ),
-              pw.Text(
-                '${edu.degreeLevel ?? ''} in ${edu.fieldOfStudy ?? ''}',
-                style: pw.TextStyle(font: font, fontSize: resume.font.contentFontSize.toDouble()),
-              ),
-              if (edu.gpa != null)
-                pw.Text(
-                  'GPA: ${edu.gpa}',
-                  style: pw.TextStyle(font: font, fontSize: resume.font.contentFontSize.toDouble()),
-                ),
-            ],
-          ),
-        )),
-      ],
-    );
-  }
+    if (startStr.isEmpty && endStr.isEmpty) return '';
+    if (startStr.isEmpty) return endStr;
+    if (endStr.isEmpty) return startStr;
 
-  pw.Widget _buildExperienceSection(
-      List<Experience> experience,
-      ResumeDoc resume,
-      pw.Font font,
-      PdfColor color,
-      ) {
-    return pw.Column(
-      crossAxisAlignment: pw.CrossAxisAlignment.start,
-      children: [
-        pw.Text(
-          'Experience',
-          style: pw.TextStyle(
-            font: font,
-            fontSize: resume.font.header2FontSize.toDouble(),
-            color: color,
-            fontWeight: pw.FontWeight.bold,
-          ),
-        ),
-        pw.SizedBox(height: 5),
-        ...experience.map((exp) => pw.Padding(
-          padding: const pw.EdgeInsets.only(bottom: 8),
-          child: pw.Column(
-            crossAxisAlignment: pw.CrossAxisAlignment.start,
-            children: [
-              pw.Text(
-                exp.jobTitle ?? '',
-                style: pw.TextStyle(
-                  font: font,
-                  fontSize: resume.font.contentFontSize.toDouble(),
-                  fontWeight: pw.FontWeight.bold,
-                ),
-              ),
-              pw.Text(
-                '${exp.company ?? ''} • ${exp.employmentType ?? ''}',
-                style: pw.TextStyle(font: font, fontSize: resume.font.contentFontSize.toDouble()),
-              ),
-              if (exp.description != null)
-                pw.Text(
-                  exp.description!,
-                  style: pw.TextStyle(font: font, fontSize: resume.font.contentFontSize.toDouble()),
-                ),
-            ],
-          ),
-        )),
-      ],
-    );
-  }
-
-  pw.Widget _buildReferencesSection(
-      List<ResumeReference> references,
-      ResumeDoc resume,
-      pw.Font font,
-      PdfColor color,
-      ) {
-    return pw.Column(
-      crossAxisAlignment: pw.CrossAxisAlignment.start,
-      children: [
-        pw.Text(
-          'References',
-          style: pw.TextStyle(
-            font: font,
-            fontSize: resume.font.header2FontSize.toDouble(),
-            color: color,
-            fontWeight: pw.FontWeight.bold,
-          ),
-        ),
-        pw.SizedBox(height: 5),
-        ...references.map((ref) => pw.Padding(
-          padding: const pw.EdgeInsets.only(bottom: 5),
-          child: pw.Column(
-            crossAxisAlignment: pw.CrossAxisAlignment.start,
-            children: [
-              pw.Text(
-                ref.name,
-                style: pw.TextStyle(
-                  font: font,
-                  fontSize: resume.font.contentFontSize.toDouble(),
-                  fontWeight: pw.FontWeight.bold,
-                ),
-              ),
-              pw.Text(
-                ref.position,
-                style: pw.TextStyle(font: font, fontSize: resume.font.contentFontSize.toDouble()),
-              ),
-              pw.Text(
-                ref.contact,
-                style: pw.TextStyle(font: font, fontSize: resume.font.contentFontSize.toDouble()),
-              ),
-            ],
-          ),
-        )),
-      ],
-    );
+    return '$startStr - $endStr';
   }
 
   // =============================

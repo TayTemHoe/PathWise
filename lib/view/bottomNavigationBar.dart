@@ -90,11 +90,12 @@ class _BottomNavScreenState extends State<BottomNavScreen> {
           Positioned(
             bottom: -8,
             child: Container(
-              width: 40,
+              width: 50,
               height: 3,
               decoration: BoxDecoration(
                 shape: BoxShape.rectangle,
                 color: Colors.blue,
+                borderRadius: BorderRadius.circular(5),
               ),
             ),
           ),

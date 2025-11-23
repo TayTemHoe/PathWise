@@ -914,7 +914,7 @@ Apply here: ${widget.job.jobApplyLink}
   }
 
   Future<void> _launchJobApplication() async {
-    final uri = Uri.parse(widget.job.jobApplyLink);
+    final uri = Uri.parse(widget.job.jobApplyLink.toString());
     if (await canLaunchUrl(uri)) {
       await launchUrl(uri, mode: LaunchMode.externalApplication);
     } else {

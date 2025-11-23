@@ -1040,7 +1040,9 @@ class _CustomizeResumePageState extends State<CustomizeResumePage>
             children: [
               CircularProgressIndicator(),
               SizedBox(height: 16),
-              Text('Saving your resume...'),
+              Text(
+                  'Saving your resume...'
+              ),
             ],
           ),
         ),

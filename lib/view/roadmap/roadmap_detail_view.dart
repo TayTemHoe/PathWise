@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:path_wise/ViewModel/careerroadmap_view_model.dart';
-import 'package:path_wise/view/roadmap/create_roadmap_view.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'package:path_wise/model/careerroadmap_model.dart';
+import 'package:path_wise/view/roadmap/create_roadmap_view.dart';
+import 'package:path_wise/ViewModel/careerroadmap_view_model.dart';
+
 
 // lib/view/roadmap/roadmap_detail_view.dart
 
@@ -838,9 +840,7 @@ class _RoadmapDetailViewState extends State<RoadmapDetailView> {
             SizedBox(
               width: double.infinity,
               child: ElevatedButton(
-                onPressed: () {
-                  // Launch URL
-                },
+                onPressed: () => _launchLearningResource(resource.courseLink, resource.courseName),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFF3B82F6),
                   shape: RoundedRectangleBorder(
@@ -857,6 +857,102 @@ class _RoadmapDetailViewState extends State<RoadmapDetailView> {
         ),
       ),
     );
+  }
+
+  /// Launch learning resource URL with confirmation dialog
+  Future<void> _launchLearningResource(String courseLink, String courseName) async {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Row(
+          children: [
+            Icon(Icons.open_in_new, color: Color(0xFF8B5CF6)),
+            SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                'Open Learning Resource',
+                style: TextStyle(fontSize: 18),
+              ),
+            ),
+          ],
+        ),
+        content: Text(
+          'You\'ll be redirected to access the "$courseName" course.',
+          style: TextStyle(fontSize: 14, color: Colors.grey[700]),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text(
+              'Cancel',
+              style: TextStyle(color: Colors.grey[600]),
+            ),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(context);
+              _openCourseLink(courseLink, courseName);
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Color(0xFF8B5CF6),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+            ),
+            child: Text('Continue',style: TextStyle(color: Colors.white),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Open course link in external browser
+  /// Handles errors gracefully with user feedback
+  Future<void> _openCourseLink(String courseLink, String courseName) async {
+    try {
+      final uri = Uri.parse(courseLink);
+
+      // Validate URL format
+      if (!courseLink.startsWith('http://') && !courseLink.startsWith('https://')) {
+        _showErrorSnackBar('Invalid course link format');
+        return;
+      }
+
+      if (await canLaunchUrl(uri)) {
+        await launchUrl(uri, mode: LaunchMode.externalApplication);
+
+        // Show success message
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Opening $courseName...'),
+              backgroundColor: Color(0xFF10B981),
+              duration: Duration(seconds: 2),
+            ),
+          );
+        }
+      } else {
+        _showErrorSnackBar('Could not open the course link');
+      }
+    } catch (e) {
+      debugPrint('❌ Error launching course link: $e');
+      _showErrorSnackBar('Failed to open course link: ${e.toString()}');
+    }
+  }
+
+  /// Display error message as SnackBar
+  void _showErrorSnackBar(String message) {
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(message),
+          backgroundColor: Colors.red,
+          duration: Duration(seconds: 3),
+        ),
+      );
+    }
   }
 
   Widget _buildInfoChip(IconData icon, String label, Color color) {
@@ -1364,4 +1460,6 @@ class _RoadmapListViewState extends State<RoadmapListView> {
       );
     }
   }
+
+
 }

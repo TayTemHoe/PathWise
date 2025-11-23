@@ -47,6 +47,7 @@ dependencies:
   share_plus: ^12.0.1
   pdf: ^3.11.3
   printing: ^5.14.2
+  permission_handler: ^12.0.1
 
 dev_dependencies:
   flutter_test:
@@ -69,6 +70,8 @@ flutter:
   # included with your application, so that you can use the icons in
   # the material Icons class.
   uses-material-design: true
+  # Add this section
+
 
   # To add assets to your application, add an assets section, like this:
   # assets:

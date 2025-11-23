@@ -1,4 +1,6 @@
 // lib/viewmodels/resume_view_model.dart
+import 'dart:io';
+import 'package:permission_handler/permission_handler.dart';
 import 'package:flutter/foundation.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:path_wise/model/resume_model.dart';
@@ -298,6 +300,25 @@ class ResumeViewModel extends ChangeNotifier {
     _setError(null);
 
     try {
+      // Check and request permission
+      if (Platform.isAndroid) {
+        final status = await Permission.storage.status;
+        if (!status.isGranted) {
+          final result = await Permission.storage.request();
+          if (!result.isGranted) {
+            // For Android 13+ (API 33+), we don't need storage permission
+            // But for older versions, we do
+            if (Platform.isAndroid) {
+              // Try requesting manageExternalStorage for Android 11+
+              final manageStatus = await Permission.manageExternalStorage.status;
+              if (!manageStatus.isGranted) {
+                await Permission.manageExternalStorage.request();
+              }
+            }
+          }
+        }
+      }
+
       if (_userProfile == null) {
         _userProfile = await _profileService.getUserWithSubcollections(uid);
       }
@@ -312,7 +333,7 @@ class ResumeViewModel extends ChangeNotifier {
         profile: _userProfile!,
       );
 
-      _setSuccess('Resume downloaded to: $path');
+      _setSuccess('Resume saved successfully!\nLocation: $path');
       return path;
     } catch (e) {
       _setError('Failed to download resume: ${e.toString()}');
@@ -321,6 +342,8 @@ class ResumeViewModel extends ChangeNotifier {
       _setDownloading(false);
     }
   }
+
+  
 
   /// Share resume as PDF
   Future<bool> shareResume(ResumeDoc resume) async {

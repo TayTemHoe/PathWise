@@ -4,34 +4,79 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart';
 import 'package:path_wise/model/job_models.dart';
 
-
 class JobService {
   final String apiKey = 'e41d8eaff2msh041a382f6bb1904p194aecjsn715ac6c5b487';
   final String apiHost = 'jsearch.p.rapidapi.com';
   final String searchEndpoint = 'https://jsearch.p.rapidapi.com/search';
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
-  /// Fetch jobs from JSearch API with proper filtering and multi-country support
+  /// Fetch ALL jobs from JSearch API with pagination (fetch all pages)
   Future<List<JobModel>> fetchJobs({
     String? query,
-    String? location,
-    String? country, // NEW: Country code parameter (us, uk, my, sg, etc.)
-    JobFilters? filters,
-    int page = 1,
+    String? country,
+    String? datePosted,
+    int maxResults = 100, // Maximum results to fetch
+  }) async {
+    try {
+      List<JobModel> allJobs = [];
+      int currentPage = 10;
+      bool hasMorePages = true;
+
+      // Fetch jobs page by page until we have enough or no more pages
+      while (hasMorePages && allJobs.length < maxResults) {
+        debugPrint('🔍 Fetching page $currentPage...');
+
+        final pageJobs = await _fetchJobsPage(
+          query: query,
+          country: country,
+          datePosted: datePosted,
+          page: currentPage,
+        );
+
+        if (pageJobs.isEmpty) {
+          hasMorePages = false;
+          debugPrint('⚠️ No more jobs available');
+        } else {
+          allJobs.addAll(pageJobs);
+          debugPrint('✅ Fetched ${pageJobs.length} jobs (Total: ${allJobs.length})');
+
+          // JSearch API returns 10 jobs per page
+          // If we get less than 10, it means no more pages
+          if (pageJobs.length < 10) {
+            hasMorePages = false;
+          } else {
+            currentPage++;
+          }
+        }
+      }
+
+      debugPrint('✅ Total jobs fetched: ${allJobs.length}');
+      return allJobs;
+    } catch (error) {
+      debugPrint('❌ Error fetching jobs: $error');
+      throw Exception('Error fetching jobs: $error');
+    }
+  }
+
+  /// Fetch a single page of jobs from JSearch API
+  Future<List<JobModel>> _fetchJobsPage({
+    String? query,
+    String? country,
+    String? datePosted,
+    int page = 10,
   }) async {
     try {
       // Build query parameters
       final queryParams = _buildQueryParams(
         query: query,
-        location: location,
         country: country,
-        filters: filters,
+        datePosted: datePosted,
         page: page,
       );
 
       final uri = Uri.parse(searchEndpoint).replace(queryParameters: queryParams);
 
-      debugPrint('🔍 Fetching jobs from: $uri');
+      debugPrint('🔍 API Request: $uri');
 
       final response = await http.get(
         uri,
@@ -46,136 +91,56 @@ class JobService {
 
         // Check if data contains jobs
         if (data['data'] == null || data['data'].isEmpty) {
-          debugPrint('⚠️ No jobs found');
           return [];
         }
 
         final jobList = _parseJobsResponse(data);
-        debugPrint('✅ Fetched ${jobList.length} jobs');
         return jobList;
       } else {
         debugPrint('❌ API Error: ${response.statusCode} - ${response.body}');
         throw Exception('Failed to load jobs: ${response.statusCode}');
       }
     } catch (error) {
-      debugPrint('❌ Error fetching jobs: $error');
-      throw Exception('Error fetching jobs: $error');
+      debugPrint('❌ Error fetching page: $error');
+      throw Exception('Error fetching page: $error');
     }
   }
 
   /// Build query parameters for JSearch API
   Map<String, String> _buildQueryParams({
     String? query,
-    String? location,
     String? country,
-    JobFilters? filters,
+    String? datePosted,
     int page = 1,
   }) {
     final params = <String, String>{};
 
-    // Main search query - combine job title with location if provided
-    String searchQuery = '';
-
+    // Main search query (required)
     if (query != null && query.isNotEmpty) {
-      searchQuery = query;
-    } else if (filters?.query != null && filters!.query!.isNotEmpty) {
-      searchQuery = filters.query!;
+      params['query'] = query;
     } else {
-      searchQuery = 'Software Developer'; // Default query
+      params['query'] = 'jobs'; // Default query
     }
 
-    // Add location to query if provided (e.g., "Software Developer in Kuala Lumpur")
-    if (location != null && location.isNotEmpty && location.toLowerCase() != 'malaysia') {
-      searchQuery += ' in $location';
-    }
-
-    params['query'] = searchQuery;
-
-    // Country code (IMPORTANT: This filters jobs by country)
-    // Supported codes: us, uk, ca, au, sg, my, in, de, fr, etc.
+    // Country code (my, us, uk, sg, etc.)
     if (country != null && country.isNotEmpty) {
       params['country'] = country.toLowerCase();
-    } else if (filters?.location != null) {
-      // Try to extract country code from filters
-      final countryCode = _extractCountryCode(filters!.location!);
-      if (countryCode != null) {
-        params['country'] = countryCode;
-      }
     } else {
-      // Default to Malaysia
-      params['country'] = 'my';
-    }
-
-    // Remote jobs filter
-    if (filters?.remote != null) {
-      if (filters!.remote == 'Remote') {
-        params['remote_jobs_only'] = 'true';
-      }
-    }
-
-    // Employment types (FULLTIME, CONTRACTOR, PARTTIME, INTERN)
-    if (filters?.employmentTypes != null && filters!.employmentTypes!.isNotEmpty) {
-      params['employment_types'] = filters.employmentTypes!.join(',');
+      params['country'] = 'my'; // Default to Malaysia
     }
 
     // Date posted filter (all, today, 3days, week, month)
-    if (filters?.dateRange != null && filters!.dateRange!.isNotEmpty) {
-      params['date_posted'] = filters.dateRange!;
+    if (datePosted != null && datePosted.isNotEmpty) {
+      params['date_posted'] = datePosted;
+    } else {
+      params['date_posted'] = 'all';
     }
 
     // Pagination
     params['page'] = page.toString();
-    params['num_pages'] = '1';
+    params['num_pages'] = '1'; // Always fetch 1 page at a time
 
     return params;
-  }
-
-  /// Extract country code from location string
-  /// Examples: "Kuala Lumpur, Malaysia" -> "my", "New York, USA" -> "us"
-  String? _extractCountryCode(String location) {
-    final locationLower = location.toLowerCase();
-
-    // Map of country names/keywords to their codes
-    final countryMap = {
-      'malaysia': 'my',
-      'singapore': 'sg',
-      'united states': 'us',
-      'usa': 'us',
-      'america': 'us',
-      'united kingdom': 'uk',
-      'uk': 'uk',
-      'england': 'uk',
-      'canada': 'ca',
-      'australia': 'au',
-      'india': 'in',
-      'indonesia': 'id',
-      'philippines': 'ph',
-      'thailand': 'th',
-      'vietnam': 'vn',
-      'germany': 'de',
-      'france': 'fr',
-      'spain': 'es',
-      'italy': 'it',
-      'netherlands': 'nl',
-      'japan': 'jp',
-      'south korea': 'kr',
-      'china': 'cn',
-      'hong kong': 'hk',
-      'taiwan': 'tw',
-      'new zealand': 'nz',
-      'brazil': 'br',
-      'mexico': 'mx',
-      'argentina': 'ar',
-    };
-
-    // Check if location contains any country keyword
-    for (var entry in countryMap.entries) {
-      if (locationLower.contains(entry.key)) {
-        return entry.value;
-      }
-    }
-
-    return null; // Return null if no country code found
   }
 
   /// Parse jobs response from JSearch API
@@ -190,27 +155,136 @@ class JobService {
           debugPrint('⚠️ Error parsing job: $e');
           return null;
         }
-      }).whereType<JobModel>().toList(); // Filter out nulls
+      }).whereType<JobModel>().toList();
     } catch (e) {
       debugPrint('❌ Error parsing jobs response: $e');
       return [];
     }
   }
 
-  /// Search jobs by career suggestion (from AI recommendations)
-  Future<List<JobModel>> searchJobsByCareerSuggestion({
-    required String jobTitle,
-    String? location,
-    String? country,
-    int page = 1,
-  }) async {
-    return fetchJobs(
-      query: jobTitle,
-      location: location,
-      country: country ?? 'my',
-      page: page,
-    );
+  /// Apply client-side filters to job list
+  List<JobModel> applyLocalFilters(
+      List<JobModel> jobs,
+      JobFilters filters,
+      ) {
+    var filteredJobs = jobs;
+
+    // Filter by salary range
+    if (filters.minSalary != null || filters.maxSalary != null) {
+      filteredJobs = filteredJobs.where((job) {
+        // If job has no salary info, include it (show "not specified")
+        if (job.jobMinSalary == null || job.jobMaxSalary == null) {
+          return true; // Include jobs with unspecified salary
+        }
+
+        final minSalary = double.tryParse(job.jobMinSalary!) ?? 0;
+        final maxSalary = double.tryParse(job.jobMaxSalary!) ?? 0;
+
+        if (filters.minSalary != null && maxSalary < filters.minSalary!) {
+          return false;
+        }
+        if (filters.maxSalary != null && minSalary > filters.maxSalary!) {
+          return false;
+        }
+
+        return true;
+      }).toList();
+    }
+
+    // Filter by work mode (Remote/Hybrid/On-site)
+    if (filters.remote != null) {
+      filteredJobs = filteredJobs.where((job) {
+        if (filters.remote == 'Remote') {
+          return job.isRemote == true;
+        } else if (filters.remote == 'On-site') {
+          return job.isRemote == false;
+        }
+        // For 'Hybrid', include both (API doesn't distinguish hybrid well)
+        return true;
+      }).toList();
+    }
+
+    // Filter by location (city/state match)
+    if (filters.location != null && filters.location!.isNotEmpty) {
+      final locationQuery = filters.location!.toLowerCase();
+      filteredJobs = filteredJobs.where((job) {
+        final jobLocation = '${job.jobLocation.city}, ${job.jobLocation.state}'.toLowerCase();
+        return jobLocation.contains(locationQuery);
+      }).toList();
+    }
+
+    // Filter by employment types (FULLTIME, PARTTIME, INTERN, CONTRACTOR)
+    if (filters.employmentTypes != null && filters.employmentTypes!.isNotEmpty) {
+      filteredJobs = filteredJobs.where((job) {
+        // Check if any of the job's employment types match the filter
+        return job.jobEmploymentTypes.any((type) =>
+            filters.employmentTypes!.any((filterType) =>
+                type.toUpperCase().contains(filterType.toUpperCase())));
+      }).toList();
+    }
+
+    return filteredJobs;
   }
+
+  /// Search jobs with comprehensive filtering
+  Future<List<JobModel>> searchJobsWithFilters({
+    required String query,
+    required String country,
+    required JobFilters filters,
+  }) async {
+    // Step 1: Fetch from API with query, country, and date posted
+    final jobs = await fetchJobs(
+      query: query,
+      country: country,
+      datePosted: filters.dateRange,
+    );
+
+    // Step 2: Apply local filters (salary, location, work mode, employment type)
+    return applyLocalFilters(jobs, filters);
+  }
+
+  /// Get list of supported countries with their codes
+  static Map<String, String> getSupportedCountries() {
+    return {
+      'my': 'Malaysia',
+      'sg': 'Singapore',
+      'us': 'United States',
+      'uk': 'United Kingdom',
+      'ca': 'Canada',
+      'au': 'Australia',
+      'in': 'India',
+      'id': 'Indonesia',
+      'ph': 'Philippines',
+      'th': 'Thailand',
+      'vn': 'Vietnam',
+      'de': 'Germany',
+      'fr': 'France',
+      'es': 'Spain',
+      'it': 'Italy',
+      'nl': 'Netherlands',
+      'jp': 'Japan',
+      'kr': 'South Korea',
+      'cn': 'China',
+      'hk': 'Hong Kong',
+      'tw': 'Taiwan',
+      'nz': 'New Zealand',
+      'br': 'Brazil',
+      'mx': 'Mexico',
+      'ar': 'Argentina',
+    };
+  }
+
+  /// Get country code from country name
+  static String? getCountryCode(String countryName) {
+    final countries = getSupportedCountries();
+    final entry = countries.entries.firstWhere(
+          (entry) => entry.value.toLowerCase() == countryName.toLowerCase(),
+      orElse: () => MapEntry('', ''),
+    );
+    return entry.key.isNotEmpty ? entry.key : null;
+  }
+
+  // ==================== FIRESTORE METHODS ====================
 
   /// Generate next job bookmark ID (JB0001, JB0002, etc.)
   Future<String> _generateNextBookmarkId(String uid) async {
@@ -241,7 +315,6 @@ class JobService {
   /// Save a job to Firestore (Bookmark)
   Future<String> saveJobToFirestore(String uid, JobModel job) async {
     try {
-      // Generate custom ID
       final bookmarkId = await _generateNextBookmarkId(uid);
 
       final bookmarkRef = _firestore
@@ -250,7 +323,6 @@ class JobService {
           .collection('job_bookmarks')
           .doc(bookmarkId);
 
-      // Save job with metadata
       await bookmarkRef.set({
         ...job.toMap(),
         'bookmarkId': bookmarkId,
@@ -307,120 +379,6 @@ class JobService {
     }
   }
 
-  /// Check if a job is already saved/bookmarked
-  /// Uses job_id from JSearch API as unique identifier
-  Future<String?> isJobSaved(String uid, String jobId) async {
-    try {
-      final snapshot = await _firestore
-          .collection('users')
-          .doc(uid)
-          .collection('job_bookmarks')
-          .where('job_id', isEqualTo: jobId)
-          .limit(1)
-          .get();
-
-      if (snapshot.docs.isNotEmpty) {
-        return snapshot.docs.first.id; // Return bookmark ID
-      }
-      return null;
-    } catch (error) {
-      debugPrint('❌ Error checking if job is saved: $error');
-      return null;
-    }
-  }
-
-  /// Get total count of saved jobs
-  Future<int> getSavedJobsCount(String uid) async {
-    try {
-      final snapshot = await _firestore
-          .collection('users')
-          .doc(uid)
-          .collection('job_bookmarks')
-          .count()
-          .get();
-
-      return snapshot.count ?? 0;
-    } catch (error) {
-      debugPrint('❌ Error getting saved jobs count: $error');
-      return 0;
-    }
-  }
-
-  /// Apply client-side filtering (for filters not supported by API)
-  List<JobModel> applyLocalFilters(
-      List<JobModel> jobs,
-      JobFilters filters,
-      ) {
-    var filteredJobs = jobs;
-
-    // Filter by salary range
-    if (filters.minSalary != null || filters.maxSalary != null) {
-      filteredJobs = filteredJobs.where((job) {
-        if (job.jobMinSalary == null || job.jobMaxSalary == null) {
-          return false;
-        }
-
-        final minSalary = double.tryParse(job.jobMinSalary!) ?? 0;
-        final maxSalary = double.tryParse(job.jobMaxSalary!) ?? 0;
-
-        if (filters.minSalary != null && maxSalary < filters.minSalary!) {
-          return false;
-        }
-        if (filters.maxSalary != null && minSalary > filters.maxSalary!) {
-          return false;
-        }
-
-        return true;
-      }).toList();
-    }
-
-    // Filter by work mode (Remote/Hybrid/On-site)
-    if (filters.remote != null) {
-      filteredJobs = filteredJobs.where((job) {
-        if (filters.remote == 'Remote') {
-          return job.isRemote == true;
-        } else if (filters.remote == 'On-site') {
-          return job.isRemote == false;
-        }
-        // For 'Hybrid', we keep both (API doesn't distinguish hybrid well)
-        return true;
-      }).toList();
-    }
-
-    // Filter by company type/industry
-    if (filters.industries != null && filters.industries!.isNotEmpty) {
-      filteredJobs = filteredJobs.where((job) {
-        final companyType = job.employerCompanyType?.toLowerCase() ?? '';
-        return filters.industries!.any(
-              (industry) => companyType.contains(industry.toLowerCase()),
-        );
-      }).toList();
-    }
-
-    return filteredJobs;
-  }
-
-  /// Search jobs with comprehensive filtering
-  Future<List<JobModel>> searchJobsWithFilters({
-    required String query,
-    String? location,
-    String? country,
-    required JobFilters filters,
-    int page = 1,
-  }) async {
-    // Fetch from API with supported filters
-    final jobs = await fetchJobs(
-      query: query,
-      location: location,
-      country: country,
-      filters: filters,
-      page: page,
-    );
-
-    // Apply additional client-side filtering
-    return applyLocalFilters(jobs, filters);
-  }
-
   /// Stream saved jobs (real-time updates)
   Stream<List<JobModel>> streamSavedJobs(String uid) {
     return _firestore
@@ -440,36 +398,5 @@ class JobService {
         }
       }).whereType<JobModel>().toList();
     });
-  }
-
-  /// Get list of supported countries with their codes
-  static Map<String, String> getSupportedCountries() {
-    return {
-      'my': 'Malaysia',
-      'sg': 'Singapore',
-      'us': 'United States',
-      'uk': 'United Kingdom',
-      'ca': 'Canada',
-      'au': 'Australia',
-      'in': 'India',
-      'id': 'Indonesia',
-      'ph': 'Philippines',
-      'th': 'Thailand',
-      'vn': 'Vietnam',
-      'de': 'Germany',
-      'fr': 'France',
-      'es': 'Spain',
-      'it': 'Italy',
-      'nl': 'Netherlands',
-      'jp': 'Japan',
-      'kr': 'South Korea',
-      'cn': 'China',
-      'hk': 'Hong Kong',
-      'tw': 'Taiwan',
-      'nz': 'New Zealand',
-      'br': 'Brazil',
-      'mx': 'Mexico',
-      'ar': 'Argentina',
-    };
   }
 }

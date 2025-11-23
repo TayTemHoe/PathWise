@@ -5,15 +5,14 @@ import 'package:path_wise/ViewModel/job_view_model.dart';
 import 'package:path_wise/ViewModel/profile_view_model.dart';
 import 'package:path_wise/model/job_models.dart';
 import 'package:path_wise/view/career/job_details_view.dart';
+import 'package:path_wise/service/job_service.dart';
 
 class JobView extends StatefulWidget {
-  final String? prefilledQuery; // For career suggestion navigation
-  final String? prefilledLocation;
+  final String? prefilledQuery;
 
   const JobView({
     Key? key,
     this.prefilledQuery,
-    this.prefilledLocation,
   }) : super(key: key);
 
   @override
@@ -22,80 +21,121 @@ class JobView extends StatefulWidget {
 
 class _JobViewState extends State<JobView> with AutomaticKeepAliveClientMixin {
   final TextEditingController _searchController = TextEditingController();
-  final TextEditingController _locationController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
   bool _showFilters = false;
+
+  // Country selection
+  String _selectedCountry = 'my'; // Default Malaysia
+  final Map<String, String> _supportedCountries = JobService.getSupportedCountries();
 
   // Pagination
   int _currentDisplayPage = 1;
   static const int _jobsPerPage = 10;
 
-  // Cache flag to prevent reloading
+  // Cache flag
   static bool _hasLoadedInitialJobs = false;
 
   @override
-  bool get wantKeepAlive => true; // Keep state alive when switching tabs
+  bool get wantKeepAlive => true;
 
   @override
   void initState() {
     super.initState();
 
-    // Set prefilled values if provided
     if (widget.prefilledQuery != null) {
       _searchController.text = widget.prefilledQuery!;
     }
-    if (widget.prefilledLocation != null) {
-      _locationController.text = widget.prefilledLocation!;
-    }
 
-    // Auto-load jobs only once (first time ever visiting)
-    WidgetsBinding.instance.addPostFrameCallback((_) {
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
       final jobVM = context.read<JobViewModel>();
+      final profileVM = context.read<ProfileViewModel>();
+
+      // Wait for profile to load if not already loaded
+      if (profileVM.profile == null && !profileVM.isLoading) {
+        debugPrint('⏳ Waiting for profile to load...');
+        await profileVM.loadAll();
+      }
+
+      // Get country from user profile
+      _setCountryFromProfile(profileVM);
 
       if (widget.prefilledQuery != null) {
-        // If there's a prefilled query (from career suggestions), always load it
         jobVM.searchJobs(
           query: widget.prefilledQuery!,
-          location: widget.prefilledLocation ?? 'Malaysia',
+          country: _selectedCountry,
         );
         _hasLoadedInitialJobs = true;
       } else if (!_hasLoadedInitialJobs && !jobVM.hasSearchResults) {
-        // Load default jobs only on FIRST visit ever
         _loadDefaultJobs();
         _hasLoadedInitialJobs = true;
       }
-      // If jobs already loaded, do nothing (preserve cache)
     });
 
-    // Setup scroll listener for pagination
     _scrollController.addListener(_onScroll);
   }
 
+  /// Set country from user profile or default to Malaysia
+  void _setCountryFromProfile(ProfileViewModel profileVM) {
+    // Get country from profile (personalInfo.location.country in Firestore)
+    final userCountry = profileVM.profile?.country;
+
+    debugPrint('🌍 Checking user profile country: $userCountry');
+
+    if (userCountry != null && userCountry.isNotEmpty) {
+      // First, check if it's already a valid country code (e.g., "my", "us", "sg")
+      if (_supportedCountries.containsKey(userCountry.toLowerCase())) {
+        setState(() {
+          _selectedCountry = userCountry.toLowerCase();
+        });
+        debugPrint('✅ Set country code from profile: ${userCountry.toLowerCase()} (${_supportedCountries[userCountry.toLowerCase()]})');
+        return;
+      }
+
+      // If not a code, try to convert country name to code (e.g., "Malaysia" -> "my")
+      final countryCode = JobService.getCountryCode(userCountry);
+      if (countryCode != null) {
+        setState(() {
+          _selectedCountry = countryCode;
+        });
+        debugPrint('✅ Converted country name to code: $userCountry -> $countryCode (${_supportedCountries[countryCode]})');
+        return;
+      }
+
+      // If conversion failed, log warning and use default
+      debugPrint('⚠️ Unknown country from profile: "$userCountry", using default Malaysia (my)');
+      setState(() {
+        _selectedCountry = 'my';
+      });
+    } else {
+      // No country in profile, use default
+      debugPrint('ℹ️ No country in profile, using default: Malaysia (my)');
+      setState(() {
+        _selectedCountry = 'my';
+      });
+    }
+  }
+
   void _onScroll() {
-    // Infinite scroll is removed, pagination is manual now
-    // This listener is kept for future enhancements
+    // Reserved for future use
   }
 
   @override
   void dispose() {
     _scrollController.dispose();
-    // Don't dispose controllers to keep state
     super.dispose();
   }
 
-  /// Load default jobs when user first visits the page (ONLY ONCE)
   Future<void> _loadDefaultJobs() async {
     final jobVM = context.read<JobViewModel>();
     await jobVM.searchJobs(
-      query: 'Software Developer OR Data Analyst OR Marketing Manager OR Designer OR Accountant',
-      location: 'Malaysia',
+      query: 'Software Developer OR Data Analyst OR Marketing Manager',
+      country: _selectedCountry,
     );
     setState(() {
       _currentDisplayPage = 1;
     });
   }
 
-  /// Get jobs for current page
   List<JobModel> _getCurrentPageJobs(JobViewModel jobVM) {
     final startIndex = (_currentDisplayPage - 1) * _jobsPerPage;
     final endIndex = startIndex + _jobsPerPage;
@@ -110,24 +150,20 @@ class _JobViewState extends State<JobView> with AutomaticKeepAliveClientMixin {
     );
   }
 
-  /// Get total number of pages
   int _getTotalPages(JobViewModel jobVM) {
     return (jobVM.searchResults.length / _jobsPerPage).ceil();
   }
 
   @override
   Widget build(BuildContext context) {
-    super.build(context); // Required for AutomaticKeepAliveClientMixin
+    super.build(context);
 
     return Scaffold(
       backgroundColor: Colors.grey[50],
       body: Column(
         children: [
           _buildSearchHeader(),
-          if (_showFilters)
-            Flexible(  // Changed: Wrap filter panel in Flexible
-              child: _buildFilterPanel(),
-            ),
+          if (_showFilters) Flexible(child: _buildFilterPanel()),
           Expanded(child: _buildJobListings()),
         ],
       ),
@@ -148,9 +184,9 @@ class _JobViewState extends State<JobView> with AutomaticKeepAliveClientMixin {
       ),
       padding: EdgeInsets.fromLTRB(
         16,
-        MediaQuery.of(context).padding.top + 16,
+        MediaQuery.of(context).padding.top + 8, // Reduced from 16 to 8
         16,
-        16,
+        12, // Reduced from 16 to 12
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -234,25 +270,43 @@ class _JobViewState extends State<JobView> with AutomaticKeepAliveClientMixin {
             ],
           ),
           SizedBox(height: 12),
-          // Location search
+
+          // Country selector
           Container(
             height: 48,
             decoration: BoxDecoration(
               color: Colors.grey[100],
               borderRadius: BorderRadius.circular(12),
             ),
-            child: TextField(
-              controller: _locationController,
+            child: DropdownButtonFormField<String>(
+              value: _selectedCountry,
               decoration: InputDecoration(
-                hintText: 'Location (e.g., Kuala Lumpur)',
-                hintStyle: TextStyle(color: Colors.grey[500], fontSize: 14),
-                prefixIcon: Icon(Icons.location_on_outlined, color: Colors.grey[600]),
+                prefixIcon: Icon(Icons.public, color: Colors.grey[600]),
                 border: InputBorder.none,
                 contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 14),
               ),
+              hint: Text('Select Country'),
+              items: _supportedCountries.entries.map((entry) {
+                return DropdownMenuItem(
+                  value: entry.key,
+                  child: Text(
+                    entry.value,
+                    style: TextStyle(fontSize: 14),
+                  ),
+                );
+              }).toList(),
+              onChanged: (value) {
+                if (value != null) {
+                  setState(() {
+                    _selectedCountry = value;
+                  });
+                }
+              },
             ),
           ),
+
           SizedBox(height: 12),
+
           // Search button
           SizedBox(
             width: double.infinity,
@@ -285,14 +339,14 @@ class _JobViewState extends State<JobView> with AutomaticKeepAliveClientMixin {
         return Container(
           color: Colors.white,
           constraints: BoxConstraints(
-            maxHeight: MediaQuery.of(context).size.height * 0.6, // Max 60% of screen height
+            maxHeight: MediaQuery.of(context).size.height * 0.6,
           ),
-          child: SingleChildScrollView(  // Add scrolling capability
+          child: SingleChildScrollView(
             child: Padding(
               padding: EdgeInsets.all(16),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min, // Add this
+                mainAxisSize: MainAxisSize.min,
                 children: [
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -313,8 +367,8 @@ class _JobViewState extends State<JobView> with AutomaticKeepAliveClientMixin {
                     ],
                   ),
                   SizedBox(height: 16),
-                  _buildFilterChips(jobVM),
-                  SizedBox(height: 12),
+                  _buildQuickFilters(jobVM),
+                  SizedBox(height: 16),
                   _buildAdvancedFilters(jobVM),
                 ],
               ),
@@ -325,33 +379,108 @@ class _JobViewState extends State<JobView> with AutomaticKeepAliveClientMixin {
     );
   }
 
-  Widget _buildFilterChips(JobViewModel jobVM) {
-    final filters = jobVM.currentFilters;
-    List<Widget> chips = [];
-
-    // Work Mode chips
-    for (var mode in ['Remote', 'Hybrid', 'On-site']) {
-      chips.add(
-        Padding(
-          padding: EdgeInsets.only(right: 8),
-          child: FilterChip(
-            label: Text(mode),
-            selected: filters.remote == mode,
-            onSelected: (selected) {
-              final newFilters = filters.copyWith(
-                remote: selected ? mode : null,
-              );
-              jobVM.applyFilters(newFilters);
-            },
-            selectedColor: Color(0xFF7C3AED).withOpacity(0.2),
-            checkmarkColor: Color(0xFF7C3AED),
-          ),
+  Widget _buildQuickFilters(JobViewModel jobVM) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Quick Filters',
+          style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
         ),
-      );
-    }
+        SizedBox(height: 8),
 
-    return Wrap(
-      children: chips,
+        // Work Mode
+        Wrap(
+          spacing: 8,
+          children: ['Remote', 'Hybrid', 'On-site'].map((mode) {
+            final isSelected = jobVM.currentFilters.remote == mode;
+            return FilterChip(
+              label: Text(mode),
+              selected: isSelected,
+              onSelected: (selected) {
+                final newFilters = jobVM.currentFilters.copyWith(
+                  remote: selected ? mode : null,
+                );
+                jobVM.applyFilters(newFilters);
+              },
+              selectedColor: Color(0xFF7C3AED).withOpacity(0.2),
+              checkmarkColor: Color(0xFF7C3AED),
+            );
+          }).toList(),
+        ),
+
+        SizedBox(height: 12),
+
+        // Employment Type
+        Text(
+          'Employment Type',
+          style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
+        ),
+        SizedBox(height: 8),
+        Wrap(
+          spacing: 8,
+          children: ['FULLTIME', 'PARTTIME', 'INTERN'].map((type) {
+            final isSelected = jobVM.currentFilters.employmentTypes?.contains(type) ?? false;
+            return FilterChip(
+              label: Text(type),
+              selected: isSelected,
+              onSelected: (selected) {
+                final currentTypes = List<String>.from(jobVM.currentFilters.employmentTypes ?? []);
+                if (selected) {
+                  currentTypes.add(type);
+                } else {
+                  currentTypes.remove(type);
+                }
+                final newFilters = jobVM.currentFilters.copyWith(
+                  employmentTypes: currentTypes.isEmpty ? null : currentTypes,
+                );
+                jobVM.applyFilters(newFilters);
+              },
+              selectedColor: Color(0xFF7C3AED).withOpacity(0.2),
+              checkmarkColor: Color(0xFF7C3AED),
+            );
+          }).toList(),
+        ),
+
+        SizedBox(height: 12),
+
+        // Date Posted
+        Text(
+          'Date Posted',
+          style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
+        ),
+        SizedBox(height: 8),
+        Wrap(
+          spacing: 8,
+          children: [
+            {'label': 'All Time', 'value': 'all'},
+            {'label': 'Today', 'value': 'today'},
+            {'label': '3 Days', 'value': '3days'},
+            {'label': 'Week', 'value': 'week'},
+            {'label': 'Month', 'value': 'month'},
+          ].map((item) {
+            final isSelected = jobVM.currentFilters.dateRange == item['value'];
+            return FilterChip(
+              label: Text(item['label']!),
+              selected: isSelected,
+              onSelected: (selected) async {
+                final newFilters = jobVM.currentFilters.copyWith(
+                  dateRange: selected ? item['value'] : 'all',
+                );
+                // Need to re-search because date is API parameter
+                await jobVM.searchJobs(
+                  query: _searchController.text.trim().isEmpty ? 'jobs' : _searchController.text.trim(),
+                  country: _selectedCountry,
+                  datePosted: newFilters.dateRange,
+                );
+                await jobVM.applyFilters(newFilters);
+              },
+              selectedColor: Color(0xFF7C3AED).withOpacity(0.2),
+              checkmarkColor: Color(0xFF7C3AED),
+            );
+          }).toList(),
+        ),
+      ],
     );
   }
 
@@ -360,16 +489,45 @@ class _JobViewState extends State<JobView> with AutomaticKeepAliveClientMixin {
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
       children: [
+        Divider(),
+        SizedBox(height: 8),
         Text(
           'Advanced Filters',
           style: TextStyle(fontWeight: FontWeight.w600, fontSize: 16),
         ),
         SizedBox(height: 12),
+        _buildLocationFilter(jobVM),
+        SizedBox(height: 12),
         _buildSalaryRangeFilter(jobVM),
+      ],
+    );
+  }
+
+  Widget _buildLocationFilter(JobViewModel jobVM) {
+    final locationController = TextEditingController(
+      text: jobVM.currentFilters.location ?? '',
+    );
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text('Location (City)', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500)),
         SizedBox(height: 8),
-        _buildExperienceLevelFilter(jobVM),
-        SizedBox(height: 8),
-        _buildIndustryFilter(jobVM),
+        TextField(
+          controller: locationController,
+          decoration: InputDecoration(
+            hintText: 'e.g., Kuala Lumpur',
+            isDense: true,
+            border: OutlineInputBorder(),
+            contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+          ),
+          onChanged: (value) {
+            final newFilters = jobVM.currentFilters.copyWith(
+              location: value.isEmpty ? null : value,
+            );
+            jobVM.applyFilters(newFilters);
+          },
+        ),
       ],
     );
   }
@@ -379,14 +537,14 @@ class _JobViewState extends State<JobView> with AutomaticKeepAliveClientMixin {
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
       children: [
-        Text('Salary Range', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500)),
+        Text('Salary Range (Optional)', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500)),
         SizedBox(height: 8),
         Row(
           children: [
             Expanded(
               child: TextField(
                 decoration: InputDecoration(
-                  labelText: 'Min (RM)',
+                  labelText: 'Min',
                   isDense: true,
                   border: OutlineInputBorder(),
                   contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 8),
@@ -394,12 +552,10 @@ class _JobViewState extends State<JobView> with AutomaticKeepAliveClientMixin {
                 keyboardType: TextInputType.number,
                 onChanged: (value) {
                   final minSalary = int.tryParse(value);
-                  if (minSalary != null) {
-                    final newFilters = jobVM.currentFilters.copyWith(
-                      minSalary: minSalary,
-                    );
-                    jobVM.applyFilters(newFilters);
-                  }
+                  final newFilters = jobVM.currentFilters.copyWith(
+                    minSalary: minSalary,
+                  );
+                  jobVM.applyFilters(newFilters);
                 },
               ),
             ),
@@ -410,7 +566,7 @@ class _JobViewState extends State<JobView> with AutomaticKeepAliveClientMixin {
             Expanded(
               child: TextField(
                 decoration: InputDecoration(
-                  labelText: 'Max (RM)',
+                  labelText: 'Max',
                   isDense: true,
                   border: OutlineInputBorder(),
                   contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 8),
@@ -418,83 +574,19 @@ class _JobViewState extends State<JobView> with AutomaticKeepAliveClientMixin {
                 keyboardType: TextInputType.number,
                 onChanged: (value) {
                   final maxSalary = int.tryParse(value);
-                  if (maxSalary != null) {
-                    final newFilters = jobVM.currentFilters.copyWith(
-                      maxSalary: maxSalary,
-                    );
-                    jobVM.applyFilters(newFilters);
-                  }
+                  final newFilters = jobVM.currentFilters.copyWith(
+                    maxSalary: maxSalary,
+                  );
+                  jobVM.applyFilters(newFilters);
                 },
               ),
             ),
           ],
         ),
-      ],
-    );
-  }
-
-  Widget _buildExperienceLevelFilter(JobViewModel jobVM) {
-    final levels = ['Internship', 'Entry level', 'Mid-Senior level', 'Director'];
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Text('Experience Level', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500)),
-        SizedBox(height: 8),
-        Wrap(
-          spacing: 8,
-          runSpacing: 8,
-          children: levels.map((level) {
-            final isSelected = jobVM.currentFilters.experienceLevel == level;
-            return ChoiceChip(
-              label: Text(level, style: TextStyle(fontSize: 12)),
-              selected: isSelected,
-              onSelected: (selected) {
-                final newFilters = jobVM.currentFilters.copyWith(
-                  experienceLevel: selected ? level : null,
-                );
-                jobVM.applyFilters(newFilters);
-              },
-              selectedColor: Color(0xFF7C3AED).withOpacity(0.2),
-            );
-          }).toList(),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildIndustryFilter(JobViewModel jobVM) {
-    final industries = ['Technology', 'Finance', 'Healthcare', 'Education', 'Marketing'];
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Text('Industry', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500)),
-        SizedBox(height: 8),
-        Wrap(
-          spacing: 8,
-          runSpacing: 8,
-          children: industries.map((industry) {
-            final isSelected = jobVM.currentFilters.industries?.contains(industry) ?? false;
-            return FilterChip(
-              label: Text(industry, style: TextStyle(fontSize: 12)),
-              selected: isSelected,
-              onSelected: (selected) {
-                final currentIndustries = List<String>.from(jobVM.currentFilters.industries ?? []);
-                if (selected) {
-                  currentIndustries.add(industry);
-                } else {
-                  currentIndustries.remove(industry);
-                }
-                final newFilters = jobVM.currentFilters.copyWith(
-                  industries: currentIndustries.isEmpty ? null : currentIndustries,
-                );
-                jobVM.applyFilters(newFilters);
-              },
-              selectedColor: Color(0xFF7C3AED).withOpacity(0.2),
-              checkmarkColor: Color(0xFF7C3AED),
-            );
-          }).toList(),
+        SizedBox(height: 4),
+        Text(
+          'Jobs without salary info will also be shown',
+          style: TextStyle(fontSize: 11, color: Colors.grey[600], fontStyle: FontStyle.italic),
         ),
       ],
     );
@@ -515,7 +607,6 @@ class _JobViewState extends State<JobView> with AutomaticKeepAliveClientMixin {
           return _buildEmptyState(hasSearched: _hasLoadedInitialJobs);
         }
 
-        // Get jobs for current page
         final currentPageJobs = _getCurrentPageJobs(jobVM);
         final totalPages = _getTotalPages(jobVM);
 
@@ -529,20 +620,30 @@ class _JobViewState extends State<JobView> with AutomaticKeepAliveClientMixin {
           },
           child: Column(
             children: [
-              // Results count and filter summary
+              // Results summary
               Container(
                 padding: EdgeInsets.fromLTRB(16, 16, 16, 8),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Expanded(
-                      child: Text(
-                        '${jobVM.totalSearchResults} Jobs Available',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w600,
-                          color: Colors.black87,
-                        ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            '${jobVM.totalSearchResults} Jobs Found',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.black87,
+                            ),
+                          ),
+                          if (jobVM.totalAllResults != jobVM.totalSearchResults)
+                            Text(
+                              'Filtered from ${jobVM.totalAllResults} total results',
+                              style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                            ),
+                        ],
                       ),
                     ),
                     if (jobVM.currentFilters.hasActiveFilters)
@@ -578,7 +679,7 @@ class _JobViewState extends State<JobView> with AutomaticKeepAliveClientMixin {
                 ),
               ),
 
-              // Pagination controls
+              // Pagination
               if (totalPages > 1) _buildPaginationControls(totalPages),
             ],
           ),
@@ -603,7 +704,6 @@ class _JobViewState extends State<JobView> with AutomaticKeepAliveClientMixin {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          // Previous button
           IconButton(
             onPressed: _currentDisplayPage > 1
                 ? () {
@@ -617,10 +717,7 @@ class _JobViewState extends State<JobView> with AutomaticKeepAliveClientMixin {
             color: Color(0xFF7C3AED),
             disabledColor: Colors.grey[300],
           ),
-
           SizedBox(width: 16),
-
-          // Page numbers
           ...List.generate(
             totalPages > 5 ? 5 : totalPages,
                 (index) {
@@ -647,23 +744,17 @@ class _JobViewState extends State<JobView> with AutomaticKeepAliveClientMixin {
                   width: 36,
                   height: 36,
                   decoration: BoxDecoration(
-                    color: _currentDisplayPage == pageNum
-                        ? Color(0xFF7C3AED)
-                        : Colors.transparent,
+                    color: _currentDisplayPage == pageNum ? Color(0xFF7C3AED) : Colors.transparent,
                     borderRadius: BorderRadius.circular(8),
                     border: Border.all(
-                      color: _currentDisplayPage == pageNum
-                          ? Color(0xFF7C3AED)
-                          : Colors.grey[300]!,
+                      color: _currentDisplayPage == pageNum ? Color(0xFF7C3AED) : Colors.grey[300]!,
                     ),
                   ),
                   child: Center(
                     child: Text(
                       '$pageNum',
                       style: TextStyle(
-                        color: _currentDisplayPage == pageNum
-                            ? Colors.white
-                            : Colors.black87,
+                        color: _currentDisplayPage == pageNum ? Colors.white : Colors.black87,
                         fontWeight: FontWeight.w600,
                       ),
                     ),
@@ -672,10 +763,7 @@ class _JobViewState extends State<JobView> with AutomaticKeepAliveClientMixin {
               );
             },
           ),
-
           SizedBox(width: 16),
-
-          // Next button
           IconButton(
             onPressed: _currentDisplayPage < totalPages
                 ? () {
@@ -726,12 +814,10 @@ class _JobViewState extends State<JobView> with AutomaticKeepAliveClientMixin {
             padding: EdgeInsets.all(16),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min, // Add this to prevent overflow
+              mainAxisSize: MainAxisSize.min,
               children: [
-                // Header with company logo and save button
                 Row(
                   children: [
-                    // Company Logo
                     Container(
                       width: 50,
                       height: 50,
@@ -756,7 +842,7 @@ class _JobViewState extends State<JobView> with AutomaticKeepAliveClientMixin {
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
-                        mainAxisSize: MainAxisSize.min, // Add this
+                        mainAxisSize: MainAxisSize.min,
                         children: [
                           Text(
                             job.companyName,
@@ -806,7 +892,6 @@ class _JobViewState extends State<JobView> with AutomaticKeepAliveClientMixin {
                   ],
                 ),
                 SizedBox(height: 12),
-                // Job Title
                 Text(
                   job.jobTitle,
                   style: TextStyle(
@@ -818,15 +903,13 @@ class _JobViewState extends State<JobView> with AutomaticKeepAliveClientMixin {
                   overflow: TextOverflow.ellipsis,
                 ),
                 SizedBox(height: 8),
-                // Tags - Wrapped in Flexible to prevent overflow
                 Flexible(
-                  fit: FlexFit.loose, // Add Flexible wrapper
+                  fit: FlexFit.loose,
                   child: Wrap(
                     spacing: 8,
                     runSpacing: 8,
                     children: [
-                      if (job.isRemote)
-                        _buildTag('Remote', Colors.green),
+                      if (job.isRemote) _buildTag('Remote', Colors.green),
                       _buildTag(job.requiredExperience.experienceLevel ?? 'Entry level', Colors.blue),
                       if (job.jobEmploymentTypes.isNotEmpty)
                         _buildTag(job.jobEmploymentTypes.first, Colors.orange),
@@ -834,7 +917,6 @@ class _JobViewState extends State<JobView> with AutomaticKeepAliveClientMixin {
                   ),
                 ),
                 SizedBox(height: 12),
-                // Salary and Posted Date
                 Row(
                   children: [
                     Icon(Icons.payments_outlined, size: 16, color: Color(0xFF10B981)),
@@ -853,7 +935,7 @@ class _JobViewState extends State<JobView> with AutomaticKeepAliveClientMixin {
                     ),
                     Icon(Icons.access_time, size: 14, color: Colors.grey[500]),
                     SizedBox(width: 4),
-                    Flexible( // Changed from implicit flex to explicit Flexible
+                    Flexible(
                       child: Text(
                         job.getTimeSincePosted(),
                         style: TextStyle(fontSize: 12, color: Colors.grey[600]),
@@ -864,7 +946,6 @@ class _JobViewState extends State<JobView> with AutomaticKeepAliveClientMixin {
                   ],
                 ),
                 SizedBox(height: 12),
-                // View Details Button
                 SizedBox(
                   width: double.infinity,
                   child: OutlinedButton(
@@ -882,7 +963,7 @@ class _JobViewState extends State<JobView> with AutomaticKeepAliveClientMixin {
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(8),
                       ),
-                      padding: EdgeInsets.symmetric(vertical: 12), // Reduced padding slightly
+                      padding: EdgeInsets.symmetric(vertical: 12),
                     ),
                     child: Text('View Details'),
                   ),
@@ -1008,7 +1089,6 @@ class _JobViewState extends State<JobView> with AutomaticKeepAliveClientMixin {
               ElevatedButton.icon(
                 onPressed: () {
                   _searchController.clear();
-                  _locationController.clear();
                   final jobVM = context.read<JobViewModel>();
                   jobVM.clearFilters();
                   _loadDefaultJobs();
@@ -1030,7 +1110,6 @@ class _JobViewState extends State<JobView> with AutomaticKeepAliveClientMixin {
 
   Future<void> _performSearch() async {
     final query = _searchController.text.trim();
-    final location = _locationController.text.trim();
 
     if (query.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -1040,9 +1119,14 @@ class _JobViewState extends State<JobView> with AutomaticKeepAliveClientMixin {
     }
 
     final jobVM = context.read<JobViewModel>();
+
+    setState(() {
+      _currentDisplayPage = 1; // Reset to first page
+    });
+
     await jobVM.searchJobs(
       query: query,
-      location: location.isEmpty ? 'Malaysia' : location,
+      country: _selectedCountry,
     );
   }
 }

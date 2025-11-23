@@ -190,17 +190,18 @@ class _RoadmapListViewState extends State<RoadmapListView> {
             // Create roadmap button
             ElevatedButton.icon(
               onPressed: () => _navigateToCreateRoadmap(),
-              icon: const Icon(Icons.add_road, size: 24),
+              icon: const Icon(Icons.add_road, size: 24, color: Colors.white),
               label: const Text(
-                'Create Roadmap',
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w600,
-                ),
+                'Create Roadmap'
               ),
               style: ElevatedButton.styleFrom(
                 backgroundColor: const Color(0xFF8B5CF6),
                 foregroundColor: Colors.white,
+                textStyle: const TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.white,
+                ),
                 padding: const EdgeInsets.symmetric(
                   horizontal: 32,
                   vertical: 16,

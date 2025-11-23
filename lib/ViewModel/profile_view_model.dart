@@ -449,7 +449,6 @@ class ProfileViewModel extends ChangeNotifier {
     final experiencePct = _experience.isNotEmpty ? 100.0 : 0.0;
 
     // --- Preferences (10%) ---
-// --- Preferences (10%) ---
     final prefs = p?.preferences;
     final hasPrefs = (prefs?.desiredJobTitles?.isNotEmpty == true) ||
         (prefs?.industries?.isNotEmpty == true) ||

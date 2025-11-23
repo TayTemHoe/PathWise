@@ -9,33 +9,31 @@ class JobViewModel extends ChangeNotifier {
   final JobService _jobService = JobService();
 
   // State variables
-  List<JobModel> _searchResults = [];
+  List<JobModel> _allSearchResults = []; // All results from API
+  List<JobModel> _filteredResults = []; // Filtered results (after local filters)
   List<JobModel> _savedJobs = [];
   JobFilters _currentFilters = JobFilters.empty();
   String? _errorMessage;
   bool _isLoading = false;
-  bool _isLoadingMore = false;
   bool _isSearching = false;
-  int _currentPage = 1;
-  bool _hasMorePages = true;
   String _lastSearchQuery = '';
-  String _lastSearchLocation = '';
+  String _lastSearchCountry = 'my'; // Last used country code
 
   // Getters
-  List<JobModel> get searchResults => _searchResults;
+  List<JobModel> get searchResults => _filteredResults;
+  List<JobModel> get allResults => _allSearchResults;
   List<JobModel> get savedJobs => _savedJobs;
   JobFilters get currentFilters => _currentFilters;
   String? get errorMessage => _errorMessage;
   bool get isLoading => _isLoading;
-  bool get isLoadingMore => _isLoadingMore;
   bool get isSearching => _isSearching;
-  bool get hasSearchResults => _searchResults.isNotEmpty;
+  bool get hasSearchResults => _filteredResults.isNotEmpty;
   bool get hasSavedJobs => _savedJobs.isNotEmpty;
   bool get hasError => _errorMessage != null;
-  bool get hasMorePages => _hasMorePages;
-  int get totalSearchResults => _searchResults.length;
+  int get totalSearchResults => _filteredResults.length;
+  int get totalAllResults => _allSearchResults.length;
   int get totalSavedJobs => _savedJobs.length;
-  int get currentPage => _currentPage;
+  String get lastSearchCountry => _lastSearchCountry;
 
   /// Check if a job is saved by its job ID
   bool isJobSaved(String jobId) {
@@ -75,53 +73,49 @@ class JobViewModel extends ChangeNotifier {
     _errorMessage = message;
     _isLoading = false;
     _isSearching = false;
-    _isLoadingMore = false;
     notifyListeners();
   }
 
-  /// Search jobs with query and location
-  // Key changes needed in job_view_model.dart
-
-// Update searchJobs method to accept country parameter:
+  /// Search jobs with query and country
+  /// This fetches ALL results from API and stores them
   Future<bool> searchJobs({
     required String query,
-    String? location,
-    String? country, // NEW: Add country parameter
-    bool clearPrevious = true,
+    required String country,
+    String? datePosted,
   }) async {
     try {
       _setSearching(true);
       _errorMessage = null;
 
-      if (clearPrevious) {
-        _searchResults = [];
-        _currentPage = 1;
-        _hasMorePages = true;
-      }
-
       _lastSearchQuery = query;
-      _lastSearchLocation = location ?? 'my';
+      _lastSearchCountry = country;
 
-      debugPrint('🔍 Searching jobs: $query in $_lastSearchLocation (Country: ${country ?? "my"})');
+      debugPrint('🔍 Searching jobs: "$query" in country "$country"');
 
+      // Fetch all jobs from API (with automatic multi-page fetching)
       final results = await _jobService.fetchJobs(
         query: query,
-        location: _lastSearchLocation,
-        country: country ?? 'my', // Pass country to service
-        filters: _currentFilters,
-        page: _currentPage,
+        country: country,
+        datePosted: datePosted ?? _currentFilters.dateRange,
+        maxResults: 500, // Fetch up to 500 jobs
       );
 
-      if (clearPrevious) {
-        _searchResults = results;
+      _allSearchResults = results;
+
+      // Apply local filters if any are active
+      if (_currentFilters.hasActiveFilters) {
+        _filteredResults = _jobService.applyLocalFilters(
+          _allSearchResults,
+          _currentFilters,
+        );
       } else {
-        _searchResults.addAll(results);
+        _filteredResults = _allSearchResults;
       }
 
-      _hasMorePages = results.isNotEmpty && results.length >= 10;
       _setSearching(false);
 
-      debugPrint('✅ Found ${results.length} jobs');
+      debugPrint('✅ Found ${_allSearchResults.length} total jobs');
+      debugPrint('✅ After filters: ${_filteredResults.length} jobs');
       return true;
     } catch (e) {
       debugPrint('❌ Error searching jobs: $e');
@@ -130,34 +124,43 @@ class JobViewModel extends ChangeNotifier {
     }
   }
 
-// Update applyFilters to handle country
+  /// Apply filters to existing search results
   Future<bool> applyFilters(JobFilters filters) async {
     try {
-      _setSearching(true);
-      _errorMessage = null;
       _currentFilters = filters;
-      _currentPage = 1;
 
       debugPrint('🔧 Applying filters: ${filters.activeFilterCount} active');
 
-      // Re-search with new filters
-      if (_lastSearchQuery.isNotEmpty) {
-        final results = await _jobService.searchJobsWithFilters(
-          query: _lastSearchQuery,
-          location: _lastSearchLocation,
-          country: filters.country ?? 'my', // Use country from filters
-          filters: _currentFilters,
-          page: _currentPage,
+      // If we have search results, apply filters to them
+      if (_allSearchResults.isNotEmpty) {
+        // Check if filters require re-fetching from API
+        // (query, country, or dateRange changed)
+        final needsRefetch =
+            (filters.query != null && filters.query != _lastSearchQuery) ||
+                (filters.country != null && filters.country != _lastSearchCountry) ||
+                (filters.dateRange != null && filters.dateRange != _currentFilters.dateRange);
+
+        if (needsRefetch) {
+          // Re-search with new API parameters
+          return await searchJobs(
+            query: filters.query ?? _lastSearchQuery,
+            country: filters.country ?? _lastSearchCountry,
+            datePosted: filters.dateRange,
+          );
+        }
+
+        // Otherwise, just apply local filters to existing results
+        _filteredResults = _jobService.applyLocalFilters(
+          _allSearchResults,
+          _currentFilters,
         );
 
-        _searchResults = results;
-        _hasMorePages = results.isNotEmpty && results.length >= 10;
-        _setSearching(false);
-
-        debugPrint('✅ Filtered results: ${results.length} jobs');
+        notifyListeners();
+        debugPrint('✅ Filtered results: ${_filteredResults.length} jobs');
         return true;
       } else {
-        _setSearching(false);
+        // No search results yet, do nothing
+        notifyListeners();
         return false;
       }
     } catch (e) {
@@ -167,55 +170,25 @@ class JobViewModel extends ChangeNotifier {
     }
   }
 
-  Future<bool> loadMoreJobs() async {
-    if (!_hasMorePages || _isLoadingMore) {
-      return false;
-    }
-
-    try {
-      _isLoadingMore = true;
-      notifyListeners();
-
-      _currentPage++;
-      debugPrint('📄 Loading page $_currentPage');
-
-      final results = await _jobService.fetchJobs(
-        query: _lastSearchQuery,
-        location: _lastSearchLocation,
-        country: _currentFilters.country ?? 'my', // Use country from filters
-        filters: _currentFilters,
-
-        page: _currentPage,
-      );
-
-      if (results.isEmpty || results.length < 10) {
-        _hasMorePages = false;
-      }
-
-      _searchResults.addAll(results);
-      _isLoadingMore = false;
-      notifyListeners();
-
-      debugPrint('✅ Loaded ${results.length} more jobs');
-      return true;
-    } catch (e) {
-      debugPrint('❌ Error loading more jobs: $e');
-      _isLoadingMore = false;
-      notifyListeners();
-      return false;
-    }
-  }
-
-  /// Clear all filters
+  /// Clear all filters and show all search results
   Future<bool> clearFilters() async {
     _currentFilters = JobFilters.empty();
     debugPrint('🧹 Cleared all filters');
 
-    // Re-search without filters
-    if (_lastSearchQuery.isNotEmpty) {
-      return searchJobs(query: _lastSearchQuery, location: _lastSearchLocation);
-    }
+    // Show all search results without filters
+    _filteredResults = _allSearchResults;
+    notifyListeners();
     return true;
+  }
+
+  /// Clear search results
+  void clearSearchResults() {
+    _allSearchResults = [];
+    _filteredResults = [];
+    _lastSearchQuery = '';
+    _lastSearchCountry = 'my';
+    notifyListeners();
+    debugPrint('🧹 Cleared search results');
   }
 
   /// Save/bookmark a job
@@ -329,16 +302,6 @@ class JobViewModel extends ChangeNotifier {
     await fetchSavedJobs(uid);
   }
 
-  /// Clear search results
-  void clearSearchResults() {
-    _searchResults = [];
-    _currentPage = 1;
-    _hasMorePages = true;
-    _lastSearchQuery = '';
-    _lastSearchLocation = '';
-    notifyListeners();
-    debugPrint('🧹 Cleared search results');
-  }
 
   /// Search in saved jobs
   List<JobModel> searchSavedJobs(String query) {
@@ -352,65 +315,16 @@ class JobViewModel extends ChangeNotifier {
     }).toList();
   }
 
-  /// Get jobs by company
-  List<JobModel> getJobsByCompany(String companyName) {
-    return _searchResults.where((job) {
-      return job.companyName.toLowerCase() == companyName.toLowerCase();
-    }).toList();
-  }
-
-  /// Get remote jobs only
-  List<JobModel> getRemoteJobs() {
-    return _searchResults.where((job) => job.isRemote).toList();
-  }
-
-  /// Get jobs by location
-  List<JobModel> getJobsByLocation(String location) {
-    final lowerLocation = location.toLowerCase();
-    return _searchResults.where((job) {
-      final jobLocation = '${job.jobLocation.city}, ${job.jobLocation.state}'.toLowerCase();
-      return jobLocation.contains(lowerLocation);
-    }).toList();
-  }
-
-  /// Get jobs by salary range
-  List<JobModel> getJobsBySalaryRange(int min, int max) {
-    return _searchResults.where((job) {
-      if (job.jobMinSalary == null || job.jobMaxSalary == null) {
-        return false;
-      }
-
-      final minSalary = double.tryParse(job.jobMinSalary!) ?? 0;
-      final maxSalary = double.tryParse(job.jobMaxSalary!) ?? 0;
-
-      return maxSalary >= min && minSalary <= max;
-    }).toList();
-  }
-
   /// Get job statistics
   Map<String, dynamic> getStatistics() {
     return {
-      'totalSearchResults': _searchResults.length,
+      'totalAllResults': _allSearchResults.length,
+      'totalFilteredResults': _filteredResults.length,
       'totalSavedJobs': _savedJobs.length,
-      'remoteJobs': _searchResults.where((j) => j.isRemote).length,
+      'remoteJobs': _filteredResults.where((j) => j.isRemote).length,
       'hasActiveFilters': _currentFilters.hasActiveFilters,
       'activeFilterCount': _currentFilters.activeFilterCount,
-      'currentPage': _currentPage,
-      'hasMorePages': _hasMorePages,
     };
-  }
-
-  /// Get company list from search results
-  List<String> getUniqueCompanies() {
-    return _searchResults.map((job) => job.companyName).toSet().toList();
-  }
-
-  /// Get location list from search results
-  List<String> getUniqueLocations() {
-    return _searchResults
-        .map((job) => '${job.jobLocation.city}, ${job.jobLocation.state}')
-        .toSet()
-        .toList();
   }
 
   /// Listen to real-time saved jobs updates

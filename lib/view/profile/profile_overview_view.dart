@@ -100,8 +100,7 @@ class ProfileOverviewScreen extends StatelessWidget {
                                     const SizedBox(height: 12),
                                     _CompletionCard(
                                       percent: (p?.completionPercent ?? 0)
-                                          .clamp(0, 100)
-                                          .toDouble(),
+                                          .toInt(),
                                     ),
                                     const SizedBox(height: 12),
 
@@ -483,7 +482,7 @@ class _HeaderCard extends StatelessWidget {
 
 class _CompletionCard extends StatelessWidget {
   const _CompletionCard({required this.percent});
-  final double percent;
+  final int percent;
 
   @override
   Widget build(BuildContext context) {
