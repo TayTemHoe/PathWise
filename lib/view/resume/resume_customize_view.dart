@@ -332,12 +332,10 @@ class _CustomizeResumePageState extends State<CustomizeResumePage>
     );
   }
 
-  Widget _buildTemplateCard(
-      ResumeTemplateType type,
+  Widget _buildTemplateCard(ResumeTemplateType type,
       String name,
       IconData icon,
-      Color color,
-      ) {
+      Color color,) {
     final isSelected = _selectedTemplate == type;
     return GestureDetector(
       onTap: () => setState(() => _selectedTemplate = type),
@@ -390,36 +388,42 @@ class _CustomizeResumePageState extends State<CustomizeResumePage>
           _buildSectionToggle(
             'Personal Information',
             _sections.personalInfo,
-                (v) => setState(() => _sections = _sections.copyWith(personalInfo: v)),
+                (v) =>
+                setState(() => _sections = _sections.copyWith(personalInfo: v)),
             required: true,
           ),
           _buildSectionToggle(
             'About Me / Summary',
             _sections.aboutMe,
-                (v) => setState(() => _sections = _sections.copyWith(aboutMe: v)),
+                (v) =>
+                setState(() => _sections = _sections.copyWith(aboutMe: v)),
           ),
           _buildSectionToggle(
             'Skills',
             _sections.skills,
-                (v) => setState(() => _sections = _sections.copyWith(skills: v)),
+                (v) =>
+                setState(() => _sections = _sections.copyWith(skills: v)),
             required: true,
           ),
           _buildSectionToggle(
             'Education',
             _sections.education,
-                (v) => setState(() => _sections = _sections.copyWith(education: v)),
+                (v) =>
+                setState(() => _sections = _sections.copyWith(education: v)),
             required: true,
           ),
           _buildSectionToggle(
             'Experience',
             _sections.experience,
-                (v) => setState(() => _sections = _sections.copyWith(experience: v)),
+                (v) =>
+                setState(() => _sections = _sections.copyWith(experience: v)),
             required: true,
           ),
           _buildSectionToggle(
             'References',
             _sections.references,
-                (v) => setState(() => _sections = _sections.copyWith(references: v)),
+                (v) =>
+                setState(() => _sections = _sections.copyWith(references: v)),
             isLast: true,
           ),
         ],
@@ -427,8 +431,7 @@ class _CustomizeResumePageState extends State<CustomizeResumePage>
     );
   }
 
-  Widget _buildSectionToggle(
-      String title,
+  Widget _buildSectionToggle(String title,
       bool value,
       Function(bool) onChanged, {
         bool required = false,
@@ -687,7 +690,8 @@ class _CustomizeResumePageState extends State<CustomizeResumePage>
             _font.header1FontSize,
             18,
             28,
-                (v) => setState(() => _font = _font.copyWith(header1FontSize: v)),
+                (v) =>
+                setState(() => _font = _font.copyWith(header1FontSize: v)),
           ),
           const SizedBox(height: 20),
           _buildFontSizeControl(
@@ -695,7 +699,8 @@ class _CustomizeResumePageState extends State<CustomizeResumePage>
             _font.header2FontSize,
             10,
             16,
-                (v) => setState(() => _font = _font.copyWith(header2FontSize: v)),
+                (v) =>
+                setState(() => _font = _font.copyWith(header2FontSize: v)),
           ),
           const SizedBox(height: 20),
           _buildFontSizeControl(
@@ -703,20 +708,19 @@ class _CustomizeResumePageState extends State<CustomizeResumePage>
             _font.contentFontSize,
             9,
             14,
-                (v) => setState(() => _font = _font.copyWith(contentFontSize: v)),
+                (v) =>
+                setState(() => _font = _font.copyWith(contentFontSize: v)),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildFontSizeControl(
-      String label,
+  Widget _buildFontSizeControl(String label,
       int value,
       int min,
       int max,
-      Function(int) onChanged,
-      ) {
+      Function(int) onChanged,) {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -739,7 +743,8 @@ class _CustomizeResumePageState extends State<CustomizeResumePage>
                 ),
               ),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                padding: const EdgeInsets.symmetric(
+                    horizontal: 12, vertical: 6),
                 decoration: BoxDecoration(
                   color: const Color(0xFF7C3AED).withOpacity(0.1),
                   borderRadius: BorderRadius.circular(8),
@@ -929,9 +934,9 @@ class _CustomizeResumePageState extends State<CustomizeResumePage>
                   child: const Text(
                     'Save Resume',
                     style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.white
+                        fontSize: 14,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white
                     ),
                   ),
                 ),
@@ -972,16 +977,18 @@ class _CustomizeResumePageState extends State<CustomizeResumePage>
     c['name']!.text.isNotEmpty ||
         c['position']!.text.isNotEmpty ||
         c['contact']!.text.isNotEmpty)
-        .map((c) => ResumeReference(
-      name: c['name']!.text,
-      position: c['position']!.text,
-      contact: c['contact']!.text,
-    ))
+        .map((c) =>
+        ResumeReference(
+          name: c['name']!.text,
+          position: c['position']!.text,
+          contact: c['contact']!.text,
+        ))
         .toList();
 
     final previewResume = ResumeDoc(
       id: widget.resume?.id ?? 'temp',
-      title: _titleController.text.isEmpty ? 'My Resume' : _titleController.text,
+      title: _titleController.text.isEmpty ? 'My Resume' : _titleController
+          .text,
       template: _selectedTemplate,
       theme: _theme,
       font: _font,
@@ -1005,7 +1012,8 @@ class _CustomizeResumePageState extends State<CustomizeResumePage>
     if (profileVM.profile == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Profile not found. Please complete your profile first.'),
+          content: Text(
+              'Profile not found. Please complete your profile first.'),
           backgroundColor: Colors.red,
         ),
       );
@@ -1018,35 +1026,19 @@ class _CustomizeResumePageState extends State<CustomizeResumePage>
     c['name']!.text.isNotEmpty &&
         c['position']!.text.isNotEmpty &&
         c['contact']!.text.isNotEmpty)
-        .map((c) => ResumeReference(
-      name: c['name']!.text,
-      position: c['position']!.text,
-      contact: c['contact']!.text,
-    ))
+        .map((c) =>
+        ResumeReference(
+          name: c['name']!.text,
+          position: c['position']!.text,
+          contact: c['contact']!.text,
+        ))
         .toList();
 
+    // Show improved loading dialog
     showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (context) => Center(
-        child: Container(
-          padding: const EdgeInsets.all(24),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(16),
-          ),
-          child: const Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              CircularProgressIndicator(),
-              SizedBox(height: 16),
-              Text(
-                  'Saving your resume...'
-              ),
-            ],
-          ),
-        ),
-      ),
+      builder: (context) => _buildLoadingDialog('Saving your resume...'),
     );
 
     bool success = false;
@@ -1058,7 +1050,8 @@ class _CustomizeResumePageState extends State<CustomizeResumePage>
         theme: _theme,
         font: _font,
         sections: _sections,
-        aboutMe: _aboutMeController.text.isEmpty ? null : _aboutMeController.text,
+        aboutMe: _aboutMeController.text.isEmpty ? null : _aboutMeController
+            .text,
         references: _references,
         updatedAt: DateTime.now(),
       );
@@ -1070,30 +1063,123 @@ class _CustomizeResumePageState extends State<CustomizeResumePage>
         theme: _theme,
         font: _font,
         sections: _sections,
-        aboutMe: _aboutMeController.text.isEmpty ? null : _aboutMeController.text,
+        aboutMe: _aboutMeController.text.isEmpty ? null : _aboutMeController
+            .text,
         references: _references,
       );
     }
 
     if (mounted) {
-      Navigator.pop(context);
+      Navigator.pop(context); // Close loading dialog
 
       if (success) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Resume saved successfully!'),
+          SnackBar(
+            content: Row(
+              children: [
+                const Icon(Icons.check_circle, color: Colors.white),
+                const SizedBox(width: 12),
+                const Expanded(
+                  child: Text(
+                    'Resume saved successfully!',
+                    style: TextStyle(fontSize: 14),
+                  ),
+                ),
+              ],
+            ),
             backgroundColor: Colors.green,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(10),
+            ),
+            margin: const EdgeInsets.all(16),
           ),
         );
         Navigator.popUntil(context, (route) => route.isFirst);
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(resumeVM.error ?? 'Failed to save resume'),
+            content: Row(
+              children: [
+                const Icon(Icons.error_outline, color: Colors.white),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    resumeVM.error ?? 'Failed to save resume',
+                    style: const TextStyle(fontSize: 14),
+                  ),
+                ),
+              ],
+            ),
             backgroundColor: Colors.red,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(10),
+            ),
+            margin: const EdgeInsets.all(16),
           ),
         );
       }
     }
+  }
+
+// Add this helper method to build improved loading dialog
+  Widget _buildLoadingDialog(String message) {
+    return Dialog(
+      backgroundColor: Colors.transparent,
+      elevation: 0,
+      child: Container(
+        padding: const EdgeInsets.all(24),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.1),
+              blurRadius: 10,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 60,
+              height: 60,
+              decoration: BoxDecoration(
+                color: const Color(0xFF7C3AED).withOpacity(0.1),
+                shape: BoxShape.circle,
+              ),
+              child: const Center(
+                child: CircularProgressIndicator(
+                  strokeWidth: 3,
+                  valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF7C3AED)),
+                ),
+              ),
+            ),
+            const SizedBox(height: 20),
+            Text(
+              message,
+              style: const TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w600,
+                color: Color(0xFF1F2937),
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 8),
+            const Text(
+              'Please wait...',
+              style: TextStyle(
+                fontSize: 13,
+                color: Color(0xFF6B7280),
+              ),
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }

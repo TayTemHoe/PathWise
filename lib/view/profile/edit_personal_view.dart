@@ -1,10 +1,12 @@
 import 'dart:io';
+import 'package:intl/intl.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import 'package:path_wise/ViewModel/profile_view_model.dart';
+import 'package:permission_handler/permission_handler.dart';
+import 'package:device_info_plus/device_info_plus.dart';
 
 class EditPersonalInfoScreen extends StatefulWidget {
   const EditPersonalInfoScreen({super.key});
@@ -53,28 +55,117 @@ class _EditPersonalInfoScreenState extends State<EditPersonalInfoScreen> {
   }
 
   Future<void> _pickAndUploadPhoto(ProfileViewModel vm) async {
-    final picker = ImagePicker();
-    final picked = await picker.pickImage(source: ImageSource.gallery, imageQuality: 90);
-    if (picked == null) return;
+    try {
+      // Request permissions
+      PermissionStatus status;
 
-    final file = File(picked.path);
-    final ext = picked.path.split('.').last.toLowerCase();
-    final allowed = ['jpg', 'jpeg', 'png', 'gif'];
-    if (!allowed.contains(ext)) {
+      if (Platform.isAndroid) {
+        // For Android 13+, request READ_MEDIA_IMAGES
+        // For Android 12 and below, request READ_EXTERNAL_STORAGE
+        final androidInfo = await DeviceInfoPlugin().androidInfo;
+        if (androidInfo.version.sdkInt >= 33) {
+          // Android 13+
+          status = await Permission.photos.request();
+        } else {
+          // Android 12 and below
+          status = await Permission.storage.request();
+        }
+      } else {
+        // iOS
+        status = await Permission.photos.request();
+      }
+
+      // Handle permission result
+      if (status.isDenied) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Photo permission is required'),
+            duration: Duration(seconds: 2),
+          ),
+        );
+        return;
+      }
+
+      if (status.isPermanentlyDenied) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Photo permission is permanently denied. Open app settings.'),
+            duration: Duration(seconds: 3),
+          ),
+        );
+        openAppSettings();
+        return;
+      }
+
+      // Pick image
+      final picker = ImagePicker();
+      final picked = await picker.pickImage(
+        source: ImageSource.gallery,
+        imageQuality: 90,
+      );
+
+      if (picked == null) {
+        // User cancelled
+        return;
+      }
+
+      final file = File(picked.path);
+      final ext = picked.path.split('.').last.toLowerCase();
+      const allowed = ['jpg', 'jpeg', 'png', 'gif'];
+
+      if (!allowed.contains(ext)) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Please choose a JPG, PNG, or GIF image'),
+            duration: Duration(seconds: 2),
+          ),
+        );
+        return;
+      }
+
+      // Show uploading indicator
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please choose JPG/PNG/GIF image')),
+        const SnackBar(
+          content: Text('Uploading photo...'),
+          duration: Duration(seconds: 5),
+        ),
       );
-      return;
-    }
 
-    final url = await vm.uploadProfilePicture(file, fileExt: ext == 'jpeg' ? 'jpg' : ext);
-    if (!mounted) return;
-    if (url != null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Photo uploaded')),
+      // Upload
+      final url = await vm.uploadProfilePicture(
+        file,
+        fileExt: ext == 'jpeg' ? 'jpg' : ext,
       );
-      setState(() {}); // refresh avatar
+
+      if (!mounted) return;
+      if (url != null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Photo uploaded successfully'),
+            duration: Duration(seconds: 2),
+          ),
+        );
+        setState(() {}); // Refresh avatar
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(vm.error ?? 'Failed to upload photo'),
+            duration: const Duration(seconds: 3),
+          ),
+        );
+      }
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error: $e'),
+          duration: const Duration(seconds: 3),
+        ),
+      );
     }
   }
 

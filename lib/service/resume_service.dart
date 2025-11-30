@@ -181,13 +181,13 @@ class ResumeService {
           _buildTechTemplate(pdf, resume, profile, customFont, primaryColor, secondaryColor);
           break;
         case ResumeTemplateType.business:
-          _buildBusinessTemplate(pdf, resume, profile, customFont!, primaryColor, secondaryColor);
+          _buildBusinessTemplate(pdf, resume, profile, customFont, primaryColor, secondaryColor);
           break;
         case ResumeTemplateType.creative:
-          _buildCreativeTemplate(pdf, resume, profile, customFont!, primaryColor, secondaryColor);
+          _buildCreativeTemplate(pdf, resume, profile, customFont, primaryColor, secondaryColor);
           break;
         case ResumeTemplateType.academic:
-          _buildAcademicTemplate(pdf, resume, profile, customFont!, primaryColor, secondaryColor);
+          _buildAcademicTemplate(pdf, resume, profile, customFont, primaryColor, secondaryColor);
           break;
       }
 
@@ -661,36 +661,552 @@ class ResumeService {
       pw.Document pdf,
       ResumeDoc resume,
       UserProfile profile,
-      pw.Font font,
+      pw.Font? font,
       PdfColor primaryColor,
       PdfColor secondaryColor,
       ) {
-    // Similar structure to tech template but with different styling
-    _buildTechTemplate(pdf, resume, profile, font, primaryColor, secondaryColor);
+    pdf.addPage(
+      pw.Page(
+        pageFormat: PdfPageFormat.a4,
+        margin: pw.EdgeInsets.zero,
+        build: (context) {
+          return pw.Column(
+            crossAxisAlignment: pw.CrossAxisAlignment.start,
+            children: [
+              // Header Section
+              pw.Container(
+                width: double.infinity,
+                padding: const pw.EdgeInsets.all(32),
+                color: PdfColors.white,
+                child: pw.Row(
+                  crossAxisAlignment: pw.CrossAxisAlignment.center,
+                  children: [
+                    // Profile Circle
+                    pw.Container(
+                      width: 80,
+                      height: 80,
+                      decoration: pw.BoxDecoration(
+                        color: primaryColor,
+                        shape: pw.BoxShape.circle,
+                      ),
+                      child: pw.Center(
+                        child: pw.Text(
+                          _getInitials(profile.name ?? 'U'),
+                          style: pw.TextStyle(
+                            font: font,
+                            fontSize: resume.font.header1FontSize.toDouble(),
+                            fontWeight: pw.FontWeight.bold,
+                            color: PdfColors.white,
+                          ),
+                        ),
+                      ),
+                    ),
+                    pw.SizedBox(width: 24),
+                    // Name and Title
+                    pw.Expanded(
+                      child: pw.Column(
+                        crossAxisAlignment: pw.CrossAxisAlignment.start,
+                        children: [
+                          pw.Text(
+                            profile.name ?? 'Your Name',
+                            style: pw.TextStyle(
+                              font: font,
+                              fontSize: resume.font.header1FontSize.toDouble(),
+                              fontWeight: pw.FontWeight.bold,
+                            ),
+                          ),
+                          pw.SizedBox(height: 4),
+                          pw.Text(
+                            resume.title,
+                            style: pw.TextStyle(
+                              font: font,
+                              fontSize: resume.font.header2FontSize.toDouble() + 2,
+                              color: secondaryColor,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
+              // Divider
+              pw.Container(
+                height: 2,
+                color: primaryColor,
+              ),
+
+              // Content
+              pw.Padding(
+                padding: const pw.EdgeInsets.all(32),
+                child: pw.Column(
+                  crossAxisAlignment: pw.CrossAxisAlignment.start,
+                  children: [
+                    // Contact Info
+                    if (resume.sections.personalInfo) ...[
+                      pw.Wrap(
+                        spacing: 16,
+                        runSpacing: 8,
+                        children: [
+                          if (profile.email != null)
+                            _buildContactRow('Email: ${profile.email}', font, resume.font.contentFontSize.toDouble()),
+                          if (profile.phone != null)
+                            _buildContactRow('Phone: ${profile.phone}', font, resume.font.contentFontSize.toDouble()),
+                          if (profile.city != null || profile.country != null)
+                            _buildContactRow(
+                              'Location: ${profile.city ?? ''}${profile.city != null && profile.country != null ? ', ' : ''}${profile.country ?? ''}',
+                              font,
+                              resume.font.contentFontSize.toDouble(),
+                            ),
+                        ],
+                      ),
+                      pw.SizedBox(height: 24),
+                    ],
+
+                    // About Me
+                    if (resume.sections.aboutMe && resume.aboutMe != null) ...[
+                      _buildSectionHeaderPDF('PROFESSIONAL SUMMARY', secondaryColor, font, resume.font.header2FontSize.toDouble()),
+                      pw.SizedBox(height: 12),
+                      pw.Text(
+                        resume.aboutMe!,
+                        style: pw.TextStyle(
+                          font: font,
+                          fontSize: resume.font.contentFontSize.toDouble(),
+                          height: 1.6,
+                        ),
+                      ),
+                      pw.SizedBox(height: 20),
+                    ],
+
+                    // Experience
+                    if (resume.sections.experience && profile.experience != null && profile.experience!.isNotEmpty) ...[
+                      _buildSectionHeaderPDF('EXPERIENCE', secondaryColor, font, resume.font.header2FontSize.toDouble()),
+                      pw.SizedBox(height: 12),
+                      ...profile.experience!.map((exp) => _buildStyledExperience(exp, secondaryColor, font, resume)),
+                    ],
+
+                    // Education
+                    if (resume.sections.education && profile.education != null && profile.education!.isNotEmpty) ...[
+                      _buildSectionHeaderPDF('EDUCATION', secondaryColor, font, resume.font.header2FontSize.toDouble()),
+                      pw.SizedBox(height: 12),
+                      ...profile.education!.map((edu) => _buildStyledEducation(edu, secondaryColor, font, resume)),
+                    ],
+
+                    // Skills
+                    if (resume.sections.skills && profile.skills != null && profile.skills!.isNotEmpty) ...[
+                      _buildSectionHeaderPDF('SKILLS', secondaryColor, font, resume.font.header2FontSize.toDouble()),
+                      pw.SizedBox(height: 12),
+                      pw.Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: profile.skills!.map((skill) {
+                          return pw.Container(
+                            padding: const pw.EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                            decoration: pw.BoxDecoration(
+                              border: pw.Border.all(color: secondaryColor),
+                              borderRadius: pw.BorderRadius.circular(4),
+                            ),
+                            child: pw.Text(
+                              skill.name ?? '',
+                              style: pw.TextStyle(
+                                font: font,
+                                fontSize: resume.font.contentFontSize.toDouble(),
+                              ),
+                            ),
+                          );
+                        }).toList(),
+                      ),
+                    ],
+
+                    // References
+                    if (resume.sections.references && resume.references.isNotEmpty) ...[
+                      pw.SizedBox(height: 20),
+                      _buildSectionHeaderPDF('REFERENCES', secondaryColor, font, resume.font.header2FontSize.toDouble()),
+                      pw.SizedBox(height: 12),
+                      ...resume.references.map((ref) => _buildStyledReference(ref, font, resume)),
+                    ],
+                  ],
+                ),
+              ),
+            ],
+          );
+        },
+      ),
+    );
   }
 
   void _buildCreativeTemplate(
       pw.Document pdf,
       ResumeDoc resume,
       UserProfile profile,
-      pw.Font font,
+      pw.Font? font,
       PdfColor primaryColor,
       PdfColor secondaryColor,
       ) {
-    // Similar structure with creative styling
-    _buildTechTemplate(pdf, resume, profile, font, primaryColor, secondaryColor);
+    pdf.addPage(
+      pw.Page(
+        pageFormat: PdfPageFormat.a4,
+        margin: pw.EdgeInsets.zero,
+        build: (context) {
+          return pw.Row(
+            crossAxisAlignment: pw.CrossAxisAlignment.start,
+            children: [
+              // Left Sidebar
+              pw.Container(
+                width: 150,
+                color: primaryColor,
+                child: pw.Padding(
+                  padding: const pw.EdgeInsets.all(20),
+                  child: pw.Column(
+                    crossAxisAlignment: pw.CrossAxisAlignment.center,
+                    children: [
+                      pw.SizedBox(height: 20),
+                      // Profile Circle
+                      pw.Container(
+                        width: 80,
+                        height: 80,
+                        decoration: pw.BoxDecoration(
+                          color: PdfColors.white,
+                          shape: pw.BoxShape.circle,
+                        ),
+                        child: pw.Center(
+                          child: pw.Text(
+                            _getInitials(profile.name ?? 'U'),
+                            style: pw.TextStyle(
+                              font: font,
+                              fontSize: resume.font.header1FontSize.toDouble(),
+                              fontWeight: pw.FontWeight.bold,
+                              color: primaryColor,
+                            ),
+                          ),
+                        ),
+                      ),
+                      pw.SizedBox(height: 24),
+
+                      // Contact
+                      if (resume.sections.personalInfo) ...[
+                        pw.Text(
+                          'CONTACT',
+                          style: pw.TextStyle(
+                            font: font,
+                            fontSize: 12,
+                            fontWeight: pw.FontWeight.bold,
+                            color: PdfColors.white,
+                            letterSpacing: 1,
+                          ),
+                        ),
+                        pw.SizedBox(height: 12),
+                        if (profile.email != null) ...[
+                          pw.Text(
+                            profile.email!,
+                            style: pw.TextStyle(
+                              font: font,
+                              fontSize: resume.font.contentFontSize.toDouble() - 1,
+                              color: PdfColors.white,
+                            ),
+                            textAlign: pw.TextAlign.center,
+                          ),
+                          pw.SizedBox(height: 8),
+                        ],
+                        if (profile.phone != null) ...[
+                          pw.Text(
+                            profile.phone!,
+                            style: pw.TextStyle(
+                              font: font,
+                              fontSize: resume.font.contentFontSize.toDouble() - 1,
+                              color: PdfColors.white,
+                            ),
+                            textAlign: pw.TextAlign.center,
+                          ),
+                          pw.SizedBox(height: 8),
+                        ],
+                      ],
+
+                      // Skills
+                      if (resume.sections.skills && profile.skills != null && profile.skills!.isNotEmpty) ...[
+                        pw.SizedBox(height: 16),
+                        pw.Text(
+                          'SKILLS',
+                          style: pw.TextStyle(
+                            font: font,
+                            fontSize: 12,
+                            fontWeight: pw.FontWeight.bold,
+                            color: PdfColors.white,
+                            letterSpacing: 1,
+                          ),
+                        ),
+                        pw.SizedBox(height: 12),
+                        ...profile.skills!.take(8).map((skill) {
+                          return pw.Padding(
+                            padding: const pw.EdgeInsets.only(bottom: 8),
+                            child: pw.Text(
+                              skill.name ?? '',
+                              style: pw.TextStyle(
+                                font: font,
+                                fontSize: resume.font.contentFontSize.toDouble() - 1,
+                                color: PdfColors.white,
+                              ),
+                              textAlign: pw.TextAlign.center,
+                            ),
+                          );
+                        }),
+                      ],
+                    ],
+                  ),
+                ),
+              ),
+
+              // Main Content
+              pw.Expanded(
+                child: pw.Padding(
+                  padding: const pw.EdgeInsets.all(32),
+                  child: pw.Column(
+                    crossAxisAlignment: pw.CrossAxisAlignment.start,
+                    children: [
+                      // Name & Title
+                      pw.Text(
+                        profile.name ?? 'Your Name',
+                        style: pw.TextStyle(
+                          font: font,
+                          fontSize: resume.font.header1FontSize.toDouble() + 4,
+                          fontWeight: pw.FontWeight.bold,
+                        ),
+                      ),
+                      pw.SizedBox(height: 6),
+                      pw.Text(
+                        resume.title,
+                        style: pw.TextStyle(
+                          font: font,
+                          fontSize: resume.font.header2FontSize.toDouble() + 2,
+                          color: secondaryColor,
+                        ),
+                      ),
+                      pw.SizedBox(height: 24),
+
+                      // About Me
+                      if (resume.sections.aboutMe && resume.aboutMe != null) ...[
+                        _buildSectionHeaderPDF('ABOUT', secondaryColor, font, resume.font.header2FontSize.toDouble()),
+                        pw.SizedBox(height: 12),
+                        pw.Text(
+                          resume.aboutMe!,
+                          style: pw.TextStyle(
+                            font: font,
+                            fontSize: resume.font.contentFontSize.toDouble(),
+                            height: 1.6,
+                          ),
+                        ),
+                        pw.SizedBox(height: 20),
+                      ],
+
+                      // Experience
+                      if (resume.sections.experience && profile.experience != null && profile.experience!.isNotEmpty) ...[
+                        _buildSectionHeaderPDF('EXPERIENCE', secondaryColor, font, resume.font.header2FontSize.toDouble()),
+                        pw.SizedBox(height: 12),
+                        ...profile.experience!.map((exp) => _buildStyledExperience(exp, secondaryColor, font, resume)),
+                      ],
+
+                      // Education
+                      if (resume.sections.education && profile.education != null && profile.education!.isNotEmpty) ...[
+                        _buildSectionHeaderPDF('EDUCATION', secondaryColor, font, resume.font.header2FontSize.toDouble()),
+                        pw.SizedBox(height: 12),
+                        ...profile.education!.map((edu) => _buildStyledEducation(edu, secondaryColor, font, resume)),
+                      ],
+
+                      // References
+                      if (resume.sections.references && resume.references.isNotEmpty) ...[
+                        _buildSectionHeaderPDF('REFERENCES', secondaryColor, font, resume.font.header2FontSize.toDouble()),
+                        pw.SizedBox(height: 12),
+                        ...resume.references.map((ref) => _buildStyledReference(ref, font, resume)),
+                      ],
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          );
+        },
+      ),
+    );
   }
 
   void _buildAcademicTemplate(
       pw.Document pdf,
       ResumeDoc resume,
       UserProfile profile,
-      pw.Font font,
+      pw.Font? font,
       PdfColor primaryColor,
       PdfColor secondaryColor,
       ) {
-    // Similar structure with academic styling
-    _buildTechTemplate(pdf, resume, profile, font, primaryColor, secondaryColor);
+    pdf.addPage(
+      pw.Page(
+        pageFormat: PdfPageFormat.a4,
+        margin: const pw.EdgeInsets.all(40),
+        build: (context) {
+          return pw.Column(
+            crossAxisAlignment: pw.CrossAxisAlignment.start,
+            children: [
+              // Centered Header
+              pw.Column(
+                children: [
+                  pw.Text(
+                    profile.name ?? 'Your Name',
+                    style: pw.TextStyle(
+                      font: font,
+                      fontSize: resume.font.header1FontSize.toDouble() + 4,
+                      fontWeight: pw.FontWeight.bold,
+                    ),
+                    textAlign: pw.TextAlign.center,
+                  ),
+                  pw.SizedBox(height: 8),
+                  pw.Text(
+                    resume.title,
+                    style: pw.TextStyle(
+                      font: font,
+                      fontSize: resume.font.header2FontSize.toDouble() + 2,
+                    ),
+                    textAlign: pw.TextAlign.center,
+                  ),
+                  if (resume.sections.personalInfo) ...[
+                    pw.SizedBox(height: 12),
+                    pw.Wrap(
+                      alignment: pw.WrapAlignment.center,
+                      spacing: 12,
+                      children: [
+                        if (profile.email != null)
+                          pw.Text(
+                            profile.email!,
+                            style: pw.TextStyle(
+                              font: font,
+                              fontSize: resume.font.contentFontSize.toDouble(),
+                            ),
+                          ),
+                        if (profile.phone != null)
+                          pw.Text(
+                            profile.phone!,
+                            style: pw.TextStyle(
+                              font: font,
+                              fontSize: resume.font.contentFontSize.toDouble(),
+                            ),
+                          ),
+                      ],
+                    ),
+                  ],
+                ],
+              ),
+
+              pw.SizedBox(height: 24),
+              pw.Container(height: 2, color: primaryColor),
+              pw.SizedBox(height: 24),
+
+              // Content
+              pw.Column(
+                crossAxisAlignment: pw.CrossAxisAlignment.start,
+                children: [
+                  // About Me
+                  if (resume.sections.aboutMe && resume.aboutMe != null) ...[
+                    _buildSectionHeaderPDF('SUMMARY', secondaryColor, font, resume.font.header2FontSize.toDouble()),
+                    pw.SizedBox(height: 12),
+                    pw.Text(
+                      resume.aboutMe!,
+                      style: pw.TextStyle(
+                        font: font,
+                        fontSize: resume.font.contentFontSize.toDouble(),
+                        height: 1.7,
+                      ),
+                    ),
+                    pw.SizedBox(height: 20),
+                  ],
+
+                  // Education
+                  if (resume.sections.education && profile.education != null && profile.education!.isNotEmpty) ...[
+                    _buildSectionHeaderPDF('EDUCATION', secondaryColor, font, resume.font.header2FontSize.toDouble()),
+                    pw.SizedBox(height: 12),
+                    ...profile.education!.map((edu) => _buildStyledEducation(edu, primaryColor, font, resume)),
+                  ],
+
+                  // Experience
+                  if (resume.sections.experience && profile.experience != null && profile.experience!.isNotEmpty) ...[
+                    _buildSectionHeaderPDF('EXPERIENCE', secondaryColor, font, resume.font.header2FontSize.toDouble()),
+                    pw.SizedBox(height: 12),
+                    ...profile.experience!.map((exp) => _buildStyledExperience(exp, primaryColor, font, resume)),
+                  ],
+
+                  // Skills
+                  if (resume.sections.skills && profile.skills != null && profile.skills!.isNotEmpty) ...[
+                    _buildSectionHeaderPDF('SKILLS', secondaryColor, font, resume.font.header2FontSize.toDouble()),
+                    pw.SizedBox(height: 12),
+                    pw.Wrap(
+                      spacing: 8,
+                      children: profile.skills!.map((skill) {
+                        return pw.Text(
+                          '${skill.name ?? ''} • ',
+                          style: pw.TextStyle(
+                            font: font,
+                            fontSize: resume.font.contentFontSize.toDouble(),
+                          ),
+                        );
+                      }).toList(),
+                    ),
+                    pw.SizedBox(height: 20),
+                  ],
+
+                  // References
+                  if (resume.sections.references && resume.references.isNotEmpty) ...[
+                    _buildSectionHeaderPDF('REFERENCES', secondaryColor, font, resume.font.header2FontSize.toDouble()),
+                    pw.SizedBox(height: 12),
+                    ...resume.references.map((ref) => _buildStyledReference(ref, font, resume)),
+                  ],
+                ],
+              ),
+            ],
+          );
+        },
+      ),
+    );
+  }
+
+  String _getInitials(String name) {
+    final parts = name.trim().split(' ');
+    if (parts.isEmpty) return 'U';
+    if (parts.length == 1) return parts[0][0].toUpperCase();
+    return '${parts[0][0]}${parts[parts.length - 1][0]}'.toUpperCase();
+  }
+
+  pw.Widget _buildContactRow(String text, pw.Font? font, double fontSize) {
+    return pw.Text(
+      text,
+      style: pw.TextStyle(
+        font: font,
+        fontSize: fontSize,
+      ),
+    );
+  }
+
+  pw.Widget _buildSectionHeaderPDF(String title, PdfColor color, pw.Font? font, double fontSize) {
+    return pw.Row(
+      children: [
+        pw.Container(
+          width: 4,
+          height: 18,
+          decoration: pw.BoxDecoration(
+            color: color,
+            borderRadius: pw.BorderRadius.circular(2),
+          ),
+        ),
+        pw.SizedBox(width: 10),
+        pw.Text(
+          title,
+          style: pw.TextStyle(
+            font: font,
+            fontSize: fontSize,
+            fontWeight: pw.FontWeight.bold,
+            color: color,
+            letterSpacing: 1,
+          ),
+        ),
+      ],
+    );
   }
 
   // =============================
@@ -877,7 +1393,7 @@ class ResumeService {
                     ),
                   ),
                 ],
-                // GPA
+                // CGPA
                 if (edu.gpa != null) ...[
                   pw.SizedBox(height: 4),
                   pw.Container(
@@ -887,7 +1403,7 @@ class ResumeService {
                       borderRadius: pw.BorderRadius.circular(4),
                     ),
                     child: pw.Text(
-                      'GPA: ${edu.gpa}',
+                      'CGPA: ${edu.gpa}',
                       style: pw.TextStyle(
                         font: font,
                         fontSize: resume.font.contentFontSize.toDouble() - 1,

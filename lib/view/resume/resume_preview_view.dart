@@ -129,12 +129,10 @@ class PreviewResumePage extends StatelessWidget {
     );
   }
 
-  Widget _buildTemplateLayout(
-      UserProfile profile,
+  Widget _buildTemplateLayout(UserProfile profile,
       List<Skill> skills,
       List<Education> education,
-      List<Experience> experience,
-      ) {
+      List<Experience> experience,) {
     switch (resume.template) {
       case ResumeTemplateType.tech:
         return _buildTechTemplate(profile, skills, education, experience);
@@ -150,12 +148,10 @@ class PreviewResumePage extends StatelessWidget {
   // ========================================
   // TECH MODERN TEMPLATE - Clean & Modern
   // ========================================
-  Widget _buildTechTemplate(
-      UserProfile profile,
+  Widget _buildTechTemplate(UserProfile profile,
       List<Skill> skills,
       List<Education> education,
-      List<Experience> experience,
-      ) {
+      List<Experience> experience,) {
     final primaryColor = _parseColor(resume.theme.primaryColorHex);
     final secondaryColor = _parseColor(resume.theme.secondaryColorHex);
 
@@ -218,7 +214,9 @@ class PreviewResumePage extends StatelessWidget {
                       if (profile.city != null || profile.country != null)
                         _buildContactItem(
                           Icons.location_on_outlined,
-                          '${profile.city ?? ''}${profile.city != null && profile.country != null ? ', ' : ''}${profile.country ?? ''}',
+                          '${profile.city ?? ''}${profile.city != null &&
+                              profile.country != null ? ', ' : ''}${profile
+                              .country ?? ''}',
                           Colors.white.withOpacity(0.95),
                         ),
                     ],
@@ -277,7 +275,8 @@ class PreviewResumePage extends StatelessWidget {
                             Text(
                               skill.name ?? '',
                               style: TextStyle(
-                                fontSize: resume.font.contentFontSize.toDouble(),
+                                fontSize: resume.font.contentFontSize
+                                    .toDouble(),
                                 color: secondaryColor,
                                 fontWeight: FontWeight.w600,
                                 fontFamily: resume.font.fontFamily,
@@ -297,33 +296,36 @@ class PreviewResumePage extends StatelessWidget {
                                 child: Text(
                                   'Lv ${skill.level}',
                                   style: TextStyle(
-                                    fontSize: resume.font.contentFontSize.toDouble() - 2,
+                                    fontSize: resume.font.contentFontSize
+                                        .toDouble() - 2,
                                     color: Colors.white,
                                     fontWeight: FontWeight.bold,
                                   ),
                                 ),
                               ),
-                            ] else if (skill.levelText != null) ...[
-                              const SizedBox(width: 8),
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 6,
-                                  vertical: 2,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: secondaryColor,
-                                  borderRadius: BorderRadius.circular(4),
-                                ),
-                                child: Text(
-                                  skill.levelText!,
-                                  style: TextStyle(
-                                    fontSize: resume.font.contentFontSize.toDouble() - 2,
-                                    color: Colors.white,
-                                    fontWeight: FontWeight.bold,
+                            ] else
+                              if (skill.levelText != null) ...[
+                                const SizedBox(width: 8),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 6,
+                                    vertical: 2,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: secondaryColor,
+                                    borderRadius: BorderRadius.circular(4),
+                                  ),
+                                  child: Text(
+                                    skill.levelText!,
+                                    style: TextStyle(
+                                      fontSize: resume.font.contentFontSize
+                                          .toDouble() - 2,
+                                      color: Colors.white,
+                                      fontWeight: FontWeight.bold,
+                                    ),
                                   ),
                                 ),
-                              ),
-                            ],
+                              ],
                           ],
                         ),
                       );
@@ -336,7 +338,8 @@ class PreviewResumePage extends StatelessWidget {
                 if (resume.sections.experience && experience.isNotEmpty) ...[
                   _buildSectionHeader('WORK EXPERIENCE', secondaryColor),
                   const SizedBox(height: 16),
-                  ...experience.map((exp) => _buildTechExperience(exp, secondaryColor)),
+                  ...experience.map((exp) =>
+                      _buildTechExperience(exp, secondaryColor)),
                   const SizedBox(height: 28),
                 ],
 
@@ -344,12 +347,14 @@ class PreviewResumePage extends StatelessWidget {
                 if (resume.sections.education && education.isNotEmpty) ...[
                   _buildSectionHeader('EDUCATION', secondaryColor),
                   const SizedBox(height: 16),
-                  ...education.map((edu) => _buildTechEducation(edu, secondaryColor)),
+                  ...education.map((edu) =>
+                      _buildTechEducation(edu, secondaryColor)),
                   const SizedBox(height: 28),
                 ],
 
                 // References
-                if (resume.sections.references && resume.references.isNotEmpty) ...[
+                if (resume.sections.references &&
+                    resume.references.isNotEmpty) ...[
                   _buildSectionHeader('REFERENCES', secondaryColor),
                   const SizedBox(height: 16),
                   ...resume.references.map((ref) => _buildTechReference(ref)),
@@ -421,7 +426,8 @@ class PreviewResumePage extends StatelessWidget {
                     if (exp.startDate != null || exp.endDate != null) ...[
                       const SizedBox(height: 4),
                       Text(
-                        _formatDateRange(exp.startDate, exp.endDate, exp.isCurrent),
+                        _formatDateRange(
+                            exp.startDate, exp.endDate, exp.isCurrent),
                         style: TextStyle(
                           fontSize: resume.font.contentFontSize.toDouble() - 1,
                           color: const Color(0xFF9CA3AF),
@@ -432,7 +438,9 @@ class PreviewResumePage extends StatelessWidget {
                     if (exp.city != null || exp.country != null) ...[
                       const SizedBox(height: 2),
                       Text(
-                        '${exp.city ?? ''}${exp.city != null && exp.country != null ? ', ' : ''}${exp.country ?? ''}',
+                        '${exp.city ?? ''}${exp.city != null &&
+                            exp.country != null ? ', ' : ''}${exp.country ??
+                            ''}',
                         style: TextStyle(
                           fontSize: resume.font.contentFontSize.toDouble() - 1,
                           color: const Color(0xFF9CA3AF),
@@ -471,7 +479,8 @@ class PreviewResumePage extends StatelessWidget {
                             child: Text(
                               skill,
                               style: TextStyle(
-                                fontSize: resume.font.contentFontSize.toDouble() - 1,
+                                fontSize: resume.font.contentFontSize
+                                    .toDouble() - 1,
                                 color: const Color(0xFF4B5563),
                                 fontFamily: resume.font.fontFamily,
                               ),
@@ -603,12 +612,10 @@ class PreviewResumePage extends StatelessWidget {
   // ========================================
   // BUSINESS PROFESSIONAL TEMPLATE - Classic & Formal
   // ========================================
-  Widget _buildBusinessTemplate(
-      UserProfile profile,
+  Widget _buildBusinessTemplate(UserProfile profile,
       List<Skill> skills,
       List<Education> education,
-      List<Experience> experience,
-      ) {
+      List<Experience> experience,) {
     final primaryColor = _parseColor(resume.theme.primaryColorHex);
     final secondaryColor = _parseColor(resume.theme.secondaryColorHex);
 
@@ -708,7 +715,9 @@ class PreviewResumePage extends StatelessWidget {
                 if (profile.city != null || profile.country != null)
                   _buildBusinessContact(
                     Icons.location_on,
-                    '${profile.city ?? ''}${profile.city != null && profile.country != null ? ', ' : ''}${profile.country ?? ''}',
+                    '${profile.city ?? ''}${profile.city != null &&
+                        profile.country != null ? ', ' : ''}${profile.country ??
+                        ''}',
                     primaryColor,
                   ),
               ],
@@ -738,9 +747,11 @@ class PreviewResumePage extends StatelessWidget {
 
               // Experience
               if (resume.sections.experience && experience.isNotEmpty) ...[
-                _buildBusinessSection('PROFESSIONAL EXPERIENCE', secondaryColor),
+                _buildBusinessSection(
+                    'PROFESSIONAL EXPERIENCE', secondaryColor),
                 const SizedBox(height: 16),
-                ...experience.map((exp) => _buildBusinessExperience(exp, primaryColor)),
+                ...experience.map((exp) =>
+                    _buildBusinessExperience(exp, primaryColor)),
                 const SizedBox(height: 28),
               ],
 
@@ -748,7 +759,8 @@ class PreviewResumePage extends StatelessWidget {
               if (resume.sections.education && education.isNotEmpty) ...[
                 _buildBusinessSection('EDUCATION', secondaryColor),
                 const SizedBox(height: 16),
-                ...education.map((edu) => _buildBusinessEducation(edu, primaryColor)),
+                ...education.map((edu) =>
+                    _buildBusinessEducation(edu, primaryColor)),
                 const SizedBox(height: 28),
               ],
 
@@ -761,7 +773,8 @@ class PreviewResumePage extends StatelessWidget {
               ],
 
               // References
-              if (resume.sections.references && resume.references.isNotEmpty) ...[
+              if (resume.sections.references &&
+                  resume.references.isNotEmpty) ...[
                 _buildBusinessSection('REFERENCES', secondaryColor),
                 const SizedBox(height: 16),
                 ...resume.references.map((ref) => _buildBusinessReference(ref)),
@@ -845,7 +858,9 @@ class PreviewResumePage extends StatelessWidget {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      '${exp.company ?? ''}${exp.employmentType != null ? ' • ${exp.employmentType}' : ''}',
+                      '${exp.company ?? ''}${exp.employmentType != null
+                          ? ' • ${exp.employmentType}'
+                          : ''}',
                       style: TextStyle(
                         fontSize: resume.font.contentFontSize.toDouble(),
                         color: color,
@@ -856,7 +871,8 @@ class PreviewResumePage extends StatelessWidget {
                     if (exp.startDate != null || exp.endDate != null) ...[
                       const SizedBox(height: 2),
                       Text(
-                        _formatDateRange(exp.startDate, exp.endDate, exp.isCurrent),
+                        _formatDateRange(
+                            exp.startDate, exp.endDate, exp.isCurrent),
                         style: TextStyle(
                           fontSize: resume.font.contentFontSize.toDouble() - 1,
                           color: const Color(0xFF6B7280),
@@ -888,7 +904,8 @@ class PreviewResumePage extends StatelessWidget {
                             child: Text(
                               exp.achievements!.description!,
                               style: TextStyle(
-                                fontSize: resume.font.contentFontSize.toDouble(),
+                                fontSize: resume.font.contentFontSize
+                                    .toDouble(),
                                 fontFamily: resume.font.fontFamily,
                                 height: 1.5,
                                 color: const Color(0xFF4B5563),
@@ -1005,7 +1022,8 @@ class PreviewResumePage extends StatelessWidget {
               ),
               if (skill.level != null)
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 8, vertical: 4),
                   decoration: BoxDecoration(
                     color: color.withOpacity(0.1),
                     borderRadius: BorderRadius.circular(4),
@@ -1020,23 +1038,25 @@ class PreviewResumePage extends StatelessWidget {
                     ),
                   ),
                 )
-              else if (skill.levelText != null)
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: color.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(4),
-                  ),
-                  child: Text(
-                    skill.levelText!,
-                    style: TextStyle(
-                      fontSize: resume.font.contentFontSize.toDouble() - 1,
-                      color: color,
-                      fontWeight: FontWeight.w600,
-                      fontFamily: resume.font.fontFamily,
+              else
+                if (skill.levelText != null)
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: color.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    child: Text(
+                      skill.levelText!,
+                      style: TextStyle(
+                        fontSize: resume.font.contentFontSize.toDouble() - 1,
+                        color: color,
+                        fontWeight: FontWeight.w600,
+                        fontFamily: resume.font.fontFamily,
+                      ),
                     ),
                   ),
-                ),
             ],
           ),
         );
@@ -1089,12 +1109,10 @@ class PreviewResumePage extends StatelessWidget {
   // ========================================
   // CREATIVE TEMPLATE - Bold & Unique
   // ========================================
-  Widget _buildCreativeTemplate(
-      UserProfile profile,
+  Widget _buildCreativeTemplate(UserProfile profile,
       List<Skill> skills,
       List<Education> education,
-      List<Experience> experience,
-      ) {
+      List<Experience> experience,) {
     final primaryColor = _parseColor(resume.theme.primaryColorHex);
     final secondaryColor = _parseColor(resume.theme.secondaryColorHex);
 
@@ -1166,7 +1184,9 @@ class PreviewResumePage extends StatelessWidget {
                       if (profile.city != null || profile.country != null)
                         _buildCreativeContact(
                           Icons.location_on_outlined,
-                          '${profile.city ?? ''}${profile.city != null && profile.country != null ? '\n' : ''}${profile.country ?? ''}',
+                          '${profile.city ?? ''}${profile.city != null &&
+                              profile.country != null ? '\n' : ''}${profile
+                              .country ?? ''}',
                         ),
                     ],
                   ),
@@ -1199,7 +1219,8 @@ class PreviewResumePage extends StatelessWidget {
                               Text(
                                 skill.name ?? '',
                                 style: TextStyle(
-                                  fontSize: resume.font.contentFontSize.toDouble() - 1,
+                                  fontSize: resume.font.contentFontSize
+                                      .toDouble() - 1,
                                   color: Colors.white,
                                   fontWeight: FontWeight.w600,
                                   fontFamily: resume.font.fontFamily,
@@ -1222,17 +1243,19 @@ class PreviewResumePage extends StatelessWidget {
                                     );
                                   }),
                                 ),
-                              ] else if (skill.levelText != null) ...[
-                                const SizedBox(height: 2),
-                                Text(
-                                  skill.levelText!,
-                                  style: TextStyle(
-                                    fontSize: resume.font.contentFontSize.toDouble() - 2,
-                                    color: Colors.white.withOpacity(0.8),
-                                    fontFamily: resume.font.fontFamily,
+                              ] else
+                                if (skill.levelText != null) ...[
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    skill.levelText!,
+                                    style: TextStyle(
+                                      fontSize: resume.font.contentFontSize
+                                          .toDouble() - 2,
+                                      color: Colors.white.withOpacity(0.8),
+                                      fontFamily: resume.font.fontFamily,
+                                    ),
                                   ),
-                                ),
-                              ],
+                                ],
                             ],
                           ),
                         );
@@ -1294,7 +1317,8 @@ class PreviewResumePage extends StatelessWidget {
                 if (resume.sections.experience && experience.isNotEmpty) ...[
                   _buildCreativeSection('EXPERIENCE', secondaryColor),
                   const SizedBox(height: 16),
-                  ...experience.map((exp) => _buildCreativeExperience(exp, secondaryColor)),
+                  ...experience.map((exp) =>
+                      _buildCreativeExperience(exp, secondaryColor)),
                   const SizedBox(height: 28),
                 ],
 
@@ -1302,15 +1326,18 @@ class PreviewResumePage extends StatelessWidget {
                 if (resume.sections.education && education.isNotEmpty) ...[
                   _buildCreativeSection('EDUCATION', secondaryColor),
                   const SizedBox(height: 16),
-                  ...education.map((edu) => _buildCreativeEducation(edu, secondaryColor)),
+                  ...education.map((edu) =>
+                      _buildCreativeEducation(edu, secondaryColor)),
                   const SizedBox(height: 28),
                 ],
 
                 // References
-                if (resume.sections.references && resume.references.isNotEmpty) ...[
+                if (resume.sections.references &&
+                    resume.references.isNotEmpty) ...[
                   _buildCreativeSection('REFERENCES', secondaryColor),
                   const SizedBox(height: 16),
-                  ...resume.references.map((ref) => _buildCreativeReference(ref)),
+                  ...resume.references.map((ref) =>
+                      _buildCreativeReference(ref)),
                 ],
               ],
             ),
@@ -1396,7 +1423,9 @@ class PreviewResumePage extends StatelessWidget {
           if (exp.startDate != null || exp.endDate != null) ...[
             const SizedBox(height: 2),
             Text(
-              '${_formatDateRange(exp.startDate, exp.endDate, exp.isCurrent)}${exp.employmentType != null ? ' • ${exp.employmentType}' : ''}',
+              '${_formatDateRange(
+                  exp.startDate, exp.endDate, exp.isCurrent)}${exp
+                  .employmentType != null ? ' • ${exp.employmentType}' : ''}',
               style: TextStyle(
                 fontSize: resume.font.contentFontSize.toDouble() - 1,
                 color: const Color(0xFF6B7280),
@@ -1518,12 +1547,10 @@ class PreviewResumePage extends StatelessWidget {
   // ========================================
   // ACADEMIC TEMPLATE - Traditional & Scholarly
   // ========================================
-  Widget _buildAcademicTemplate(
-      UserProfile profile,
+  Widget _buildAcademicTemplate(UserProfile profile,
       List<Skill> skills,
       List<Education> education,
-      List<Experience> experience,
-      ) {
+      List<Experience> experience,) {
     final primaryColor = _parseColor(resume.theme.primaryColorHex);
     final secondaryColor = _parseColor(resume.theme.secondaryColorHex);
 
@@ -1582,7 +1609,9 @@ class PreviewResumePage extends StatelessWidget {
                       ),
                     if (profile.city != null || profile.country != null)
                       Text(
-                        '${profile.city ?? ''}${profile.city != null && profile.country != null ? ', ' : ''}${profile.country ?? ''}',
+                        '${profile.city ?? ''}${profile.city != null &&
+                            profile.country != null ? ', ' : ''}${profile
+                            .country ?? ''}',
                         style: TextStyle(
                           fontSize: resume.font.contentFontSize.toDouble(),
                           fontFamily: resume.font.fontFamily,
@@ -1626,15 +1655,18 @@ class PreviewResumePage extends StatelessWidget {
               if (resume.sections.education && education.isNotEmpty) ...[
                 _buildAcademicSection('EDUCATION', secondaryColor),
                 const SizedBox(height: 16),
-                ...education.map((edu) => _buildAcademicEducation(edu, primaryColor)),
+                ...education.map((edu) =>
+                    _buildAcademicEducation(edu, primaryColor)),
                 const SizedBox(height: 28),
               ],
 
               // Experience
               if (resume.sections.experience && experience.isNotEmpty) ...[
-                _buildAcademicSection('PROFESSIONAL EXPERIENCE', secondaryColor),
+                _buildAcademicSection(
+                    'PROFESSIONAL EXPERIENCE', secondaryColor),
                 const SizedBox(height: 16),
-                ...experience.map((exp) => _buildAcademicExperience(exp, primaryColor)),
+                ...experience.map((exp) =>
+                    _buildAcademicExperience(exp, primaryColor)),
                 const SizedBox(height: 28),
               ],
 
@@ -1647,10 +1679,12 @@ class PreviewResumePage extends StatelessWidget {
               ],
 
               // References
-              if (resume.sections.references && resume.references.isNotEmpty) ...[
+              if (resume.sections.references &&
+                  resume.references.isNotEmpty) ...[
                 _buildAcademicSection('REFERENCES', secondaryColor),
                 const SizedBox(height: 16),
-                ...resume.references.map((ref) => _buildAcademicReference(ref, primaryColor)),
+                ...resume.references.map((ref) =>
+                    _buildAcademicReference(ref, primaryColor)),
               ],
             ],
           ),
@@ -1716,7 +1750,8 @@ class PreviewResumePage extends StatelessWidget {
                     if (edu.startDate != null || edu.endDate != null) ...[
                       const SizedBox(height: 4),
                       Text(
-                        _formatDateRange(edu.startDate, edu.endDate, edu.isCurrent),
+                        _formatDateRange(
+                            edu.startDate, edu.endDate, edu.isCurrent),
                         style: TextStyle(
                           fontSize: resume.font.contentFontSize.toDouble() - 1,
                           color: const Color(0xFF6B7280),
@@ -1820,7 +1855,9 @@ class PreviewResumePage extends StatelessWidget {
       runSpacing: 8,
       children: skills.map((skill) {
         return Text(
-          '${skill.name ?? ''}${skill.level != null ? ' (Level ${skill.level})' : skill.levelText != null ? ' (${skill.levelText})' : ''} • ',
+          '${skill.name ?? ''}${skill.level != null
+              ? ' (Level ${skill.level})'
+              : skill.levelText != null ? ' (${skill.levelText})' : ''} • ',
           style: TextStyle(
             fontSize: resume.font.contentFontSize.toDouble(),
             fontFamily: resume.font.fontFamily,
@@ -1934,8 +1971,11 @@ class PreviewResumePage extends StatelessWidget {
 
     if (start == null && end == null) return '';
 
-    final startStr = start != null ? dateFormat.format(start.toDate()) : 'Unknown';
-    final endStr = isCurrent == true ? 'Present' : (end != null ? dateFormat.format(end.toDate()) : 'Present');
+    final startStr = start != null
+        ? dateFormat.format(start.toDate())
+        : 'Unknown';
+    final endStr = isCurrent == true ? 'Present' : (end != null ? dateFormat
+        .format(end.toDate()) : 'Present');
 
     return '$startStr - $endStr';
   }
@@ -1976,38 +2016,86 @@ class PreviewResumePage extends StatelessWidget {
                     onPressed: viewModel.isSharing
                         ? null
                         : () async {
+                      // Show loading dialog
+                      showDialog(
+                        context: context,
+                        barrierDismissible: false,
+                        builder: (context) =>
+                            _buildLoadingDialog('Preparing to share...'),
+                      );
+
                       await viewModel.shareResume(resume);
-                      if (viewModel.successMessage != null && context.mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text(viewModel.successMessage!),
-                            backgroundColor: Colors.green,
-                          ),
-                        );
+
+                      if (context.mounted) {
+                        Navigator.pop(context); // Close loading dialog
+
+                        if (viewModel.successMessage != null) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Row(
+                                children: [
+                                  const Icon(
+                                      Icons.check_circle, color: Colors.white),
+                                  const SizedBox(width: 12),
+                                  const Expanded(
+                                    child: Text(
+                                      'Resume ready to share!',
+                                      style: TextStyle(fontSize: 14),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              backgroundColor: Colors.green,
+                              behavior: SnackBarBehavior.floating,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              margin: const EdgeInsets.all(16),
+                            ),
+                          );
+                        } else if (viewModel.error != null) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Row(
+                                children: [
+                                  const Icon(
+                                      Icons.error_outline, color: Colors.white),
+                                  const SizedBox(width: 12),
+                                  Expanded(
+                                    child: Text(
+                                      viewModel.error!,
+                                      style: const TextStyle(fontSize: 14),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              backgroundColor: Colors.red,
+                              behavior: SnackBarBehavior.floating,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              margin: const EdgeInsets.all(16),
+                            ),
+                          );
+                        }
                       }
                     },
                     style: OutlinedButton.styleFrom(
-                      side: const BorderSide(color: Color(0xFF7C3AED)),
+                      side: const BorderSide(
+                          color: Color(0xFF7C3AED), width: 2),
                       minimumSize: const Size.fromHeight(52),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12),
                       ),
                     ),
-                    icon: viewModel.isSharing
-                        ? const SizedBox(
-                      width: 20,
-                      height: 20,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        color: Color(0xFF7C3AED),
-                      ),
-                    )
-                        : const Icon(Icons.share, color: Color(0xFF7C3AED)),
+                    icon: const Icon(
+                        Icons.share_outlined, color: Color(0xFF7C3AED),
+                        size: 20),
                     label: const Text(
                       'Share',
                       style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
+                        fontSize: 15,
+                        fontWeight: FontWeight.w600,
                         color: Color(0xFF7C3AED),
                       ),
                     ),
@@ -2021,26 +2109,63 @@ class PreviewResumePage extends StatelessWidget {
                         colors: [Color(0xFF7C3AED), Color(0xFF9F7AEA)],
                       ),
                       borderRadius: BorderRadius.circular(12),
+                      boxShadow: [
+                        BoxShadow(
+                          color: const Color(0xFF7C3AED).withOpacity(0.3),
+                          blurRadius: 8,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
                     ),
                     child: ElevatedButton.icon(
                       onPressed: viewModel.isDownloading
                           ? null
                           : () async {
-                        await viewModel.downloadResume(resume);
-                        if (viewModel.successMessage != null && context.mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Text(viewModel.successMessage!),
-                              backgroundColor: Colors.green,
-                            ),
-                          );
-                        } else if (viewModel.error != null && context.mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Text(viewModel.error!),
-                              backgroundColor: Colors.red,
-                            ),
-                          );
+                        // Show loading dialog
+                        showDialog(
+                          context: context,
+                          barrierDismissible: false,
+                          builder: (context) =>
+                              _buildLoadingDialog('Downloading your resume...'),
+                        );
+
+                        final path = await viewModel.downloadResume(resume);
+
+                        if (context.mounted) {
+                          Navigator.pop(context); // Close loading dialog
+
+                          if (path != null &&
+                              viewModel.successMessage != null) {
+                            // Show success with file location
+                            showDialog(
+                              context: context,
+                              builder: (context) => _buildSuccessDialog(context, path),
+                            );
+                          } else if (viewModel.error != null) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Row(
+                                  children: [
+                                    const Icon(Icons.error_outline,
+                                        color: Colors.white),
+                                    const SizedBox(width: 12),
+                                    Expanded(
+                                      child: Text(
+                                        viewModel.error!,
+                                        style: const TextStyle(fontSize: 14),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                backgroundColor: Colors.red,
+                                behavior: SnackBarBehavior.floating,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                                margin: const EdgeInsets.all(16),
+                              ),
+                            );
+                          }
                         }
                       },
                       style: ElevatedButton.styleFrom(
@@ -2051,20 +2176,13 @@ class PreviewResumePage extends StatelessWidget {
                           borderRadius: BorderRadius.circular(12),
                         ),
                       ),
-                      icon: viewModel.isDownloading
-                          ? const SizedBox(
-                        width: 20,
-                        height: 20,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          color: Colors.white,
-                        ),
-                      )
-                          : const Icon(Icons.download, color: Colors.white),
+                      icon: const Icon(
+                          Icons.download_rounded, color: Colors.white,
+                          size: 20),
                       label: const Text(
                         'Download PDF',
                         style: TextStyle(
-                          fontSize: 16,
+                          fontSize: 15,
                           fontWeight: FontWeight.bold,
                           color: Colors.white,
                         ),
@@ -2076,6 +2194,183 @@ class PreviewResumePage extends StatelessWidget {
             ),
           );
         },
+      ),
+    );
+  }
+
+// Helper method for loading dialog in preview page
+  Widget _buildLoadingDialog(String message) {
+    return Dialog(
+      backgroundColor: Colors.transparent,
+      elevation: 0,
+      child: Container(
+        padding: const EdgeInsets.all(24),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.1),
+              blurRadius: 10,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 60,
+              height: 60,
+              decoration: BoxDecoration(
+                color: const Color(0xFF7C3AED).withOpacity(0.1),
+                shape: BoxShape.circle,
+              ),
+              child: const Center(
+                child: CircularProgressIndicator(
+                  strokeWidth: 3,
+                  valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF7C3AED)),
+                ),
+              ),
+            ),
+            const SizedBox(height: 20),
+            Text(
+              message,
+              style: const TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w600,
+                color: Color(0xFF1F2937),
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 8),
+            const Text(
+              'Please wait...',
+              style: TextStyle(
+                fontSize: 13,
+                color: Color(0xFF6B7280),
+              ),
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // Helper method for success dialog with file location
+  // Helper method for success dialog with file location
+  Widget _buildSuccessDialog(BuildContext context, String filePath) {  // ADD context parameter
+    final fileName = filePath.split('/').last;
+
+    return Dialog(
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Container(
+        padding: const EdgeInsets.all(24),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 70,
+              height: 70,
+              decoration: BoxDecoration(
+                color: Colors.green.withOpacity(0.1),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(
+                Icons.check_circle,
+                color: Colors.green,
+                size: 40,
+              ),
+            ),
+            const SizedBox(height: 20),
+            const Text(
+              'Download Successful!',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: Color(0xFF1F2937),
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 12),
+            const Text(
+              'Your resume has been saved to:',
+              style: TextStyle(
+                fontSize: 14,
+                color: Color(0xFF6B7280),
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF3F4F6),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Row(
+                children: [
+                  const Icon(
+                    Icons.folder_outlined,
+                    size: 20,
+                    color: Color(0xFF7C3AED),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      fileName,
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: Color(0xFF374151),
+                        fontWeight: FontWeight.w500,
+                      ),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Downloads folder',
+              style: TextStyle(
+                fontSize: 11,
+                color: Colors.grey[500],
+                fontStyle: FontStyle.italic,
+              ),
+            ),
+            const SizedBox(height: 24),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: () => Navigator.pop(context),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF7C3AED),
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                ),
+                child: const Text(
+                  'Done',
+                  style: TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.white,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
