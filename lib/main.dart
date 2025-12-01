@@ -28,6 +28,14 @@ import 'package:path_wise/viewModel/program_detail_view_model.dart';
 
 import 'config/supabase_config.dart';
 import 'firebase_options.dart';
+import 'package:path_wise/view/bottomNavigationBar.dart';
+import 'package:path_wise/view/interview/interview_home_view.dart';
+import 'package:path_wise/view/interview/interview_setup_view.dart';
+import 'package:path_wise/view/interview/interview_session_view.dart';
+import 'package:path_wise/view/interview/interview_result_view.dart';
+import 'package:path_wise/view/interview/interview_history_view.dart';
+import 'package:path_wise/view/resume/resume_create_view.dart';
+import 'package:path_wise/view/resume/resume_customize_view.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
