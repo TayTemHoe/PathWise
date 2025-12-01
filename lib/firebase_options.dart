@@ -59,5 +59,4 @@ class DefaultFirebaseOptions {
     projectId: 'pathwise-283ff',
     storageBucket: 'pathwise-283ff.firebasestorage.app',
   );
-
 }
