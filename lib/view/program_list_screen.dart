@@ -85,7 +85,7 @@ class _ProgramListScreenState extends State<ProgramListScreen> {
 
         // ✅ FIX: Always reset and reload AI matched programs
         if (widget.aiMatchedProgramIds != null && widget.aiMatchedProgramIds!.isNotEmpty) {
-          debugPrint('🔄 Resetting ViewModel and loading ${widget.aiMatchedProgramIds!.length} AI-matched programs');
+          debugPrint('🔄 Resetting viewModel and loading ${widget.aiMatchedProgramIds!.length} AI-matched programs');
 
           // Clear existing state first
           viewModel.resetToAIMode();

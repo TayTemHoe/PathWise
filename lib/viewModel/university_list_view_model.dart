@@ -297,7 +297,7 @@ class UniversityListViewModel extends ChangeNotifier {
   void applyFilter(UniversityFilterModel newFilter) {
     debugPrint('🔍 Applying new filter: $newFilter');
 
-    // --- CRITICAL FIX: The ViewModel uses the model's check to set the flag ---
+    // --- CRITICAL FIX: The viewModel uses the model's check to set the flag ---
     final isActive = newFilter.hasActiveFilters; // Get state from the model
 
     // If ACTIVE, shouldDefaultToMalaysia = false (show world/custom list).

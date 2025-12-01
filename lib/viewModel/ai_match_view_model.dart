@@ -91,10 +91,10 @@ class AIMatchViewModel extends ChangeNotifier {
   // Initialize
   Future<void> initialize() async {
     try {
-      debugPrint('🚀 Initializing AI Match ViewModel...');
+      debugPrint('🚀 Initializing AI Match viewModel...');
       await _loadAvailableOptions();
       await loadProgress();
-      debugPrint('✅ AI Match ViewModel initialized');
+      debugPrint('✅ AI Match viewModel initialized');
     } catch (e) {
       debugPrint('❌ Initialization error: $e');
     }

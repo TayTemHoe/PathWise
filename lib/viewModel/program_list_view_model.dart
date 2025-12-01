@@ -376,7 +376,7 @@ class ProgramListViewModel extends ChangeNotifier {
 
   /// ✅ NEW: Reset state for AI mode
   void resetToAIMode() {
-    debugPrint('🔄 Resetting ViewModel to AI mode');
+    debugPrint('🔄 Resetting viewModel to AI mode');
     _programs.clear();
     _currentPage = 0;
     _hasMore = true;
