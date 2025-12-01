@@ -1,7 +1,7 @@
 // lib/views/resume_builder/template_selection_page.dart
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:path_wise/ViewModel/profile_view_model.dart';
+import 'package:path_wise/viewModel/profile_view_model.dart';
 import 'package:path_wise/view/resume/resume_customize_view.dart';
 import 'package:path_wise/model/resume_model.dart';
 import 'package:path_wise/model/user_profile.dart';

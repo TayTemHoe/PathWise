@@ -5,25 +5,30 @@ import 'package:flutter/foundation.dart';
 import 'package:path_wise/model/job_models.dart';
 
 class JobService {
-  final String apiKey = 'e41d8eaff2msh041a382f6bb1904p194aecjsn715ac6c5b487';
+  final String apiKey = 'cbfdb0b43emsh0b6a5cfa8235903p1b0a25jsnefb054e0d52c';
   final String apiHost = 'jsearch.p.rapidapi.com';
   final String searchEndpoint = 'https://jsearch.p.rapidapi.com/search';
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
-  /// Fetch ALL jobs from JSearch API with pagination (fetch all pages)
+  /// Fetch ALL jobs from JSearch API with pagination
   Future<List<JobModel>> fetchJobs({
     String? query,
     String? country,
     String? datePosted,
-    int maxResults = 100, // Maximum results to fetch
+    int maxResults = 50,
   }) async {
     try {
       List<JobModel> allJobs = [];
-      int currentPage = 10;
+      int currentPage = 1; // Start at page 1 (was 10 in your original code)
       bool hasMorePages = true;
+      int pagesFetched = 0;
+      int maxPages = 3; // LIMIT 2: Never fetch more than 3 pages, regardless of results
 
-      // Fetch jobs page by page until we have enough or no more pages
-      while (hasMorePages && allJobs.length < maxResults) {
+      // Loop only if:
+      // 1. We have more pages to fetch
+      // 2. We haven't reached our max result count
+      // 3. We haven't exceeded our max page limit
+      while (hasMorePages && allJobs.length < maxResults && pagesFetched < maxPages) {
         debugPrint('🔍 Fetching page $currentPage...');
 
         final pageJobs = await _fetchJobsPage(
@@ -35,22 +40,29 @@ class JobService {
 
         if (pageJobs.isEmpty) {
           hasMorePages = false;
-          debugPrint('⚠️ No more jobs available');
+          debugPrint('⚠️ No more jobs available at page $currentPage');
         } else {
           allJobs.addAll(pageJobs);
+          pagesFetched++;
+
           debugPrint('✅ Fetched ${pageJobs.length} jobs (Total: ${allJobs.length})');
 
-          // JSearch API returns 10 jobs per page
-          // If we get less than 10, it means no more pages
+          // JSearch API returns 10 jobs per page.
+          // If we get less than 10, it implies it's the last page.
           if (pageJobs.length < 10) {
             hasMorePages = false;
           } else {
             currentPage++;
           }
         }
+
+        // Small delay to prevent hitting API rate limits too quickly (optional but recommended)
+        if (hasMorePages) {
+          await Future.delayed(const Duration(milliseconds: 500));
+        }
       }
 
-      debugPrint('✅ Total jobs fetched: ${allJobs.length}');
+      debugPrint('✅ Search complete. Total jobs: ${allJobs.length}');
       return allJobs;
     } catch (error) {
       debugPrint('❌ Error fetching jobs: $error');
@@ -63,7 +75,7 @@ class JobService {
     String? query,
     String? country,
     String? datePosted,
-    int page = 10,
+    int page = 3,
   }) async {
     try {
       // Build query parameters

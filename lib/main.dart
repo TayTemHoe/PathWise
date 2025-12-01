@@ -4,6 +4,7 @@ import 'package:path_wise/ViewModel/interview_view_model.dart';
 import 'package:path_wise/ViewModel/resume_view_model.dart';
 import 'package:provider/provider.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:path_wise/ViewModel/profile_view_model.dart';
 import 'package:path_wise/ViewModel/career_view_model.dart';
 import 'package:path_wise/ViewModel/job_view_model.dart';
@@ -24,13 +25,18 @@ import 'package:path_wise/view/interview/interview_history_view.dart';
 import 'package:path_wise/view/resume/resume_create_view.dart';
 import 'package:path_wise/view/resume/resume_customize_view.dart';
 
-
-
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );
+
+  await Supabase.initialize(
+    url: 'https://ajdaciskaffuvaanizlw.supabase.co',
+    anonKey: 'sb_publishable_Vs82x42CVKx28QIzgQEYNw_zvzJ7yEg',
+  );
+
   final opts = Firebase.app().options;
   debugPrint('FIREBASE PROJECT: ${opts.projectId} / ${opts.appId}');
   runApp(const MyApp());

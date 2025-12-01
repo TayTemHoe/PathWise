@@ -1,4 +1,4 @@
-// lib/service/career_service.dart
+// lib/services/career_service.dart
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart';
 import 'package:path_wise/model/career_suggestion.dart';

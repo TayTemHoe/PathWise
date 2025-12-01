@@ -3,7 +3,7 @@ import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:path_wise/model/careerroadmap_model.dart';
 import 'package:path_wise/view/roadmap/create_roadmap_view.dart';
-import 'package:path_wise/ViewModel/careerroadmap_view_model.dart';
+import 'package:path_wise/viewModel/careerroadmap_view_model.dart';
 
 
 // lib/view/roadmap/roadmap_detail_view.dart

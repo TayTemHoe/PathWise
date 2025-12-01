@@ -1,12 +1,11 @@
 import 'dart:io';
-import 'package:intl/intl.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
+import 'package:permission_handler/permission_handler.dart'; // Import permission_handler
 import 'package:path_wise/ViewModel/profile_view_model.dart';
-import 'package:permission_handler/permission_handler.dart';
-import 'package:device_info_plus/device_info_plus.dart';
 
 class EditPersonalInfoScreen extends StatefulWidget {
   const EditPersonalInfoScreen({super.key});
@@ -55,116 +54,73 @@ class _EditPersonalInfoScreenState extends State<EditPersonalInfoScreen> {
   }
 
   Future<void> _pickAndUploadPhoto(ProfileViewModel vm) async {
+    // 1. Request Permissions on Android
+    // This handles both older Android (Storage) and Android 13+ (Photos)
+    if (Platform.isAndroid) {
+      Map<Permission, PermissionStatus> statuses = await [
+        Permission.storage,
+        Permission.photos,
+      ].request();
+
+      // We continue even if denied because ImagePicker might use the
+      // system Photo Picker which doesn't require app-level permissions on 13+.
+    }
+
     try {
-      // Request permissions
-      PermissionStatus status;
-
-      if (Platform.isAndroid) {
-        // For Android 13+, request READ_MEDIA_IMAGES
-        // For Android 12 and below, request READ_EXTERNAL_STORAGE
-        final androidInfo = await DeviceInfoPlugin().androidInfo;
-        if (androidInfo.version.sdkInt >= 33) {
-          // Android 13+
-          status = await Permission.photos.request();
-        } else {
-          // Android 12 and below
-          status = await Permission.storage.request();
-        }
-      } else {
-        // iOS
-        status = await Permission.photos.request();
-      }
-
-      // Handle permission result
-      if (status.isDenied) {
-        if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Photo permission is required'),
-            duration: Duration(seconds: 2),
-          ),
-        );
-        return;
-      }
-
-      if (status.isPermanentlyDenied) {
-        if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Photo permission is permanently denied. Open app settings.'),
-            duration: Duration(seconds: 3),
-          ),
-        );
-        openAppSettings();
-        return;
-      }
-
-      // Pick image
       final picker = ImagePicker();
       final picked = await picker.pickImage(
-        source: ImageSource.gallery,
-        imageQuality: 90,
+          source: ImageSource.gallery,
+          imageQuality: 90
       );
 
-      if (picked == null) {
-        // User cancelled
+      if (picked == null) return;
+
+      final file = File(picked.path);
+
+      // Ensure file exists before trying to read/upload
+      if (!await file.exists()) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Error: Image file not found')),
+        );
         return;
       }
 
-      final file = File(picked.path);
       final ext = picked.path.split('.').last.toLowerCase();
-      const allowed = ['jpg', 'jpeg', 'png', 'gif'];
+      final allowed = ['jpg', 'jpeg', 'png', 'gif'];
 
       if (!allowed.contains(ext)) {
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Please choose a JPG, PNG, or GIF image'),
-            duration: Duration(seconds: 2),
-          ),
+          const SnackBar(content: Text('Please choose JPG/PNG/GIF image')),
         );
         return;
       }
 
-      // Show uploading indicator
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Uploading photo...'),
-          duration: Duration(seconds: 5),
-        ),
-      );
-
-      // Upload
-      final url = await vm.uploadProfilePicture(
-        file,
-        fileExt: ext == 'jpeg' ? 'jpg' : ext,
-      );
+      // Show loading indicator in UI if needed, or rely on VM state
+      final url = await vm.uploadProfilePicture(file, fileExt: ext == 'jpeg' ? 'jpg' : ext);
 
       if (!mounted) return;
+
       if (url != null) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Photo uploaded successfully'),
-            duration: Duration(seconds: 2),
-          ),
+          const SnackBar(content: Text('Photo uploaded successfully')),
         );
-        setState(() {}); // Refresh avatar
+        setState(() {});
       } else {
+        // Now vm.error will contain the REAL exception (e.g., "FirebaseException: [firebase_storage/unauthorized]...")
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(vm.error ?? 'Failed to upload photo'),
-            duration: const Duration(seconds: 3),
+            content: Text(vm.error ?? 'Unknown error occurred'),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 5), // Show longer so you can read it
           ),
         );
       }
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Error: $e'),
-          duration: const Duration(seconds: 3),
-        ),
+        SnackBar(content: Text('Error picking image: $e')),
       );
     }
   }
@@ -244,7 +200,9 @@ class _EditPersonalInfoScreenState extends State<EditPersonalInfoScreen> {
                                     ),
                                   ),
                                   icon: const Icon(Icons.photo_camera_outlined, size: 18),
-                                  label: const Text('Upload Photo'),
+                                  label: vm.savingRoot
+                                      ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
+                                      : const Text('Upload Photo'),
                                 ),
                                 const SizedBox(height: 6),
                                 const Text(

@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import 'package:path_wise/routes.dart';
-import 'package:path_wise/ViewModel/profile_view_model.dart';
+import 'package:path_wise/viewModel/profile_view_model.dart';
 import 'package:path_wise/model/user_profile.dart';
 
 class ProfileOverviewScreen extends StatelessWidget {
@@ -88,14 +88,7 @@ class ProfileOverviewScreen extends StatelessWidget {
                                       name: p?.name ?? '-',
                                       location: _composeLocation(p),
                                       lastUpdated: _formatDate(p?.lastUpdated),
-                                      photoUrl: p?.profilePictureUrl,
-                                      onChangePhoto: () {
-                                        ScaffoldMessenger.of(context).showSnackBar(
-                                          const SnackBar(
-                                            content: Text('Open photo picker...'),
-                                          ),
-                                        );
-                                      },
+                                      photoUrl: p?.profilePictureUrl
                                     ),
                                     const SizedBox(height: 12),
                                     _CompletionCard(
@@ -358,14 +351,12 @@ class _HeaderCard extends StatelessWidget {
     required this.location,
     required this.lastUpdated,
     required this.photoUrl,
-    required this.onChangePhoto,
   });
 
   final String name;
   final String location;
   final String? lastUpdated;
   final String? photoUrl;
-  final VoidCallback onChangePhoto;
 
   @override
   Widget build(BuildContext context) {
@@ -406,23 +397,6 @@ class _HeaderCard extends StatelessWidget {
                     ),
                   )
                       : null,
-                ),
-                Positioned(
-                  right: 0,
-                  bottom: 0,
-                  child: InkWell(
-                    onTap: onChangePhoto,
-                    borderRadius: BorderRadius.circular(20),
-                    child: Container(
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        border: Border.all(color: const Color(0xFFE5E7EB)),
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                      padding: const EdgeInsets.all(6),
-                      child: const Icon(Icons.photo_camera_outlined, size: 16),
-                    ),
-                  ),
                 ),
               ],
             ),

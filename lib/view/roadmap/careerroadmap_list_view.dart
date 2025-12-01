@@ -1,7 +1,7 @@
 // lib/view/roadmap/careerroadmap_list_view.dart
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:path_wise/ViewModel/careerroadmap_view_model.dart';
+import 'package:path_wise/viewModel/careerroadmap_view_model.dart';
 import 'package:path_wise/view/roadmap/roadmap_detail_view.dart';
 import 'package:path_wise/view/roadmap/create_roadmap_view.dart';
 

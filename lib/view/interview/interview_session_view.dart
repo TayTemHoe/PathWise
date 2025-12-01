@@ -586,7 +586,7 @@ class _InterviewSessionPageState extends State<InterviewSessionPage> {
     // Check if this is the last question BEFORE submitting
     final isLastQuestion = interviewVM.isLastQuestion;
 
-    // Submit answer to ViewModel
+    // Submit answer to viewModel
     await interviewVM.submitAnswer(answer);
 
     // Clear answer box for next question

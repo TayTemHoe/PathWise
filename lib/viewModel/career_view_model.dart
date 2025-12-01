@@ -1,11 +1,11 @@
 // lib/viewmodel/career_view_model.dart
 import 'package:flutter/foundation.dart';
 import 'package:path_wise/model/career_suggestion.dart';
-import 'package:path_wise/service/gemini_service.dart';
-import 'package:path_wise/service/career_service.dart';
-import 'package:path_wise/ViewModel/profile_view_model.dart';
+import 'package:path_wise/services/gemini_service.dart';
+import 'package:path_wise/services/career_service.dart';
+import 'package:path_wise/viewModel/profile_view_model.dart';
 
-/// ViewModel for managing career suggestions
+/// viewModel for managing career suggestions
 /// Follows MVVM architecture pattern with ChangeNotifier for state management
 class CareerViewModel extends ChangeNotifier {
   // Services

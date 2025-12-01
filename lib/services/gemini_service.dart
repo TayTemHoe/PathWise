@@ -1,4 +1,4 @@
-// lib/service/ai_career_service.dart
+// lib/services/ai_career_service.dart
 import 'dart:convert';
 import 'package:flutter/cupertino.dart';
 import 'package:http/http.dart' as http;
@@ -6,7 +6,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:path_wise/model/career_suggestion.dart';
 import 'package:path_wise/model/careerroadmap_model.dart';
 import 'package:path_wise/model/user_profile.dart';
-import 'package:path_wise/ViewModel/profile_view_model.dart';
+import 'package:path_wise/viewModel/profile_view_model.dart';
 
 class AiService {
   final String apiKey = 'AIzaSyDIyRw4MEfeE0cTJ80tXB6_5RurcTVj2Go';

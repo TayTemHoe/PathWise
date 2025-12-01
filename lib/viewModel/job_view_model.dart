@@ -1,9 +1,9 @@
 // lib/viewmodel/job_view_model.dart
 import 'package:flutter/foundation.dart';
 import 'package:path_wise/model/job_models.dart';
-import 'package:path_wise/service/job_service.dart';
+import 'package:path_wise/services/job_service.dart';
 
-/// ViewModel for managing job search and bookmarks
+/// viewModel for managing job search and bookmarks
 /// Follows MVVM architecture pattern with ChangeNotifier
 class JobViewModel extends ChangeNotifier {
   final JobService _jobService = JobService();
@@ -281,7 +281,7 @@ class JobViewModel extends ChangeNotifier {
     }
   }
 
-  /// Initialize ViewModel
+  /// Initialize viewModel
   Future<void> initialize(String uid) async {
     try {
       _setLoading(true);

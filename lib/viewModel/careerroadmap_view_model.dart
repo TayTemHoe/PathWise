@@ -1,16 +1,16 @@
-// lib/ViewModel/careerroadmap_view_model.dart
+// lib/viewModel/careerroadmap_view_model.dart
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 import 'package:path_wise/model/careerroadmap_model.dart';
 import 'package:path_wise/model/user_profile.dart';
-import 'package:path_wise/service/gemini_service.dart';
-import 'package:path_wise/service/roadmap_service.dart';
-import 'package:path_wise/ViewModel/profile_view_model.dart';
+import 'package:path_wise/services/gemini_service.dart';
+import 'package:path_wise/services/roadmap_service.dart';
+import 'package:path_wise/viewModel/profile_view_model.dart';
 
-/// ViewModel for Career Roadmap, Skill Gap Analysis, and Learning Resources
+/// viewModel for Career Roadmap, Skill Gap Analysis, and Learning Resources
 /// Manages the state and business logic for Module B.2 and B.3
 ///
-/// This ViewModel follows the MVVM architecture pattern and integrates with:
+/// This viewModel follows the MVVM architecture pattern and integrates with:
 /// - ProfileViewModel: For user profile data
 /// - AiService: For AI-powered roadmap generation
 /// - RoadmapService: For Firestore CRUD operations

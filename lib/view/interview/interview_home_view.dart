@@ -1,9 +1,9 @@
 // lib/view/interview/interview_home_view.dart
 import 'package:flutter/material.dart';
-import 'package:path_wise/ViewModel/profile_view_model.dart';
+import 'package:path_wise/viewModel/profile_view_model.dart';
 import 'package:provider/provider.dart';
-import 'package:path_wise/ViewModel/interview_view_model.dart';
-import 'package:path_wise/ViewModel/career_view_model.dart';
+import 'package:path_wise/viewModel/interview_view_model.dart';
+import 'package:path_wise/viewModel/career_view_model.dart';
 
 class InterviewHomePage extends StatefulWidget {
   const InterviewHomePage({Key? key}) : super(key: key);

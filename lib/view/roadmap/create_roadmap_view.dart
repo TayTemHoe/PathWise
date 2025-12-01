@@ -2,7 +2,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:path_wise/ViewModel/careerroadmap_view_model.dart';
-import 'package:path_wise/ViewModel/career_view_model.dart';
+import 'package:path_wise/viewModel/career_view_model.dart';
 import 'package:path_wise/ViewModel/profile_view_model.dart';
 import 'package:path_wise/view/roadmap/roadmap_detail_view.dart';
 

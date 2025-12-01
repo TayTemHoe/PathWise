@@ -1,21 +1,18 @@
-
 import 'dart:io';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import '../model/user_profile.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:path_wise/model/user_profile.dart';
 
 class ProfileService {
   ProfileService({
     FirebaseFirestore? firestore,
-    FirebaseStorage? storage,
     FirebaseAuth? auth,
   })  : _db = firestore ?? FirebaseFirestore.instance,
-        _storage = storage ?? FirebaseStorage.instance,
         _auth = auth ?? FirebaseAuth.instance;
 
   final FirebaseFirestore _db;
-  final FirebaseStorage _storage;
   final FirebaseAuth _auth;
 
   // =============================
@@ -70,9 +67,7 @@ class ProfileService {
       if (!doc.exists) return null;
       return UserProfile.fromFirestore(doc as DocumentSnapshot<Map<String, dynamic>>);
     } catch (e, st) {
-      // log
-      // ignore: avoid_print
-      print('[service] getUser error: $e\n$st');
+      print('[services] getUser error: $e\n$st');
       rethrow;
     }
   }
@@ -96,13 +91,11 @@ class ProfileService {
         experience: results[2].cast<Experience>(),
       );
     } catch (e, st) {
-      // ignore: avoid_print
-      print('[service] getUserWithSubcollections error: $e\n$st');
+      print('[services] getUserWithSubcollections error: $e\n$st');
       rethrow;
     }
   }
 
-  /// Create or merge a root user document (respects your nested schema).
   Future<void> createOrMergeUser(String uid, UserProfile profile) async {
     try {
       final exists = (await _userDoc(uid).get()).exists;
@@ -116,13 +109,11 @@ class ProfileService {
 
       await _userDoc(uid).set(data, SetOptions(merge: true));
     } catch (e, st) {
-      // ignore: avoid_print
-      print('[service] createOrMergeUser error: $e\n$st');
+      print('[services] createOrMergeUser error: $e\n$st');
       rethrow;
     }
   }
 
-  /// Patch fields at root while stamping date-only lastUpdated.
   Future<void> patchRoot(String uid, Map<String, dynamic> patch) async {
     try {
       final m = <String, dynamic>{...patch, 'lastUpdated': _dateOnly()};
@@ -137,22 +128,17 @@ class ProfileService {
         rethrow;
       }
     } catch (e, st) {
-      // ignore: avoid_print
-      print('[service] patchRoot error: $e\n$st');
+      print('[services] patchRoot error: $e\n$st');
       rethrow;
     }
   }
-
-  // =============================
-  // Root: specific patch helpers (keys per your schema)
-  // =============================
 
   Future<void> updatePersonalInfo({
     required String uid,
     String? name,
     String? email,
     String? phone,
-    Timestamp? dob, // date-only (pass Timestamp.fromDate(DateTime(y,m,d)))
+    Timestamp? dob,
     String? gender,
     String? city,
     String? state,
@@ -176,7 +162,7 @@ class ProfileService {
   Future<void> updatePersonality({
     required String uid,
     String? mbti,
-    String? riasec, // string per schema (not array)
+    String? riasec,
   }) async {
     final p = <String, dynamic>{
       if (mbti != null) 'personality.mbti': mbti,
@@ -186,11 +172,10 @@ class ProfileService {
     await patchRoot(uid, p);
   }
 
-  // profile_service.dart
   Future<void> updatePreferences(String uid, Map<String, dynamic> prefs) async {
     await _db.collection('users').doc(uid).update({
       'preferences': prefs,
-      'lastUpdated': FieldValue.serverTimestamp(), // optional
+      'lastUpdated': FieldValue.serverTimestamp(),
     });
   }
 
@@ -205,150 +190,104 @@ class ProfileService {
   Future<String?> uploadProfilePicture({
     required String uid,
     required File file,
-    String? fileExt, // jpg/png
+    String? fileExt,
   }) async {
     try {
       final ext = (fileExt ?? 'jpg').toLowerCase();
-      final path = 'users/$uid/profile/profile.$ext';
-      final ref = _storage.ref().child(path);
-      await ref.putFile(file);
-      final url = await ref.getDownloadURL();
-      // also patch to user root
+      final fileName = 'profile_$uid.${DateTime.now().millisecondsSinceEpoch}.$ext';
+      final path = '$uid/$fileName';
+
+      // 1. Upload to Supabase Storage
+      // Make sure you created a bucket named 'profiles' in Supabase Dashboard
+      await Supabase.instance.client.storage
+          .from('profiles')
+          .upload(
+        path,
+        file,
+        fileOptions: const FileOptions(upsert: true),
+      );
+
+      // 2. Get Public URL
+      final url = Supabase.instance.client.storage
+          .from('profiles')
+          .getPublicUrl(path);
+
+      // 3. Save URL to Firestore (Your existing logic)
       await updatePersonalInfo(uid: uid, profilePictureUrl: url);
+
       return url;
     } catch (e, st) {
-      // ignore: avoid_print
-      print('[service] uploadProfilePicture error: $e\n$st');
-      return null;
+      print('[services] uploadProfilePicture error: $e\n$st');
+      // Rethrow to let viewModel handle the UI error message
+      throw Exception('Supabase Upload Failed: $e');
     }
   }
 
   // =============================
-  // Skills (users/{uid}/skills/{SK0001})
+  // Skills, Education, Experience...
+  // (Left unchanged as they were correct)
   // =============================
 
   Future<List<Skill>> listSkills({required String uid, int limit = 100}) async {
     final snap = await _skillsCol(uid).orderBy('order', descending: false).limit(limit).get();
-    return snap.docs
-        .map((d) => Skill.fromFirestore(d as DocumentSnapshot<Map<String, dynamic>>))
-        .toList();
+    return snap.docs.map((d) => Skill.fromFirestore(d as DocumentSnapshot<Map<String, dynamic>>)).toList();
   }
 
-  Future<Skill> createSkill({
-    required String uid,
-    required Skill skill,
-  }) async {
+  Future<Skill> createSkill({required String uid, required Skill skill}) async {
     final id = await _nextId(_skillsCol(uid), 'SK');
-    final data = skill.copyWith(
-      id: id,
-      updatedAt: _dateOnly(),
-    ).toMap();
-
+    final data = skill.copyWith(id: id, updatedAt: _dateOnly()).toMap();
     await _skillsCol(uid).doc(id).set(data, SetOptions(merge: true));
     final doc = await _skillsCol(uid).doc(id).get();
     return Skill.fromFirestore(doc as DocumentSnapshot<Map<String, dynamic>>);
   }
 
-  Future<void> updateSkill({
-    required String uid,
-    required Skill skill,
-  }) async {
-    await _skillsCol(uid).doc(skill.id).set(
-      skill.copyWith(updatedAt: _dateOnly()).toMap(),
-      SetOptions(merge: true),
-    );
+  Future<void> updateSkill({required String uid, required Skill skill}) async {
+    await _skillsCol(uid).doc(skill.id).set(skill.copyWith(updatedAt: _dateOnly()).toMap(), SetOptions(merge: true));
   }
 
-  Future<void> deleteSkill({
-    required String uid,
-    required String skillId,
-  }) async {
+  Future<void> deleteSkill({required String uid, required String skillId}) async {
     await _skillsCol(uid).doc(skillId).delete();
   }
 
-  // =============================
-  // Education (users/{uid}/education/{ED0001})
-  // =============================
-
   Future<List<Education>> listEducation({required String uid, int limit = 100}) async {
     final snap = await _educationCol(uid).orderBy('order', descending: false).limit(limit).get();
-    return snap.docs
-        .map((d) => Education.fromFirestore(d as DocumentSnapshot<Map<String, dynamic>>))
-        .toList();
+    return snap.docs.map((d) => Education.fromFirestore(d as DocumentSnapshot<Map<String, dynamic>>)).toList();
   }
 
-  Future<Education> createEducation({
-    required String uid,
-    required Education education,
-  }) async {
+  Future<Education> createEducation({required String uid, required Education education}) async {
     final id = await _nextId(_educationCol(uid), 'ED');
-    final data = education.copyWith(
-      id: id,
-      updatedAt: _dateOnly(),
-    ).toMap();
-
+    final data = education.copyWith(id: id, updatedAt: _dateOnly()).toMap();
     await _educationCol(uid).doc(id).set(data, SetOptions(merge: true));
     final doc = await _educationCol(uid).doc(id).get();
     return Education.fromFirestore(doc as DocumentSnapshot<Map<String, dynamic>>);
   }
 
-  Future<void> updateEducation({
-    required String uid,
-    required Education education,
-  }) async {
-    await _educationCol(uid).doc(education.id).set(
-      education.copyWith(updatedAt: _dateOnly()).toMap(),
-      SetOptions(merge: true),
-    );
+  Future<void> updateEducation({required String uid, required Education education}) async {
+    await _educationCol(uid).doc(education.id).set(education.copyWith(updatedAt: _dateOnly()).toMap(), SetOptions(merge: true));
   }
 
-  Future<void> deleteEducation({
-    required String uid,
-    required String eduId,
-  }) async {
+  Future<void> deleteEducation({required String uid, required String eduId}) async {
     await _educationCol(uid).doc(eduId).delete();
   }
 
-  // =============================
-  // Experience (users/{uid}/experience/{EX0001})
-  // =============================
-
   Future<List<Experience>> listExperience({required String uid, int limit = 100}) async {
     final snap = await _experienceCol(uid).orderBy('order', descending: false).limit(limit).get();
-    return snap.docs
-        .map((d) => Experience.fromFirestore(d as DocumentSnapshot<Map<String, dynamic>>))
-        .toList();
+    return snap.docs.map((d) => Experience.fromFirestore(d as DocumentSnapshot<Map<String, dynamic>>)).toList();
   }
 
-  Future<Experience> createExperience({
-    required String uid,
-    required Experience experience,
-  }) async {
+  Future<Experience> createExperience({required String uid, required Experience experience}) async {
     final id = await _nextId(_experienceCol(uid), 'EX');
-    final data = experience.copyWith(
-      id: id,
-      updatedAt: _dateOnly(),
-    ).toMap();
-
+    final data = experience.copyWith(id: id, updatedAt: _dateOnly()).toMap();
     await _experienceCol(uid).doc(id).set(data, SetOptions(merge: true));
     final doc = await _experienceCol(uid).doc(id).get();
     return Experience.fromFirestore(doc as DocumentSnapshot<Map<String, dynamic>>);
   }
 
-  Future<void> updateExperience({
-    required String uid,
-    required Experience experience,
-  }) async {
-    await _experienceCol(uid).doc(experience.id).set(
-      experience.copyWith(updatedAt: _dateOnly()).toMap(),
-      SetOptions(merge: true),
-    );
+  Future<void> updateExperience({required String uid, required Experience experience}) async {
+    await _experienceCol(uid).doc(experience.id).set(experience.copyWith(updatedAt: _dateOnly()).toMap(), SetOptions(merge: true));
   }
 
-  Future<void> deleteExperience({
-    required String uid,
-    required String expId,
-  }) async {
+  Future<void> deleteExperience({required String uid, required String expId}) async {
     await _experienceCol(uid).doc(expId).delete();
   }
 }

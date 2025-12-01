@@ -1,8 +1,8 @@
 // lib/view/interview/interview_history_page.dart
 import 'package:flutter/material.dart';
-import 'package:path_wise/ViewModel/profile_view_model.dart';
 import 'package:provider/provider.dart';
-import 'package:path_wise/ViewModel/interview_view_model.dart';
+import 'package:path_wise/viewModel/profile_view_model.dart';
+import 'package:path_wise/viewModel/interview_view_model.dart';
 import 'package:intl/intl.dart';
 
 class InterviewHistoryPage extends StatefulWidget {

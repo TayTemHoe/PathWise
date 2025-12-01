@@ -1,8 +1,8 @@
 // lib/view/career__view.dart
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:path_wise/ViewModel/career_view_model.dart';
-import 'package:path_wise/ViewModel/profile_view_model.dart';
+import 'package:path_wise/viewModel/career_view_model.dart';
+import 'package:path_wise/viewModel/profile_view_model.dart';
 import 'package:path_wise/model/career_suggestion.dart';
 import 'package:path_wise/view/career/job_view.dart';
 

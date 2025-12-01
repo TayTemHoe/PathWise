@@ -4,8 +4,8 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 
-import '../model/user_profile.dart';
-import '../service/profile_service.dart';
+import 'package:path_wise/model/user_profile.dart';
+import 'package:path_wise/services/profile_service.dart';
 
 class ProfileViewModel extends ChangeNotifier {
   ProfileViewModel({
@@ -218,6 +218,9 @@ class ProfileViewModel extends ChangeNotifier {
     _setSavingRoot(true);
     _setError(null);
     try {
+      // Print debug info
+      print('Attempting upload for user: $uid');
+
       final url = await _service.uploadProfilePicture(uid: uid, file: file, fileExt: fileExt);
       if (url != null) {
         _profile = (_profile ?? const UserProfile()).copyWith(
@@ -229,7 +232,9 @@ class ProfileViewModel extends ChangeNotifier {
       }
       return url;
     } catch (e) {
-      _setError(e);
+      // Capture the full error string
+      print('viewModel Upload Error: $e');
+      _setError(e.toString());
       return null;
     } finally {
       _setSavingRoot(false);

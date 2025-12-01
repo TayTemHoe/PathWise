@@ -2,8 +2,8 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:path_wise/model/job_models.dart';
-import 'package:path_wise/ViewModel/job_view_model.dart';
-import 'package:path_wise/ViewModel/profile_view_model.dart';
+import 'package:path_wise/viewModel/job_view_model.dart';
+import 'package:path_wise/viewModel/profile_view_model.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:share_plus/share_plus.dart';
 
