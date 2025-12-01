@@ -1,19 +1,18 @@
+// lib/viewModel/branch_view_model_v2.dart
 import 'package:flutter/material.dart';
-import 'package:path_wise/model/branch.dart';
-import 'package:path_wise/repository/branch_repository.dart';
+import '../model/branch.dart';
+import '../repository/branch_repository.dart';
 
-/// CRITICAL FIX: Prevents multiple simultaneous branch loading calls
-/// This was causing crashes when scrolling through university lists
 class BranchViewModel extends ChangeNotifier {
   final BranchRepository _repository = BranchRepository();
 
   // Store branches grouped by universityId
   final Map<String, List<BranchModel>> _branchesByUniversity = {};
 
-  // Track IDs that are currently being fetched (CRITICAL: prevents duplicate calls)
+  // Track IDs that are currently being fetched
   final Set<String> _loadingIds = {};
 
-  // Track IDs that have been requested (prevents reload loops)
+  // Track IDs that have been requested
   final Set<String> _requestedIds = {};
 
   bool _isLoading = false;
@@ -25,33 +24,31 @@ class BranchViewModel extends ChangeNotifier {
   List<BranchModel> getBranches(String universityId) =>
       _branchesByUniversity[universityId] ?? [];
 
-  // Check if a specific university's branches are loading
   bool isLoadingBranches(String universityId) =>
       _loadingIds.contains(universityId);
 
-  // Check if branches have been requested (loaded or loading)
   bool hasRequestedBranches(String universityId) =>
       _requestedIds.contains(universityId);
 
-  /// CRITICAL FIX: Prevents duplicate loading calls that cause crashes
+  /// Load branches for a university
   Future<void> loadBranches(String universityId) async {
-    // STEP 1: Check if already loaded, loading, or requested
+    // Check if already loaded, loading, or requested
     if (_branchesByUniversity.containsKey(universityId)) {
       debugPrint('✅ Branches already loaded for $universityId');
-      return; // Already have data
+      return;
     }
 
     if (_loadingIds.contains(universityId)) {
       debugPrint('⏸️ Already loading branches for $universityId');
-      return; // Currently loading
+      return;
     }
 
     if (_requestedIds.contains(universityId)) {
       debugPrint('⏸️ Already requested branches for $universityId');
-      return; // Already requested (loading or failed)
+      return;
     }
 
-    // STEP 2: Mark as requested IMMEDIATELY to prevent duplicate calls
+    // Mark as requested IMMEDIATELY
     _requestedIds.add(universityId);
     _loadingIds.add(universityId);
     _isLoading = true;
@@ -61,15 +58,12 @@ class BranchViewModel extends ChangeNotifier {
     try {
       final branches = await _repository.getBranchesByUniversity(universityId);
 
-      // Store the result
       _branchesByUniversity[universityId] = branches;
       _errorMessage = null;
 
       debugPrint('✅ Loaded ${branches.length} branches for $universityId');
     } catch (e) {
       _errorMessage = e.toString();
-
-      // IMPORTANT: Add empty list on failure to prevent reload loops
       _branchesByUniversity[universityId] = [];
 
       debugPrint('❌ Error loading branches for $universityId: $e');
@@ -77,18 +71,18 @@ class BranchViewModel extends ChangeNotifier {
       _isLoading = false;
       _loadingIds.remove(universityId);
 
-      // CRITICAL: Notify listeners AFTER the current frame to avoid build errors
+      // Notify listeners after the current frame
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (_isLoading == false) { // Double-check we're not loading
+        if (_isLoading == false) {
           notifyListeners();
         }
       });
     }
   }
 
-  /// Load multiple universities' branches in batch (optimized for performance)
+  /// Load multiple universities' branches in batch
   Future<void> loadBranchesBatch(List<String> universityIds) async {
-    // Filter out IDs that are already loaded, loading, or requested
+    // Filter out already loaded/loading/requested IDs
     final idsToLoad = universityIds
         .where((id) =>
     !_branchesByUniversity.containsKey(id) &&
@@ -108,8 +102,8 @@ class BranchViewModel extends ChangeNotifier {
     _loadingIds.addAll(idsToLoad);
 
     try {
-      // Load all branches in parallel (max 5 at a time to avoid overload)
-      final batchSize = 5;
+      // Load all branches in parallel (max 5 at a time)
+      const batchSize = 5;
       for (var i = 0; i < idsToLoad.length; i += batchSize) {
         final batch = idsToLoad.skip(i).take(batchSize).toList();
 
@@ -142,12 +136,13 @@ class BranchViewModel extends ChangeNotifier {
     }
   }
 
-  /// Clear branch data (e.g., when switching university or refreshing)
+  /// Clear branch data
   void clearBranches() {
     debugPrint('🧹 Clearing all branches');
     _branchesByUniversity.clear();
     _loadingIds.clear();
     _requestedIds.clear();
+    _repository.clearCache();
     notifyListeners();
   }
 
@@ -157,6 +152,7 @@ class BranchViewModel extends ChangeNotifier {
     _branchesByUniversity.remove(universityId);
     _loadingIds.remove(universityId);
     _requestedIds.remove(universityId);
+    _repository.clearCacheFor(universityId);
     notifyListeners();
   }
 
@@ -173,6 +169,7 @@ class BranchViewModel extends ChangeNotifier {
     _branchesByUniversity.clear();
     _loadingIds.clear();
     _requestedIds.clear();
+    _repository.clearCache();
     super.dispose();
   }
 }

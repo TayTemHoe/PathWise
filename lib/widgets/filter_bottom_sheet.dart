@@ -3,12 +3,13 @@ import 'package:flutter/services.dart';
 import '../model/university_filter.dart';
 import '../utils/app_color.dart';
 import '../utils/currency_utils.dart';
-import '../viewModel/filter_view_model.dart';
+import '../viewModel/university_filter_view_model.dart';
+import 'form_components.dart';
 
 class FilterBottomSheet extends StatefulWidget {
-  final FilterModel initialFilter;
-  final FilterViewModel filterViewModel; // Accept existing instance
-  final Function(FilterModel) onApply;
+  final UniversityFilterModel initialFilter;
+  final FilterViewModel filterViewModel;
+  final Function(UniversityFilterModel) onApply;
 
   const FilterBottomSheet({
     Key? key,
@@ -22,9 +23,7 @@ class FilterBottomSheet extends StatefulWidget {
 }
 
 class _FilterBottomSheetState extends State<FilterBottomSheet> {
-  // Text Controllers for input fields
-  final TextEditingController _minRankingController = TextEditingController();
-  final TextEditingController _maxRankingController = TextEditingController();
+  final TextEditingController _topNController = TextEditingController();
   final TextEditingController _minStudentsController = TextEditingController();
   final TextEditingController _maxStudentsController = TextEditingController();
   final TextEditingController _minTuitionController = TextEditingController();
@@ -36,11 +35,10 @@ class _FilterBottomSheetState extends State<FilterBottomSheet> {
   String? _selectedType;
 
   // Validation error messages
-  String? _rankingError;
+  String? _topNError;
   String? _studentError;
   String? _tuitionError;
 
-  // Add listener subscription
   bool _isDisposed = false;
 
   @override
@@ -58,12 +56,9 @@ class _FilterBottomSheetState extends State<FilterBottomSheet> {
 
     final filterVM = widget.filterViewModel;
 
-    // Initialize ranking fields
-    if (widget.initialFilter.minRanking != null) {
-      _minRankingController.text = widget.initialFilter.minRanking!.toInt().toString();
-    }
-    if (widget.initialFilter.maxRanking != null) {
-      _maxRankingController.text = widget.initialFilter.maxRanking!.toInt().toString();
+    // Initialize Top N field
+    if (widget.initialFilter.topN != null) {
+      _topNController.text = widget.initialFilter.topN!.toString();
     }
     _rankingSortOrder = widget.initialFilter.rankingSortOrder;
 
@@ -101,28 +96,24 @@ class _FilterBottomSheetState extends State<FilterBottomSheet> {
   bool _validateInputs() {
     bool isValid = true;
 
-    // Validate ranking
-    if (_minRankingController.text.isNotEmpty || _maxRankingController.text.isNotEmpty) {
-      final minRank = int.tryParse(_minRankingController.text);
-      final maxRank = int.tryParse(_maxRankingController.text);
+    // Validate Top N
+    if (_topNController.text.isNotEmpty) {
+      final topN = int.tryParse(_topNController.text);
 
-      if (_minRankingController.text.isNotEmpty && minRank == null) {
-        setState(() => _rankingError = 'Invalid minimum ranking');
+      if (topN == null) {
+        setState(() => _topNError = 'Invalid number');
         isValid = false;
-      } else if (_maxRankingController.text.isNotEmpty && maxRank == null) {
-        setState(() => _rankingError = 'Invalid maximum ranking');
+      } else if (topN < 1) {
+        setState(() => _topNError = 'Must be at least 1');
         isValid = false;
-      } else if (minRank != null && maxRank != null && minRank > maxRank) {
-        setState(() => _rankingError = 'Min ranking cannot exceed max ranking');
-        isValid = false;
-      } else if (minRank != null && minRank < 1) {
-        setState(() => _rankingError = 'Ranking must be at least 1');
+      } else if (topN > 2000) {
+        setState(() => _topNError = 'Cannot exceed 2000');
         isValid = false;
       } else {
-        setState(() => _rankingError = null);
+        setState(() => _topNError = null);
       }
     } else {
-      setState(() => _rankingError = null);
+      setState(() => _topNError = null);
     }
 
     // Validate students
@@ -179,13 +170,109 @@ class _FilterBottomSheetState extends State<FilterBottomSheet> {
   @override
   void dispose() {
     _isDisposed = true;
-    _minRankingController.dispose();
-    _maxRankingController.dispose();
+    _topNController.dispose();
     _minStudentsController.dispose();
     _maxStudentsController.dispose();
     _minTuitionController.dispose();
     _maxTuitionController.dispose();
     super.dispose();
+  }
+
+  Widget _buildTopNFilter(FilterViewModel filterVM) {
+    return _buildFilterSection(
+      title: 'Top Universities',
+      icon: Icons.emoji_events,
+      error: _topNError,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.info_outline, size: 14, color: AppColors.primary),
+              const SizedBox(width: 6),
+              Expanded(
+                child: Text(
+                  _selectedCountry != null
+                      ? 'View top universities in $_selectedCountry'
+                      : 'View top universities globally',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Colors.grey[600],
+                    fontStyle: FontStyle.italic,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          NumberStepperField(
+            controller: _topNController,
+            label: 'Top N Universities',
+            hint: 'Enter a number (e.g., 10)',
+            min: 1,
+            max: 10000,
+            step: 1,
+            onChanged: (_) => _validateInputs(),
+          ),
+          const SizedBox(height: 16),
+          const Text(
+            'Sort Order',
+            style: TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w600,
+              color: AppColors.textPrimary,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              Expanded(
+                child: _buildSortOption(
+                  'Best First',
+                  'asc',
+                  Icons.arrow_upward,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: _buildSortOption(
+                  'Worst First',
+                  'desc',
+                  Icons.arrow_downward,
+                ),
+              ),
+            ],
+          ),
+          if (_topNController.text.isNotEmpty && _selectedCountry != null) ...[
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: AppColors.primary.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: AppColors.primary.withOpacity(0.3)),
+              ),
+              child: Row(
+                children: [
+                  Icon(Icons.info, size: 16, color: AppColors.primary),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Showing top ${_topNController.text} universities in $_selectedCountry',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: AppColors.primary,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
   }
 
   @override
@@ -220,9 +307,9 @@ class _FilterBottomSheetState extends State<FilterBottomSheet> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  _buildRankingFilter(filterVM),
-                  const SizedBox(height: 24),
                   _buildLocationFilter(filterVM),
+                  const SizedBox(height: 24),
+                  _buildTopNFilter(filterVM), // NEW: Top N filter
                   const SizedBox(height: 24),
                   _buildStudentFilter(filterVM),
                   const SizedBox(height: 24),
@@ -286,159 +373,70 @@ class _FilterBottomSheetState extends State<FilterBottomSheet> {
     );
   }
 
-  Widget _buildRankingFilter(FilterViewModel filterVM) {
-    return _buildFilterSection(
-      title: 'University Ranking',
-      icon: Icons.emoji_events,
-      error: _rankingError,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(Icons.info_outline, size: 14, color: AppColors.primary),
-              const SizedBox(width: 6),
-              Expanded(
-                child: Text(
-                  'Filter by ranking range, or just sort all universities by rank',
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: Colors.grey[600],
-                    fontStyle: FontStyle.italic,
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          Text(
-            'Ranking Range (Optional)',
-            style: TextStyle(
-              fontSize: 13,
-              fontWeight: FontWeight.w600,
-              color: Colors.grey[700],
-            ),
-          ),
-          const SizedBox(height: 8),
-          Row(
-            children: [
-              Expanded(
-                child: _buildNumberTextField(
-                  controller: _minRankingController,
-                  label: 'Min Ranking',
-                  hint: '1',
-                  onChanged: (_) => _validateInputs(),
-                ),
-              ),
-              const Padding(
-                padding: EdgeInsets.only(top: 10, left: 12, right: 12),
-                child: Text(
-                  'to',
-                  style: TextStyle(fontSize: 15, fontWeight: FontWeight.normal),
-                ),
-              ),
-              Expanded(
-                child: _buildNumberTextField(
-                  controller: _maxRankingController,
-                  label: 'Max Ranking',
-                  hint: '2000',
-                  onChanged: (_) => _validateInputs(),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          const Text(
-            'Sort Order',
-            style: TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.w600,
-              color: AppColors.textPrimary,
-            ),
-          ),
-          const SizedBox(height: 8),
-          Row(
-            children: [
-              Expanded(
-                child: _buildSortOption(
-                  'Ascending',
-                  'asc',
-                  Icons.arrow_upward,
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: _buildSortOption(
-                  'Descending',
-                  'desc',
-                  Icons.arrow_downward,
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
   Widget _buildLocationFilter(FilterViewModel filterVM) {
-    return _buildFilterSection(
-      title: 'Location',
-      icon: Icons.location_on,
-      child: Column(
-        children: [
-          _buildDropdown(
-            label: 'Country',
-            value: _selectedCountry,
-            items: filterVM.availableCountries,
-            onChanged: (value) {
-              if (_isDisposed) return;
-
-              setState(() {
-                _selectedCountry = value;
-                _selectedCity = null;
-              });
-
-              if (value != null && !_isDisposed) {
-                filterVM.loadCitiesForCountry(value).then((_) {
-                  // Force rebuild after cities are loaded
-                  if (mounted && !_isDisposed) {
-                    setState(() {});
-                  }
-                });
-              } else if (!_isDisposed) {
-                filterVM.clearCities();
-              }
-            },
-            hint: 'Select Country',
-          ),
-          const SizedBox(height: 16),
-          // Listen to filterVM to rebuild when cities change
-          AnimatedBuilder(
-            animation: filterVM,
-            builder: (context, child) {
-              return _buildDropdown(
-                label: 'City',
-                value: _selectedCity,
-                items: filterVM.availableCities,
+    // We wrap the entire section in a Stack to overlay the chip
+    return Stack(
+      children: [
+        // 1. Your original _buildFilterSection.
+        //    It is NOT modified, and its logic is unchanged.
+        _buildFilterSection(
+          title: 'Location',
+          icon: Icons.location_on,
+          child: Column(
+            children: [
+              _buildDropdown(
+                label: 'Country',
+                value: _selectedCountry,
+                items: filterVM.availableCountries,
                 onChanged: (value) {
                   if (_isDisposed) return;
 
                   setState(() {
-                    _selectedCity = value;
+                    _selectedCountry = value;
+                    _selectedCity = null;
                   });
+
+                  if (value != null && !_isDisposed) {
+                    filterVM.loadCitiesForCountry(value).then((_) {
+                      if (mounted && !_isDisposed) {
+                        setState(() {});
+                      }
+                    });
+                  } else if (!_isDisposed) {
+                    filterVM.clearCities();
+                  }
                 },
-                hint: _selectedCountry == null
-                    ? 'Select country first'
-                    : filterVM.isLoadingCities
-                    ? 'Loading cities...'
-                    : 'Select City',
-                enabled: _selectedCountry != null && !filterVM.isLoadingCities,
-              );
-            },
+                hint: 'Select Country',
+              ),
+              const SizedBox(height: 16),
+
+              AnimatedBuilder(
+                animation: filterVM,
+                builder: (context, child) {
+                  return _buildDropdown(
+                    label: 'City',
+                    value: _selectedCity,
+                    items: filterVM.availableCities,
+                    onChanged: (value) {
+                      if (_isDisposed) return;
+
+                      setState(() {
+                        _selectedCity = value;
+                      });
+                    },
+                    hint: _selectedCountry == null
+                        ? 'Select country first'
+                        : filterVM.isLoadingCities
+                        ? 'Loading cities...'
+                        : 'Select City (Optional)',
+                    enabled: _selectedCountry != null && !filterVM.isLoadingCities,
+                  );
+                },
+              ),
+            ],
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 
@@ -512,7 +510,7 @@ class _FilterBottomSheetState extends State<FilterBottomSheet> {
                 child: _buildNumberTextField(
                   controller: _minTuitionController,
                   label: 'Min Tuition (RM)',
-                  hint: '0.00',
+                  hint: '0',
                   isDecimal: true,
                   onChanged: (_) => _validateInputs(),
                 ),
@@ -528,7 +526,7 @@ class _FilterBottomSheetState extends State<FilterBottomSheet> {
                 child: _buildNumberTextField(
                   controller: _maxTuitionController,
                   label: 'Max Tuition (RM)',
-                  hint: '200000.00',
+                  hint: '200000',
                   isDecimal: true,
                   onChanged: (_) => _validateInputs(),
                 ),
@@ -779,11 +777,15 @@ class _FilterBottomSheetState extends State<FilterBottomSheet> {
               color: isSelected ? Colors.white : AppColors.textSecondary,
             ),
             const SizedBox(width: 6),
-            Text(
-              label,
-              style: TextStyle(
-                color: isSelected ? Colors.white : AppColors.textPrimary,
-                fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
+            Flexible(
+              child: Text(
+                label,
+                style: TextStyle(
+                  color: isSelected ? Colors.white : AppColors.textPrimary,
+                  fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+                  fontSize: 13,
+                ),
+                textAlign: TextAlign.center,
               ),
             ),
           ],
@@ -858,8 +860,7 @@ class _FilterBottomSheetState extends State<FilterBottomSheet> {
     if (_isDisposed) return;
 
     setState(() {
-      _minRankingController.clear();
-      _maxRankingController.clear();
+      _topNController.clear();
       _rankingSortOrder = null;
       _minStudentsController.clear();
       _maxStudentsController.clear();
@@ -868,7 +869,7 @@ class _FilterBottomSheetState extends State<FilterBottomSheet> {
       _selectedType = null;
       _minTuitionController.clear();
       _maxTuitionController.clear();
-      _rankingError = null;
+      _topNError = null;
       _studentError = null;
       _tuitionError = null;
     });
@@ -885,12 +886,9 @@ class _FilterBottomSheetState extends State<FilterBottomSheet> {
       return;
     }
 
-    final filter = FilterModel(
-      minRanking: _minRankingController.text.isNotEmpty
-          ? int.tryParse(_minRankingController.text)
-          : null,
-      maxRanking: _maxRankingController.text.isNotEmpty
-          ? int.tryParse(_maxRankingController.text)
+    final filter = UniversityFilterModel(
+      topN: _topNController.text.isNotEmpty
+          ? int.tryParse(_topNController.text)
           : null,
       rankingSortOrder: _rankingSortOrder,
       minStudents: _minStudentsController.text.isNotEmpty
@@ -908,7 +906,10 @@ class _FilterBottomSheetState extends State<FilterBottomSheet> {
       maxTuitionFeeMYR: _maxTuitionController.text.isNotEmpty
           ? double.tryParse(_maxTuitionController.text)
           : null,
+      shouldDefaultToMalaysia: false,
     );
+
+    debugPrint('🎯 Created filter: ${filter.toJson()}');
 
     widget.onApply(filter);
     Navigator.pop(context);

@@ -1,9 +1,10 @@
+// lib/viewModel/program_filter_view_model_v2.dart
 import 'package:flutter/material.dart';
-import '../repository/program_filter_repository.dart';
+import '../repository/filter_repository.dart';
 import '../utils/currency_utils.dart';
 
 class ProgramFilterViewModel extends ChangeNotifier {
-  final ProgramFilterRepository _repository = ProgramFilterRepository();
+  final FilterRepository _repository = FilterRepository();
 
   // Filter Options
   List<String> _availableSubjectAreas = [];
@@ -11,6 +12,7 @@ class ProgramFilterViewModel extends ChangeNotifier {
   List<String> _availableStudyLevels = [];
   List<String> _availableIntakeMonths = [];
   List<Map<String, String>> _availableUniversities = [];
+  List<String> _availableCountries = [];
 
   // Ranges
   int _minRankingRange = 1;
@@ -35,6 +37,7 @@ class ProgramFilterViewModel extends ChangeNotifier {
   List<String> get availableStudyLevels => _availableStudyLevels;
   List<String> get availableIntakeMonths => _availableIntakeMonths;
   List<Map<String, String>> get availableUniversities => _availableUniversities;
+  List<String> get availableCountries => _availableCountries;
 
   int get minRankingRange => _minRankingRange;
   int get maxRankingRange => _maxRankingRange;
@@ -50,16 +53,10 @@ class ProgramFilterViewModel extends ChangeNotifier {
   String? get errorMessage => _errorMessage;
   bool get currencyRatesLoaded => _currencyRatesLoaded;
 
-  /// Initialize currency rates in background
-  Future<void> _initializeCurrencyRates() async {
-    try {
-      await CurrencyUtils.fetchExchangeRates();
-      _currencyRatesLoaded = true;
-      debugPrint('✅ Currency rates initialized');
-    } catch (e) {
-      debugPrint('⚠️ Currency rates initialization failed: $e');
-      _currencyRatesLoaded = false;
-    }
+  /// Initialize and load filter options
+  Future<void> initialize() async {
+    await loadFilterOptions();
+    await _repository.warmUpCache(); // Preload all metadata
   }
 
   /// Load all filter options
@@ -73,35 +70,45 @@ class ProgramFilterViewModel extends ChangeNotifier {
     notifyListeners();
 
     try {
-      debugPrint('🔄 Loading filter options...');
+      debugPrint('🔄 Loading program filter options...');
 
       // Ensure currency rates are loaded first
       if (!_currencyRatesLoaded) {
-        await CurrencyUtils.fetchExchangeRates();
-        _currencyRatesLoaded = true;
+        try {
+          await CurrencyUtils.fetchExchangeRates();
+          _currencyRatesLoaded = true;
+        } catch (e) {
+          debugPrint('⚠️ Currency rates unavailable: $e');
+        }
       }
 
       // Load all metadata at once
-      final metadata = await _repository.loadAllFilterMetadata();
+      final metadata = await _repository.loadProgramFilterMetadata();
 
       // Extract all data
-      _availableUniversities = metadata['universities'] as List<Map<String, String>>;
-      _availableSubjectAreas = metadata['subjectAreas'] as List<String>;
-      _availableStudyModes = metadata['studyModes'] as List<String>;
-      _availableStudyLevels = metadata['studyLevels'] as List<String>;
-      _availableIntakeMonths = metadata['intakeMonths'] as List<String>;
+      _availableUniversities = metadata['universities'] as List<Map<String, String>>? ?? [];
+      _availableSubjectAreas = metadata['subjectAreas'] as List<String>? ?? [];
+      _availableStudyModes = metadata['studyModes'] as List<String>? ?? [];
+      _availableStudyLevels = metadata['studyLevels'] as List<String>? ?? [];
+      _availableIntakeMonths = metadata['intakeMonths'] as List<String>? ?? [];
+      _availableCountries = metadata['countries'] as List<String>? ?? [];
+      final rankingRange = metadata['rankingRange'] as (int, int)?;
+      if (rankingRange != null) {
+        _minRankingRange = rankingRange.$1;
+        _maxRankingRange = rankingRange.$2;
+      }
 
-      final rankingRange = metadata['rankingRange'] as (int, int);
-      _minRankingRange = rankingRange.$1;
-      _maxRankingRange = rankingRange.$2;
+      final durationRange = metadata['durationRange'] as (double, double)?;
+      if (durationRange != null) {
+        _minDurationRange = durationRange.$1;
+        _maxDurationRange = durationRange.$2;
+      }
 
-      final durationRange = metadata['durationRange'] as (double, double);
-      _minDurationRange = durationRange.$1;
-      _maxDurationRange = durationRange.$2;
-
-      final tuitionRange = metadata['tuitionRange'] as (double, double);
-      _minTuitionRange = tuitionRange.$1;
-      _maxTuitionRange = tuitionRange.$2;
+      final tuitionRange = metadata['tuitionRange'] as (double, double)?;
+      if (tuitionRange != null) {
+        _minTuitionRange = tuitionRange.$1;
+        _maxTuitionRange = tuitionRange.$2;
+      }
 
       debugPrint('✅ Filter options loaded successfully');
       debugPrint('   - ${_availableUniversities.length} universities');
@@ -109,6 +116,7 @@ class ProgramFilterViewModel extends ChangeNotifier {
       debugPrint('   - ${_availableStudyModes.length} study modes');
       debugPrint('   - ${_availableStudyLevels.length} study levels');
       debugPrint('   - ${_availableIntakeMonths.length} intake months');
+      debugPrint('   - ${_availableCountries.length} countries');
       debugPrint('   - Ranking range: $_minRankingRange - $_maxRankingRange');
       debugPrint('   - Duration range: $_minDurationRange - $_maxDurationRange years');
       debugPrint('   - Tuition range: ${CurrencyUtils.formatMYR(_minTuitionRange)} - ${CurrencyUtils.formatMYR(_maxTuitionRange)}');
@@ -123,12 +131,24 @@ class ProgramFilterViewModel extends ChangeNotifier {
     }
   }
 
+  /// Search programs (for autocomplete)
+  Future<List<String>> searchPrograms(String query) async {
+    if (query.isEmpty) return [];
+
+    try {
+      return await _repository.searchPrograms(query, limit: 5);
+    } catch (e) {
+      debugPrint('❌ Error searching programs: $e');
+      return [];
+    }
+  }
+
   /// Refresh all filter data
   Future<void> refreshFilterData() async {
     debugPrint('🔄 Refreshing all filter data...');
 
-    // Clear cache
-    ProgramFilterRepository.clearCache();
+    // Clear caches
+    _repository.clearCache();
     CurrencyUtils.clearCache();
 
     // Reload everything
@@ -221,7 +241,7 @@ class ProgramFilterViewModel extends ChangeNotifier {
       _currencyRatesLoaded = true;
 
       // Reload tuition range with new rates
-      final tuitionRange = await _repository.getTuitionFeeRange();
+      final tuitionRange = await _repository.getProgramTuitionFeeRange();
       _minTuitionRange = tuitionRange.$1;
       _maxTuitionRange = tuitionRange.$2;
 
@@ -230,6 +250,11 @@ class ProgramFilterViewModel extends ChangeNotifier {
     } catch (e) {
       debugPrint('❌ Error refreshing currency rates: $e');
     }
+  }
+
+  /// Get cache statistics
+  Map<String, dynamic> getCacheStats() {
+    return _repository.getCacheStats();
   }
 
   @override

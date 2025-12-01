@@ -41,6 +41,18 @@ dependencies:
   flutter_html: ^3.0.0
   url_launcher: ^6.3.2
   intl: ^0.20.2
+  sqflite_common_ffi: ^2.3.6
+  path: ^1.9.1
+  sqlite3: ^2.9.4
+  connectivity_plus: ^7.0.0
+  sqflite: ^2.4.2
+  supabase_flutter: ^2.10.3
+  image_picker: ^1.2.0
+  google_mlkit_text_recognition: ^0.15.0
+  flutter_svg: ^2.2.2
+  collection: ^1.19.1
+  http: ^1.5.0
+  webview_flutter: ^4.13.0
 
 dev_dependencies:
   flutter_test:
@@ -66,6 +78,7 @@ flutter:
 
   assets:
     - assets/images/
+    - assets/pathwise.db
 
   # To add assets to your application, add an assets section, like this:
   # assets:

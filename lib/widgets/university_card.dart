@@ -14,6 +14,8 @@ class UniversityCard extends StatelessWidget {
   final bool isInCompareList;
   final bool canCompare;
   final bool isLoadingBranches;
+  final Future<int> programCount;
+  final int? countryRank;
 
   const UniversityCard({
     super.key,
@@ -25,24 +27,36 @@ class UniversityCard extends StatelessWidget {
     required this.canCompare,
     required this.branches,
     required this.isLoadingBranches,
+    required this.programCount,
+    this.countryRank,
   });
 
   @override
   Widget build(BuildContext context) {
-    final isTopRanked = university.isTopRanked;
+    final effectiveRank = countryRank ?? university.minRanking;
+    final isTop3 = effectiveRank != null && effectiveRank <= 3;
 
-    bool hasMalaysianBranch =
-        branches.isNotEmpty &&
+    // ✅ Use enhanced design for Top 3 (passing the effective rank)
+    if (isTop3) {
+      return _buildTop3Card(context, effectiveRank);
+    }
+
+    // Standard card design for others
+    return _buildStandardCard(context);
+  }
+
+  Widget _buildTop3Card(BuildContext context, int rank) {
+    final rankColor = _getTopRankColor(rank);
+
+    // --- Fee Logic (Kept exactly as provided) ---
+    bool hasMalaysianBranch = branches.isNotEmpty &&
         branches.any((b) => b.country.toLowerCase() == 'malaysia');
 
-    // Convert fees to MYR
     double? domesticFeeMYR;
     double? internationalFeeMYR;
 
     if (university.domesticTuitionFee != null) {
-      domesticFeeMYR = CurrencyUtils.convertToMYR(
-        university.domesticTuitionFee,
-      );
+      domesticFeeMYR = CurrencyUtils.convertToMYR(university.domesticTuitionFee);
     }
 
     if (university.internationalTuitionFee != null) {
@@ -51,9 +65,6 @@ class UniversityCard extends StatelessWidget {
       );
     }
 
-    // Determine which fee to show
-    // RULE: If university has Malaysian branch(es), show domestic fees
-    // Otherwise, show international fees
     String feeLabel;
     double? feeAmount;
 
@@ -64,17 +75,204 @@ class UniversityCard extends StatelessWidget {
       feeLabel = 'Int\'l Fees';
       feeAmount = internationalFeeMYR;
     } else if (domesticFeeMYR != null) {
-      // Fallback to domestic if available
       feeLabel = 'Dom. Fees';
       feeAmount = domesticFeeMYR;
     } else if (internationalFeeMYR != null) {
-      // Last fallback to international
       feeLabel = 'Int\'l Fees';
       feeAmount = internationalFeeMYR;
     } else {
       feeLabel = '';
       feeAmount = null;
     }
+
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      decoration: BoxDecoration(
+        color: Colors.white, // ✅ Changed to White Background
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(
+            color: rankColor.withOpacity(0.5),
+            width: 2 // ✅ Subtle border matching rank color
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: rankColor.withOpacity(0.15), // ✅ Soft colored glow
+            blurRadius: 20,
+            offset: const Offset(0, 8),
+            spreadRadius: 1,
+          ),
+        ],
+      ),
+      child: Material(
+        color: Colors.transparent,
+        borderRadius: BorderRadius.circular(24),
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(24),
+          child: Stack( // ✅ Used Stack to position badge Top-Right
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 24, 20, 20),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _buildHeader(),
+                    const SizedBox(height: 20),
+                    _buildBranchInfo(),
+                    const SizedBox(height: 20),
+
+                    // --- Statistics Logic (Kept exactly as provided) ---
+                    FutureBuilder<int>(
+                      future: programCount,
+                      builder: (context, snapshot) {
+                        int? count;
+                        if (snapshot.hasData && snapshot.data! > 0) {
+                          count = snapshot.data!;
+                        }
+
+                        final bool hasPrograms = count != null && count > 0;
+                        final bool hasOtherStats = feeAmount != null ||
+                            university.totalStudents != null;
+
+                        Widget statsWidget;
+                        if (!hasPrograms && !hasOtherStats) {
+                          if (snapshot.connectionState == ConnectionState.waiting) {
+                            statsWidget = const Align(
+                              alignment: Alignment.centerLeft,
+                              child: SizedBox(
+                                width: 14,
+                                height: 14,
+                                child: CircularProgressIndicator(strokeWidth: 2),
+                              ),
+                            );
+                          } else {
+                            statsWidget = const SizedBox.shrink();
+                          }
+                        } else {
+                          statsWidget = Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              if (hasOtherStats || hasPrograms)
+                                _buildStatistics(
+                                  hasPrograms,
+                                  count,
+                                  feeLabel,
+                                  feeAmount,
+                                ),
+                            ],
+                          );
+                        }
+
+                        return Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            statsWidget,
+                            const SizedBox(height: 16),
+                            _buildActionButtons(context, count),
+                          ],
+                        );
+                      },
+                    ),
+                  ],
+                ),
+              ),
+
+              Positioned(
+                top: 0,
+                right: 12, // Shifted slightly from right edge for aesthetic
+                child: _buildRankBadge(rank, rankColor),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// ✅ Smaller, Compact "Bookmark" Style Badge
+  Widget _buildRankBadge(int rank, Color color) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+      decoration: BoxDecoration(
+        color: color,
+        // Only round bottom corners to create a "hanging banner/bookmark" look
+        borderRadius: const BorderRadius.only(
+          bottomLeft: Radius.circular(12),
+          bottomRight: Radius.circular(12),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: color.withOpacity(0.4),
+            blurRadius: 6,
+            offset: const Offset(0, 3),
+          ),
+        ],
+      ),
+      child: Column( // ✅ Changed to Column for Vertical Alignment
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            _getRankIcon(rank),
+            color: Colors.white,
+            size: 18,
+          ),
+          const SizedBox(height: 2),
+          Text(
+            '#$rank',
+            style: const TextStyle(
+              color: Colors.white,
+              fontWeight: FontWeight.bold,
+              fontSize: 13,
+              height: 1.0,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// ✅ Standard card design
+  Widget _buildStandardCard(BuildContext context) {
+    final isTopRanked = university.isTopRanked;
+
+    bool hasMalaysianBranch = branches.isNotEmpty &&
+        branches.any((b) => b.country.toLowerCase() == 'malaysia');
+
+    double? domesticFeeMYR;
+    double? internationalFeeMYR;
+
+    if (university.domesticTuitionFee != null) {
+      domesticFeeMYR = CurrencyUtils.convertToMYR(university.domesticTuitionFee);
+    }
+
+    if (university.internationalTuitionFee != null) {
+      internationalFeeMYR = CurrencyUtils.convertToMYR(
+        university.internationalTuitionFee,
+      );
+    }
+
+    String feeLabel;
+    double? feeAmount;
+
+    if (hasMalaysianBranch && domesticFeeMYR != null) {
+      feeLabel = 'Dom. Fees';
+      feeAmount = domesticFeeMYR;
+    } else if (!hasMalaysianBranch && internationalFeeMYR != null) {
+      feeLabel = 'Int\'l Fees';
+      feeAmount = internationalFeeMYR;
+    } else if (domesticFeeMYR != null) {
+      feeLabel = 'Dom. Fees';
+      feeAmount = domesticFeeMYR;
+    } else if (internationalFeeMYR != null) {
+      feeLabel = 'Int\'l Fees';
+      feeAmount = internationalFeeMYR;
+    } else {
+      feeLabel = '';
+      feeAmount = null;
+    }
+
+    // Logic for standard card fallback color (if needed)
+    final rankForColor = countryRank ?? university.minRanking ?? 999;
 
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -84,14 +282,14 @@ class UniversityCard extends StatelessWidget {
         boxShadow: [
           BoxShadow(
             color: isTopRanked
-                ? _getTopRankColor().withOpacity(0.2)
+                ? _getTopRankColor(rankForColor).withOpacity(0.2)
                 : Colors.black.withOpacity(0.06),
             blurRadius: 12,
             offset: const Offset(0, 4),
           ),
         ],
         border: isTopRanked
-            ? Border.all(color: _getTopRankColor(), width: 2)
+            ? Border.all(color: _getTopRankColor(rankForColor), width: 2)
             : null,
       ),
       child: Material(
@@ -109,12 +307,57 @@ class UniversityCard extends StatelessWidget {
                 const SizedBox(height: 12),
                 _buildBranchInfo(),
                 const SizedBox(height: 12),
-                if (university.programCount > 0 ||
-                    feeAmount != null ||
-                    university.totalStudents != null)
-                  _buildStatistics(feeLabel, feeAmount),
-                const SizedBox(height: 16),
-                _buildActionButtons(context),
+                FutureBuilder<int>(
+                  future: programCount,
+                  builder: (context, snapshot) {
+                    int? count;
+                    if (snapshot.hasData && snapshot.data! > 0) {
+                      count = snapshot.data!;
+                    }
+
+                    final bool hasPrograms = count != null && count > 0;
+                    final bool hasOtherStats =
+                        feeAmount != null || university.totalStudents != null;
+
+                    Widget statsWidget;
+                    if (!hasPrograms && !hasOtherStats) {
+                      if (snapshot.connectionState == ConnectionState.waiting) {
+                        statsWidget = const Align(
+                          alignment: Alignment.centerLeft,
+                          child: SizedBox(
+                            width: 14,
+                            height: 14,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          ),
+                        );
+                      } else {
+                        statsWidget = const SizedBox.shrink();
+                      }
+                    } else {
+                      statsWidget = Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          if (hasOtherStats || hasPrograms)
+                            _buildStatistics(
+                              hasPrograms,
+                              count,
+                              feeLabel,
+                              feeAmount,
+                            ),
+                        ],
+                      );
+                    }
+
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        statsWidget,
+                        const SizedBox(height: 12),
+                        _buildActionButtons(context, count),
+                      ],
+                    );
+                  },
+                ),
               ],
             ),
           ),
@@ -124,6 +367,9 @@ class UniversityCard extends StatelessWidget {
   }
 
   Widget _buildHeader() {
+    // For standard card header, fallback to minRanking if countryRank not present
+    final rank = countryRank ?? university.minRanking;
+
     return Row(
       children: [
         Container(
@@ -131,8 +377,8 @@ class UniversityCard extends StatelessWidget {
           height: 70,
           decoration: BoxDecoration(
             gradient: LinearGradient(
-              colors: university.isTopRanked
-                  ? [_getTopRankColor(), _getTopRankColor().withOpacity(0.7)]
+              colors: rank != null && rank <= 3
+                  ? [_getTopRankColor(rank), _getTopRankColor(rank).withOpacity(0.7)]
                   : [Colors.grey[300]!, Colors.grey[200]!],
             ),
             borderRadius: BorderRadius.circular(16),
@@ -215,9 +461,10 @@ class UniversityCard extends StatelessWidget {
 
   Widget _buildRankingBadge() {
     final isTopRanked = university.isTopRanked;
+    final rank = countryRank ?? university.minRanking ?? 999;
 
-    // FIXED: Use RankingParser to format the display
     String rankingText;
+    // Logic to show rank range or single rank
     if (university.maxRanking == null ||
         university.minRanking == university.maxRanking) {
       rankingText = 'QS #${university.minRanking}';
@@ -228,39 +475,39 @@ class UniversityCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
-        gradient: isTopRanked
+        gradient: rank <= 3
             ? LinearGradient(
-                colors: [
-                  _getTopRankColor(),
-                  _getTopRankColor().withOpacity(0.8),
-                ],
-              )
+          colors: [
+            _getTopRankColor(rank),
+            _getTopRankColor(rank).withOpacity(0.8),
+          ],
+        )
             : null,
-        color: isTopRanked ? null : Colors.grey[100],
+        color: rank <= 3 ? null : Colors.grey[100],
         borderRadius: BorderRadius.circular(8),
-        boxShadow: isTopRanked
+        boxShadow: rank <= 3
             ? [
-                BoxShadow(
-                  color: _getTopRankColor().withOpacity(0.3),
-                  blurRadius: 4,
-                  offset: const Offset(0, 2),
-                ),
-              ]
+          BoxShadow(
+            color: _getTopRankColor(rank).withOpacity(0.3),
+            blurRadius: 4,
+            offset: const Offset(0, 2),
+          ),
+        ]
             : null,
         border: Border.all(color: AppColors.secondary.withOpacity(0.1)),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          if (isTopRanked)
-            Padding(
-              padding: const EdgeInsets.only(right: 4),
+          if (rank <= 3)
+            const Padding(
+              padding: EdgeInsets.only(right: 4),
               child: Icon(Icons.star, size: 14, color: Colors.white),
             ),
           Text(
             rankingText,
             style: TextStyle(
-              color: isTopRanked ? Colors.white : AppColors.textSecondary,
+              color: rank <= 3 ? Colors.white : AppColors.textSecondary,
               fontSize: 12,
               fontWeight: FontWeight.bold,
             ),
@@ -401,8 +648,12 @@ class UniversityCard extends StatelessWidget {
     );
   }
 
-  /// ENHANCED: Display statistics with MYR conversion
-  Widget _buildStatistics(String feeLabel, double? feeAmount) {
+  Widget _buildStatistics(
+      bool hasProgramStat,
+      int? programCount,
+      String feeLabel,
+      double? feeAmount,
+      ) {
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
@@ -412,14 +663,14 @@ class UniversityCard extends StatelessWidget {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceAround,
         children: [
-          if (university.programCount != null &&
-              university.programCount > 0) ...[
+          if (hasProgramStat) ...[
             _buildStat(
               icon: Icons.school,
               label: 'Programs',
-              value: '${university.programCount} Programs',
+              value: _formatNumber(programCount ?? 0),
             ),
-            Container(width: 1, height: 30, color: Colors.grey[300]),
+            if (feeAmount != null || university.totalStudents != null)
+              Container(width: 1, height: 30, color: Colors.grey[300]),
           ],
           if (feeAmount != null) ...[
             _buildStat(
@@ -427,7 +678,8 @@ class UniversityCard extends StatelessWidget {
               label: feeLabel,
               value: CurrencyUtils.formatMYR(feeAmount, compact: true),
             ),
-            Container(width: 1, height: 30, color: Colors.grey[300]),
+            if (hasProgramStat || university.totalStudents != null)
+              Container(width: 1, height: 30, color: Colors.grey[300]),
           ],
           if (university.totalStudents != null) ...[
             _buildStat(
@@ -466,30 +718,32 @@ class UniversityCard extends StatelessWidget {
     );
   }
 
-  Widget _buildActionButtons(BuildContext context) {
+  Widget _buildActionButtons(BuildContext context, int? programCount) {
+    final bool hasPrograms = programCount != null && programCount > 0;
+
     return Row(
       children: [
-        // if (university.programCount != null && university.programCount > 0)
-        Expanded(
-          child: ElevatedButton.icon(
-            onPressed: onViewPrograms,
-            icon: const Icon(Icons.school, size: 16),
-            label: const Text(
-              'Programs',
-              style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
-            ),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.secondary.withOpacity(0.1),
-              foregroundColor: AppColors.secondary,
-              padding: const EdgeInsets.symmetric(vertical: 12),
-              elevation: 0,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(10),
-                side: BorderSide(color: AppColors.secondary.withOpacity(0.3)),
+        if (hasPrograms)
+          Expanded(
+            child: ElevatedButton.icon(
+              onPressed: onViewPrograms,
+              icon: const Icon(Icons.school, size: 16),
+              label: const Text(
+                'Programs',
+                style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
+              ),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.secondary.withOpacity(0.1),
+                foregroundColor: AppColors.secondary,
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                elevation: 0,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10),
+                  side: BorderSide(color: AppColors.secondary.withOpacity(0.3)),
+                ),
               ),
             ),
           ),
-        ),
         const SizedBox(width: 8),
         Expanded(
           child: ElevatedButton.icon(
@@ -512,17 +766,22 @@ class UniversityCard extends StatelessWidget {
         ),
         const SizedBox(width: 8),
         Material(
+          // Visual Logic: Grey background if limit reached (!canCompare) & not in list
           color: isInCompareList
               ? AppColors.accent
               : (canCompare ? Colors.white : Colors.grey[200]),
           borderRadius: BorderRadius.circular(10),
           child: InkWell(
-            onTap: (canCompare || isInCompareList) ? onCompare : null,
+            // 🔴 CHANGE HERE: Always trigger onCompare.
+            // The check for the limit happens inside the parent screen's callback.
+            onTap: onCompare,
+
             borderRadius: BorderRadius.circular(10),
             child: Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
                 border: Border.all(
+                  // Visual Logic: Grey border if limit reached
                   color: isInCompareList
                       ? AppColors.accent
                       : (canCompare ? AppColors.accent : Colors.grey[300]!),
@@ -534,6 +793,7 @@ class UniversityCard extends StatelessWidget {
                 isInCompareList
                     ? Icons.check_circle
                     : Icons.compare_arrows_outlined,
+                // Visual Logic: Grey icon if limit reached
                 color: isInCompareList
                     ? Colors.white
                     : (canCompare ? AppColors.accent : Colors.grey[400]),
@@ -548,10 +808,7 @@ class UniversityCard extends StatelessWidget {
 
   String _formatLocation(BranchModel branch) {
     final city = branch.city.trim().replaceAll(RegExp(r'^,+|,+$'), '').trim();
-    final country = branch.country
-        .trim()
-        .replaceAll(RegExp(r'^,+|,+$'), '')
-        .trim();
+    final country = branch.country.trim().replaceAll(RegExp(r'^,+|,+$'), '').trim();
 
     if (city.isNotEmpty && country.isNotEmpty) {
       return '$city, $country';
@@ -573,10 +830,20 @@ class UniversityCard extends StatelessWidget {
     return number.toString();
   }
 
-  Color _getTopRankColor() {
-    if (university.minRanking == 1) return const Color(0xFFFFD700); // Gold
-    if (university.minRanking == 2) return const Color(0xFFC0C0C0); // Silver
-    if (university.minRanking == 3) return const Color(0xFFCD7F32); // Bronze
+  // ✅ UPDATED: Accepts rank argument to support Global fallback
+  IconData _getRankIcon(int rank) {
+    if (rank == 1) return Icons.emoji_events; // Trophy for #1
+    if (rank == 2) return Icons.military_tech; // Medal for #2
+    if (rank == 3) return Icons.workspace_premium; // Badge for #3
+    return Icons.star;
+  }
+
+  // ✅ UPDATED: Accepts rank argument to support Global fallback
+  Color _getTopRankColor(int rank) {
+    if (rank == 1) return const Color(0xFFFFD700); // Gold
+    if (rank == 2) return const Color(0xFFC0C0C0); // Silver
+    if (rank == 3) return const Color(0xFFCD7F32); // Bronze
+
     return AppColors.primary;
   }
 }

@@ -32,6 +32,46 @@ class ProgramCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final isTopRanked = program.isTopRanked;
 
+    bool hasMalaysianBranch = (branch?.country.toLowerCase() == 'malaysia');
+
+    // Convert fees to MYR
+    double? domesticFeeMYR;
+    double? internationalFeeMYR;
+
+    if (program.minDomesticTuitionFee != null) {
+      domesticFeeMYR = CurrencyUtils.convertToMYR(
+        program.minDomesticTuitionFee,
+      );
+    }
+
+    if (program.minInternationalTuitionFee != null) {
+      internationalFeeMYR = CurrencyUtils.convertToMYR(
+        program.minInternationalTuitionFee,
+      );
+    }
+
+    String feeLabel;
+    double? feeAmount;
+
+    if (hasMalaysianBranch && domesticFeeMYR != null) {
+      feeLabel = 'Dom. Fees';
+      feeAmount = domesticFeeMYR;
+    } else if (!hasMalaysianBranch && internationalFeeMYR != null) {
+      feeLabel = 'Int\'l Fees';
+      feeAmount = internationalFeeMYR;
+    } else if (domesticFeeMYR != null) {
+      // Fallback to domestic if available
+      feeLabel = 'Dom. Fees';
+      feeAmount = domesticFeeMYR;
+    } else if (internationalFeeMYR != null) {
+      // Last fallback to international
+      feeLabel = 'Int\'l Fees';
+      feeAmount = internationalFeeMYR;
+    } else {
+      feeLabel = '';
+      feeAmount = null;
+    }
+
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       decoration: BoxDecoration(
@@ -65,8 +105,8 @@ class ProgramCard extends StatelessWidget {
                 const SizedBox(height: 12),
                 _buildInstitutionInfo(),
                 const SizedBox(height: 12),
-                if (program.durationMonths != null || program.intakePeriod.isNotEmpty || _formatTuitionFee() != 'N/A')...[
-                  _buildProgramDetails(),
+                if (program.durationMonths != null || program.intakePeriod.isNotEmpty || feeAmount != null)...[
+                  _buildProgramDetails(feeLabel, feeAmount),
                   const SizedBox(height: 16),
                 ],
                 _buildActionButtons(context),
@@ -138,7 +178,7 @@ class ProgramCard extends StatelessWidget {
             children: [
               // MODIFIED: Use a Wrap to hold study level and ranking badge
               Wrap(
-                spacing: 8,
+                spacing: 5,
                 runSpacing: 4,
                 children: [
                   if (program.studyLevel != null)
@@ -162,6 +202,25 @@ class ProgramCard extends StatelessWidget {
                     ),
                   // NEW: Call to the new ranking badge
                   _buildRankingBadge(),
+                  if (program.studyMode != null)
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: AppColors.success.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(6),
+                        border: Border.all(
+                            color: AppColors.success.withOpacity(0.3)),
+                      ),
+                      child: Text(
+                        program.studyMode!,
+                        style: const TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.success,
+                        ),
+                      ),
+                    ),
                 ],
               ),
               const SizedBox(height: 4),
@@ -358,8 +417,9 @@ class ProgramCard extends StatelessWidget {
   }
 
   String _formatInstitutionLine() {
-    if (university == null || branch == null)
+    if (university == null || branch == null) {
       return 'Institution details loading...';
+    }
 
     final uniName = university!.universityName.trim();
     final branchName = branch!.branchName.trim();
@@ -386,7 +446,7 @@ class ProgramCard extends StatelessWidget {
     return parts.join(', ').replaceAll(RegExp(r',\s*,'), ',').trim();
   }
 
-  Widget _buildProgramDetails() {
+  Widget _buildProgramDetails(String feeLabel,double? feeAmount) {
     return Container(
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
@@ -417,12 +477,12 @@ class ProgramCard extends StatelessWidget {
               Container(width: 1, height: 30, color: Colors.grey[300]),
             ],
 
-            if (_formatTuitionFee() != 'N/A') ...[
+            if (feeAmount != null) ...[
               Expanded(
                 child: _buildDetailItem(
                   icon: Icons.attach_money,
-                  label: 'From',
-                  value: _formatTuitionFee(),
+                  label: feeLabel,
+                  value: CurrencyUtils.formatMYR(feeAmount, compact: true),
                 ),
               ),
             ],
@@ -494,6 +554,7 @@ class ProgramCard extends StatelessWidget {
   }
 
   Widget _buildActionButtons(BuildContext context) {
+    print("isInCompareList: $isInCompareList");
     return Row(
       children: [
         Expanded(
@@ -516,18 +577,24 @@ class ProgramCard extends StatelessWidget {
           ),
         ),
         const SizedBox(width: 8),
+
         Material(
+          // Visual Logic: Grey background if limit reached (!canCompare) & not in list
           color: isInCompareList
               ? AppColors.accent
               : (canCompare ? Colors.white : Colors.grey[200]),
           borderRadius: BorderRadius.circular(10),
           child: InkWell(
-            onTap: (canCompare || isInCompareList) ? onCompare : null,
+            // 🔴 CHANGE HERE: Always trigger onCompare.
+            // The check for the limit happens inside the parent screen's callback.
+            onTap: onCompare,
+
             borderRadius: BorderRadius.circular(10),
             child: Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
                 border: Border.all(
+                  // Visual Logic: Grey border if limit reached
                   color: isInCompareList
                       ? AppColors.accent
                       : (canCompare ? AppColors.accent : Colors.grey[300]!),
@@ -539,6 +606,7 @@ class ProgramCard extends StatelessWidget {
                 isInCompareList
                     ? Icons.check_circle
                     : Icons.compare_arrows_outlined,
+                // Visual Logic: Grey icon if limit reached
                 color: isInCompareList
                     ? Colors.white
                     : (canCompare ? AppColors.accent : Colors.grey[400]),

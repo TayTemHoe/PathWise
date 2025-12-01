@@ -13,6 +13,7 @@ class UniversityModel {
   final int? totalFacultyStaff;
   final int? minRanking;
   final int? maxRanking;
+  final int? countryRank;
   final List<BranchModel> branches;
   final int programCount;
 
@@ -29,9 +30,47 @@ class UniversityModel {
     this.totalFacultyStaff,
     this.minRanking,
     this.maxRanking,
+    this.countryRank,
     this.branches = const [],
     this.programCount = 0,
   });
+
+  UniversityModel copyWith({
+    String? universityId,
+    String? universityName,
+    String? universityLogo,
+    String? universityUrl,
+    String? uniDescription,
+    String? domesticTuitionFee,
+    String? internationalTuitionFee,
+    int? totalStudents,
+    int? internationalStudents,
+    int? totalFacultyStaff,
+    int? minRanking,
+    int? maxRanking,
+    int? countryRank, // <-- ADD HERE
+    List<BranchModel>? branches,
+    int? programCount,
+  }) {
+    return UniversityModel(
+      universityId: universityId ?? this.universityId,
+      universityName: universityName ?? this.universityName,
+      universityLogo: universityLogo ?? this.universityLogo,
+      universityUrl: universityUrl ?? this.universityUrl,
+      uniDescription: uniDescription ?? this.uniDescription,
+      domesticTuitionFee: domesticTuitionFee ?? this.domesticTuitionFee,
+      internationalTuitionFee: internationalTuitionFee ?? this.internationalTuitionFee,
+      totalStudents: totalStudents ?? this.totalStudents,
+      internationalStudents: internationalStudents ?? this.internationalStudents,
+      totalFacultyStaff: totalFacultyStaff ?? this.totalFacultyStaff,
+      minRanking: minRanking ?? this.minRanking,
+      maxRanking: maxRanking ?? this.maxRanking,
+      countryRank: countryRank, // <-- Use the new value (important not to use ?? this.countryRank here
+      // if you explicitly pass null to clear the rank)
+      branches: branches ?? this.branches,
+      programCount: programCount ?? this.programCount,
+    );
+  }
 
   factory UniversityModel.fromJson(Map<String, dynamic> json) {
     return UniversityModel(
@@ -71,9 +110,8 @@ class UniversityModel {
   }
 
   bool get isTopRanked {
-    if (minRanking == null) return false;
-    final rank = minRanking;
-    return rank! <= 3;
+    // Only true if the repository has actively assigned a countryRank for ranking/country filter.
+    return countryRank != null && countryRank! <= 3;
   }
 
   String get institutionType => 'Private'; // Can be enhanced

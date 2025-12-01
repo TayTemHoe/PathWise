@@ -1,24 +1,13 @@
-// lib/viewModel/program_detail_view_model.dart
+// lib/viewModel/program_detail_view_model_v2.dart
 import 'package:flutter/material.dart';
 import '../model/branch.dart';
 import '../model/program.dart';
 import '../model/program_admission.dart';
 import '../model/university.dart';
 import '../repository/program_detail_repository.dart';
-import '../services/firebase_service.dart';
 
 class ProgramDetailViewModel extends ChangeNotifier {
-  late final ProgramDetailRepository _repository;
-
-  ProgramDetailViewModel() {
-    final firebaseService = FirebaseService();
-    _repository = ProgramDetailRepository(firebaseService);
-  }
-
-  // For testing with dependency injection
-  ProgramDetailViewModel.withRepository(ProgramDetailRepository repository) {
-    _repository = repository;
-  }
+  final ProgramDetailRepository _repository = ProgramDetailRepository();
 
   ProgramModel? _program;
   UniversityModel? _university;
@@ -41,41 +30,43 @@ class ProgramDetailViewModel extends ChangeNotifier {
   Future<void> loadProgramDetails(String programId) async {
     _isLoading = true;
     _error = null;
+    clearProgramData();
     notifyListeners();
 
     try {
-      // Load program details
+      debugPrint('📥 Loading program details for $programId...');
+
+      // Load program first
       _program = await _repository.getProgramDetails(programId);
 
       if (_program == null) {
         throw Exception('Program not found');
       }
 
-      // Load university
-      _university = await _repository.getUniversityForProgram(_program!.universityId);
-
-      // Load branch
-      _branch = await _repository.getBranchForProgram(
-        _program!.branchId,
-        _program!.universityId,
-      );
-
-      // Load admissions
-      _admissions = await _repository.getAdmissionsByProgram(_program!.programId);
-
-      // Load related programs by study level
-      if (_program!.studyLevel != null) {
-        _relatedProgramsByLevel = await _repository.getRelatedProgramsByLevel(
+      // Load related data concurrently
+      final results = await Future.wait([
+        _repository.getUniversityForProgram(_program!.universityId),
+        _repository.getBranchForProgram(_program!.branchId),
+        _repository.getAdmissionsByProgram(_program!.programId),
+        _program!.studyLevel != null
+            ? _repository.getRelatedProgramsByLevel(
           _program!.universityId,
           _program!.studyLevel!,
-          _program!.programId, // Exclude current program
-        );
-      }
+          _program!.programId,
+        )
+            : Future.value(<String, List<ProgramModel>>{}),
+      ]);
+
+      _university = results[0] as UniversityModel?;
+      _branch = results[1] as BranchModel?;
+      _admissions = results[2] as List<ProgramAdmissionModel>;
+      _relatedProgramsByLevel = results[3] as Map<String, List<ProgramModel>>;
 
       _error = null;
+      debugPrint('✅ Program details loaded successfully');
     } catch (e) {
       _error = e.toString();
-      debugPrint('Error loading program details: $e');
+      debugPrint('❌ Error loading program details: $e');
     } finally {
       _isLoading = false;
       notifyListeners();
@@ -103,6 +94,7 @@ class ProgramDetailViewModel extends ChangeNotifier {
     _relatedProgramsByLevel = {};
     _expandedLevels.clear();
     _error = null;
+    _repository.clearCache();
     notifyListeners();
   }
 

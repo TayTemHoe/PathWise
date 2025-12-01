@@ -365,7 +365,7 @@ class FirebaseService {
   Future<QuerySnapshot> getAllUniversities({
     int limit = 10,
     DocumentSnapshot? lastDoc,
-    FilterModel? filter,
+    UniversityFilterModel? filter,
   }) async {
     // Create cache key based on filter
     final cacheKey = _createCacheKey(filter, lastDoc?.id);
@@ -419,7 +419,7 @@ class FirebaseService {
     return snapshot;
   }
 
-  String _createCacheKey(FilterModel? filter, String? lastDocId) {
+  String _createCacheKey(UniversityFilterModel? filter, String? lastDocId) {
     if (filter == null) return 'default_${lastDocId ?? 'start'}';
     return '${filter.hashCode}_${lastDocId ?? 'start'}';
   }

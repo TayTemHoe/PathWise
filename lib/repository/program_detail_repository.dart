@@ -1,226 +1,136 @@
-// lib/repository/program_detail_repository.dart
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart';
 import '../model/branch.dart';
 import '../model/program.dart';
 import '../model/program_admission.dart';
 import '../model/university.dart';
-import '../services/firebase_service.dart';
+import '../services/local_data_source.dart';
 
 class ProgramDetailRepository {
-  final FirebaseService _firebaseService;
+  final LocalDataSource _localDataSource = LocalDataSource.instance;
 
-  // Local caching
-  static final Map<String, ProgramModel> _programCache = {};
-  static final Map<String, UniversityModel> _universityCache = {};
-  static final Map<String, BranchModel> _branchCache = {};
-  static final Map<String, List<ProgramAdmissionModel>> _admissionCache = {};
-
-  ProgramDetailRepository(this._firebaseService);
+  // Memory cache for current detail view
+  ProgramModel? _cachedProgram;
+  UniversityModel? _cachedUniversity;
+  BranchModel? _cachedBranch;
+  final Map<String, List<ProgramAdmissionModel>> _admissionsCache = {};
+  Map<String, List<ProgramModel>>? _cachedRelatedPrograms;
 
   /// Get program details
   Future<ProgramModel?> getProgramDetails(String programId) async {
-    // Check cache
-    if (_programCache.containsKey(programId)) {
-      debugPrint('📦 Cache HIT: Program $programId');
-      return _programCache[programId];
-    }
-
     try {
-      debugPrint('🔥 Fetching program $programId...');
+      debugPrint('📥 Loading program details for $programId...');
 
-      DocumentSnapshot doc;
-      try {
-        doc = await FirebaseFirestore.instance
-            .collection('programs')
-            .doc(programId)
-            .get(const GetOptions(source: Source.cache));
-
-        if (!doc.exists) throw Exception('No cache');
-      } catch (e) {
-        doc = await FirebaseFirestore.instance
-            .collection('programs')
-            .doc(programId)
-            .get(const GetOptions(source: Source.server));
+      final program = await _localDataSource.getProgramById(programId);
+      if (program == null) {
+        throw Exception('Program not found');
       }
 
-      if (doc.exists && doc.data() != null) {
-        final program = ProgramModel.fromJson(doc.data() as Map<String, dynamic>);
-        _programCache[programId] = program;
-        return program;
-      }
+      _cachedProgram = program;
 
-      return null;
+      debugPrint('✅ Program details loaded');
+      return program;
     } catch (e) {
-      debugPrint('❌ Error getting program: $e');
+      debugPrint('❌ Error loading program details: $e');
       return null;
     }
   }
 
   /// Get university for program
   Future<UniversityModel?> getUniversityForProgram(String universityId) async {
-    if (_universityCache.containsKey(universityId)) {
-      debugPrint('📦 Cache HIT: University $universityId');
-      return _universityCache[universityId];
+    if (_cachedUniversity != null && _cachedUniversity!.universityId == universityId) {
+      debugPrint('📦 Cache HIT: University');
+      return _cachedUniversity;
     }
 
     try {
-      final uni = await _firebaseService.getUniversity(universityId);
-      if (uni != null) {
-        _universityCache[universityId] = uni;
-      }
-      return uni;
+      final university = await _localDataSource.getUniversityById(universityId);
+      _cachedUniversity = university;
+      return university;
     } catch (e) {
-      debugPrint('❌ Error getting university: $e');
+      debugPrint('❌ Error loading university: $e');
       return null;
     }
   }
 
   /// Get branch for program
-  Future<BranchModel?> getBranchForProgram(String branchId, String universityId) async {
-    if (_branchCache.containsKey(branchId)) {
-      debugPrint('📦 Cache HIT: Branch $branchId');
-      return _branchCache[branchId];
+  Future<BranchModel?> getBranchForProgram(String branchId) async {
+    if (_cachedBranch != null && _cachedBranch!.branchId == branchId) {
+      debugPrint('📦 Cache HIT: Branch');
+      return _cachedBranch;
     }
 
     try {
-      final branches = await _firebaseService.getBranchesByUniversity(universityId);
-
-      // Cache all branches
-      for (var branch in branches) {
-        _branchCache[branch.branchId] = branch;
-      }
-
-      return _branchCache[branchId];
+      final branch = await _localDataSource.getBranchById(branchId);
+      _cachedBranch = branch;
+      return branch;
     } catch (e) {
-      debugPrint('❌ Error getting branch: $e');
+      debugPrint('❌ Error loading branch: $e');
       return null;
     }
   }
 
   /// Get admissions for program
   Future<List<ProgramAdmissionModel>> getAdmissionsByProgram(String programId) async {
-    if (_admissionCache.containsKey(programId)) {
-      debugPrint('📦 Cache HIT: Admissions for $programId');
-      return _admissionCache[programId]!;
+    if (_admissionsCache.containsKey(programId)) {
+      debugPrint('📦 Cache HIT for $programId');
+      return _admissionsCache[programId]!;
     }
 
     try {
-      debugPrint('🔥 Fetching admissions for $programId...');
+      debugPrint('📥 Loading admissions for $programId...');
 
-      QuerySnapshot snapshot;
-      try {
-        snapshot = await FirebaseFirestore.instance
-            .collection('prog_admissions')
-            .where('program_id', isEqualTo: programId)
-            .get(const GetOptions(source: Source.cache));
+      final admissions = await _localDataSource.getProgramAdmissions(programId);
 
-        if (snapshot.docs.isEmpty) throw Exception('No cache');
-      } catch (e) {
-        snapshot = await FirebaseFirestore.instance
-            .collection('prog_admissions')
-            .where('program_id', isEqualTo: programId)
-            .get(const GetOptions(source: Source.server));
-      }
+      // Store in cache
+      _admissionsCache[programId] = admissions;
 
-      final admissions = snapshot.docs
-          .map((doc) {
-        try {
-          return ProgramAdmissionModel.fromJson(doc.data() as Map<String, dynamic>);
-        } catch (e) {
-          debugPrint('⚠️ Error parsing admission: $e');
-          return null;
-        }
-      })
-          .whereType<ProgramAdmissionModel>()
-          .toList();
-
-      _admissionCache[programId] = admissions;
+      debugPrint('✅ Loaded ${admissions.length} admissions for $programId');
       return admissions;
     } catch (e) {
-      debugPrint('❌ Error getting admissions: $e');
+      debugPrint('❌ Error loading admissions: $e');
       return [];
     }
   }
 
-  /// Get related programs by study level
+  /// Get related programs by level
   Future<Map<String, List<ProgramModel>>> getRelatedProgramsByLevel(
       String universityId,
       String studyLevel,
       String currentProgramId,
       ) async {
+    if (_cachedRelatedPrograms != null) {
+      debugPrint('📦 Cache HIT: Related programs');
+      return _cachedRelatedPrograms!;
+    }
+
     try {
-      debugPrint('🔥 Fetching related programs for level: $studyLevel');
+      debugPrint('📥 Loading related programs...');
 
-      // Get all branches for this university
-      final branches = await _firebaseService.getBranchesByUniversity(universityId);
-      final branchIds = branches.map((b) => b.branchId).toList();
+      final relatedPrograms = await _localDataSource.getRelatedProgramsByLevel(
+        universityId,
+        studyLevel,
+        currentProgramId,
+      );
 
-      if (branchIds.isEmpty) return {};
+      _cachedRelatedPrograms = relatedPrograms;
 
-      final Map<String, List<ProgramModel>> programsByLevel = {};
-      final allPrograms = <ProgramModel>[];
+      final totalPrograms = relatedPrograms.values.fold(0, (sum, list) => sum + list.length);
+      debugPrint('✅ Loaded $totalPrograms related programs');
 
-      // Fetch programs in batches
-      for (int i = 0; i < branchIds.length; i += 10) {
-        final batch = branchIds.skip(i).take(10).toList();
-
-        QuerySnapshot snapshot;
-        try {
-          snapshot = await FirebaseFirestore.instance
-              .collection('programs')
-              .where('branch_id', whereIn: batch)
-              .where('study_level', isEqualTo: studyLevel)
-              .limit(50)
-              .get(const GetOptions(source: Source.cache));
-
-          if (snapshot.docs.isEmpty) throw Exception('No cache');
-        } catch (e) {
-          snapshot = await FirebaseFirestore.instance
-              .collection('programs')
-              .where('branch_id', whereIn: batch)
-              .where('study_level', isEqualTo: studyLevel)
-              .limit(50)
-              .get(const GetOptions(source: Source.server));
-        }
-
-        for (var doc in snapshot.docs) {
-          try {
-            final program = ProgramModel.fromJson(doc.data() as Map<String, dynamic>);
-
-            // Exclude current program
-            if (program.programId != currentProgramId) {
-              allPrograms.add(program);
-            }
-          } catch (e) {
-            debugPrint('⚠️ Error parsing program: $e');
-          }
-        }
-      }
-
-      // Group by study level
-      for (var program in allPrograms) {
-        final level = program.studyLevel ?? 'Other';
-        if (!programsByLevel.containsKey(level)) {
-          programsByLevel[level] = [];
-        }
-        programsByLevel[level]!.add(program);
-      }
-
-      debugPrint('✅ Found ${allPrograms.length} related programs');
-      return programsByLevel;
+      return relatedPrograms;
     } catch (e) {
-      debugPrint('❌ Error getting related programs: $e');
+      debugPrint('❌ Error loading related programs: $e');
       return {};
     }
   }
 
-  /// Clear caches
-  static void clearCaches() {
-    _programCache.clear();
-    _universityCache.clear();
-    _branchCache.clear();
-    _admissionCache.clear();
-    debugPrint('🧹 Program detail repository caches cleared');
+  /// Clear cache
+  void clearCache() {
+    _cachedProgram = null;
+    _cachedUniversity = null;
+    _cachedBranch = null;
+    _admissionsCache.clear();
+    _cachedRelatedPrograms = null;
+    debugPrint('🧹 Program detail cache cleared');
   }
 }

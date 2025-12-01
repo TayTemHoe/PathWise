@@ -1,24 +1,45 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:path_wise/view/program_detail_screen.dart';
+import 'package:path_wise/viewModel/comparison_view_model.dart';
 import 'package:provider/provider.dart';
 import 'dart:async';
+import '../model/ai_match_model.dart';
+import '../model/comparison.dart';
+import '../model/program_filter.dart';
+import '../repository/comparison_repository.dart';
+import '../viewModel/ai_match_view_model.dart';
+import '../viewModel/university_list_view_model.dart';
 import '../model/program.dart';
 import '../model/branch.dart';
 import '../model/university.dart';
-import '../repository/program_filter_repository.dart';
-import '../repository/program_repository.dart';
-import '../services/firebase_service.dart';
+import '../services/app_initialization_service.dart';
 import '../utils/app_color.dart';
 import '../utils/currency_utils.dart';
 import '../viewModel/program_list_view_model.dart';
 import '../viewModel/program_filter_view_model.dart';
+import '../widgets/ai_match_pages/ai_recommendation_widgets.dart';
 import '../widgets/app_loading_screen.dart';
 import '../widgets/program_card.dart';
 import '../widgets/program_filter_bottom_sheet.dart';
+import 'ai_match_screen.dart';
+import 'ai_rationale_screen.dart';
+import 'comparison_screen.dart';
 
 class ProgramListScreen extends StatefulWidget {
-  const ProgramListScreen({Key? key}) : super(key: key);
+  final List<RecommendedSubjectArea>? aiRecommendations;
+  final List<String>? aiMatchedProgramIds;
+  final UserPreferences? aiUserPreferences;
+  final bool showOnlyRecommended;
+
+  const ProgramListScreen({
+    super.key,
+    this.aiRecommendations,
+    this.aiMatchedProgramIds,
+    this.aiUserPreferences,
+    this.showOnlyRecommended = false,
+  });
 
   @override
   State<ProgramListScreen> createState() => _ProgramListScreenState();
@@ -36,7 +57,6 @@ class _ProgramListScreenState extends State<ProgramListScreen> {
   final Map<String, UniversityModel> _universityCache = {};
   final Map<String, BranchModel> _branchCache = {};
   final Set<String> _loadingDetails = {};
-  final Set<String> _loadingStudyArea = {};
 
   Timer? _searchDebounceTimer;
   static const Duration _searchDebounceDuration = Duration(milliseconds: 400);
@@ -47,16 +67,39 @@ class _ProgramListScreenState extends State<ProgramListScreen> {
     _scrollController.addListener(_onScroll);
     _searchFocusNode.addListener(_onSearchFocusChange);
 
-    WidgetsBinding.instance.addPostFrameCallback((_) {
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
       final viewModel = context.read<ProgramListViewModel>();
       final filterVM = context.read<ProgramFilterViewModel>();
+      final aiViewModel = context.read<AIMatchViewModel>();
 
-      // Load filter options in background
       filterVM.loadFilterOptions();
 
-      // Load initial programs
-      if (viewModel.programs.isEmpty && !viewModel.isLoading) {
-        viewModel.loadPrograms();
+      if (widget.showOnlyRecommended) {
+        // ✅ CRITICAL: Always reset state when showing AI recommendations
+        debugPrint('🎯 Preparing to show AI-matched programs');
+
+        // Load AI data if not already loaded
+        if (aiViewModel.matchResponse == null) {
+          await aiViewModel.loadProgress();
+        }
+
+        // ✅ FIX: Always reset and reload AI matched programs
+        if (widget.aiMatchedProgramIds != null && widget.aiMatchedProgramIds!.isNotEmpty) {
+          debugPrint('🔄 Resetting ViewModel and loading ${widget.aiMatchedProgramIds!.length} AI-matched programs');
+
+          // Clear existing state first
+          viewModel.resetToAIMode();
+
+          // Set and load AI matched programs
+          viewModel.setAIMatchedPrograms(widget.aiMatchedProgramIds!);
+        } else {
+          debugPrint('⚠️ No AI matched program IDs available');
+        }
+      } else {
+        // Normal mode: Load programs with Malaysia + ranking sort
+        if (viewModel.programs.isEmpty && !viewModel.isLoading) {
+          await viewModel.loadPrograms();
+        }
       }
     });
   }
@@ -139,25 +182,26 @@ class _ProgramListScreenState extends State<ProgramListScreen> {
         _branchCache.containsKey(program.branchId)) {
       return;
     }
-
     _loadingDetails.add(program.programId);
+
+    final viewModel = context.read<ProgramListViewModel>();
 
     try {
       // Load university
       if (!_universityCache.containsKey(program.universityId)) {
-        final uni = await FirebaseService()
-            .getUniversity(program.universityId);
+        final uni = await viewModel.getUniversityForProgram(
+          program.universityId,
+        );
         if (uni != null) {
           _universityCache[program.universityId] = uni;
         }
       }
 
-      // Load branch
+      // Load branch (using the new VM method, NOT FirebaseService)
       if (!_branchCache.containsKey(program.branchId)) {
-        final branches = await FirebaseService()
-            .getBranchesByUniversity(program.universityId);
-        for (var branch in branches) {
-          _branchCache[branch.branchId] = branch;
+        final branch = await viewModel.getBranchForProgram(program.branchId);
+        if (branch != null) {
+          _branchCache[program.branchId] = branch;
         }
       }
 
@@ -192,13 +236,48 @@ class _ProgramListScreenState extends State<ProgramListScreen> {
           icon: const Icon(Icons.arrow_back),
           onPressed: () => Navigator.pop(context),
         ),
-        title: const Text(
-          'Programs',
-          style: TextStyle(
-            fontSize: 20,
-            fontWeight: FontWeight.bold,
-            color: AppColors.textPrimary,
-          ),
+        title: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text(
+              'Programs',
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+                color: AppColors.textPrimary,
+              ),
+            ),
+            if (widget.showOnlyRecommended) ...[
+              SizedBox(width: 8),
+              Container(
+                padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [
+                      AppColors.primary,
+                      AppColors.primary.withOpacity(0.7),
+                    ],
+                  ),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.auto_awesome, size: 20, color: Colors.white),
+                    SizedBox(width: 4),
+                    Text(
+                      'AI',
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ],
         ),
         actions: [
           if (kDebugMode)
@@ -206,6 +285,7 @@ class _ProgramListScreenState extends State<ProgramListScreen> {
               icon: const Icon(Icons.cleaning_services, color: Colors.orange),
               tooltip: 'Clear Cache',
               onPressed: () async {
+                // Show confirmation dialog
                 final confirmed = await showDialog<bool>(
                   context: context,
                   builder: (context) => AlertDialog(
@@ -229,46 +309,35 @@ class _ProgramListScreenState extends State<ProgramListScreen> {
                   ),
                 );
 
+                final viewModel = context.read<UniversityListViewModel>();
+
                 if (confirmed == true && mounted) {
                   ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Row(
-                        children: [
-                          SizedBox(
-                            width: 20,
-                            height: 20,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              color: Colors.white,
-                            ),
-                          ),
-                          SizedBox(width: 12),
-                          Text('Clearing cache...'),
-                        ],
-                      ),
-                      duration: Duration(seconds: 2),
-                    ),
+                    const SnackBar(content: Text('Clearing local database...')),
                   );
 
-                  ProgramFilterRepository.clearCache();
-                  ProgramRepository.clearCaches();
-                  FirebaseService.clearAllCaches();
-                  CurrencyUtils.clearCache();
+                  try {
+                    // Reset database and resync
+                    await AppInitializationService.instance.resetAppData();
+                    await viewModel.performInitialSync();
 
-                  final viewModel = context.read<ProgramListViewModel>();
-                  final filterVM = context.read<ProgramFilterViewModel>();
-
-                  await filterVM.loadFilterOptions();
-                  await viewModel.forceRefresh();
-
-                  if (mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('✅ Cache cleared successfully!'),
-                        backgroundColor: Colors.green,
-                        behavior: SnackBarBehavior.floating,
-                      ),
-                    );
+                    if (mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('✅ Cache cleared and resynced!'),
+                          backgroundColor: Colors.green,
+                        ),
+                      );
+                    }
+                  } catch (e) {
+                    if (mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text('❌ Error: $e'),
+                          backgroundColor: Colors.red,
+                        ),
+                      );
+                    }
                   }
                 }
               },
@@ -279,18 +348,26 @@ class _ProgramListScreenState extends State<ProgramListScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _buildSearchBar(),
+            if (!widget.showOnlyRecommended) ...[_buildSearchBar()],
             Expanded(
               child: Stack(
                 children: [
                   Positioned.fill(
                     child: Column(
                       children: [
-                        _buildFilterChips(),
+                        if (!widget.showOnlyRecommended) ...[
+                          _buildFilterChips(),
+                        ],
                         Expanded(child: _buildProgramList()),
                       ],
                     ),
                   ),
+                  Positioned(
+                    bottom: 16,
+                    right: 16,
+                    child: _buildCompareFAB(),
+                  ),
+
                   if (_showSuggestions) _buildSuggestions(),
                 ],
               ),
@@ -298,7 +375,131 @@ class _ProgramListScreenState extends State<ProgramListScreen> {
           ],
         ),
       ),
-      floatingActionButton: _buildCompareFAB(),
+    );
+  }
+
+  void _navigateToAIRationaleScreen() async {
+    final aiViewModel = context.read<AIMatchViewModel>();
+
+    // Load progress if not already loaded
+    if (aiViewModel.matchResponse == null) {
+      await aiViewModel.loadProgress();
+    }
+
+    // Safety check after loading
+    if (aiViewModel.matchResponse == null) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('AI match data not available'),
+            backgroundColor: Colors.orange,
+          ),
+        );
+      }
+      return;
+    }
+
+    if (!mounted) return;
+
+    // Navigate to full screen
+    await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => AIRationaleScreen(
+          viewModel: aiViewModel,
+          programCount: widget.aiMatchedProgramIds?.length ?? 0,
+        ),
+      ),
+    );
+  }
+
+  Widget _navigateAIScreen(ProgramListViewModel programVM) {
+    if (programVM.filter.hasActiveFilters) {
+      return const SizedBox.shrink();
+    }
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 5, 16, 5),
+      child: InkWell(
+        onTap: () async {
+          final aiViewModel = context.read<AIMatchViewModel>();
+
+          // ✅ CRITICAL FIX: Always reload from SharedPreferences to get latest data
+          debugPrint('🔄 Force reloading AI data from SharedPreferences...');
+          await aiViewModel.loadProgress(forceRefresh: true);
+
+          // Check if AI matches exist after loading
+          if (aiViewModel.hasAIMatches &&
+              aiViewModel.matchResponse != null &&
+              aiViewModel.matchedProgramIds != null &&
+              aiViewModel.matchedProgramIds!.isNotEmpty) {
+
+            debugPrint('✅ Loaded ${aiViewModel.matchedProgramIds!.length} matched programs');
+
+            await Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => ProgramListScreen(
+                  aiRecommendations:
+                  aiViewModel.matchResponse!.recommendedSubjectAreas,
+                  aiMatchedProgramIds: aiViewModel.matchedProgramIds,
+                  aiUserPreferences: aiViewModel.preferences,
+                  showOnlyRecommended: true,
+                ),
+              ),
+            );
+          } else {
+            // Open AI matching form
+            await Navigator.push(
+              context,
+              MaterialPageRoute(builder: (context) => const AIMatchScreen()),
+            );
+          }
+        },
+        borderRadius: BorderRadius.circular(12),
+        child: Container(
+          width: double.infinity,
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: [AppColors.primary, AppColors.primary.withOpacity(0.8)],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+            borderRadius: BorderRadius.circular(12),
+            boxShadow: [
+              BoxShadow(
+                color: AppColors.primary.withOpacity(0.3),
+                blurRadius: 8,
+                offset: const Offset(0, 2),
+              ),
+            ],
+          ),
+          child: Row(
+            children: [
+              const Icon(Icons.auto_awesome, color: Colors.white, size: 22),
+              const SizedBox(width: 12),
+              const Expanded(
+                child: Text(
+                  'AI Personalized Program Match',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                  ),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              const SizedBox(width: 8),
+              const Icon(
+                Icons.arrow_forward_ios,
+                color: Colors.white,
+                size: 16,
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 
@@ -395,15 +596,15 @@ class _ProgramListScreenState extends State<ProgramListScreen> {
                   ),
                   suffixIcon: _searchController.text.isNotEmpty
                       ? IconButton(
-                    icon: const Icon(Icons.clear, size: 20),
-                    onPressed: () {
-                      _searchController.clear();
-                      context.read<ProgramListViewModel>().clearSearch();
-                      setState(() {
-                        _showSuggestions = false;
-                      });
-                    },
-                  )
+                          icon: const Icon(Icons.clear, size: 20),
+                          onPressed: () {
+                            _searchController.clear();
+                            context.read<ProgramListViewModel>().clearSearch();
+                            setState(() {
+                              _showSuggestions = false;
+                            });
+                          },
+                        )
                       : null,
                   border: InputBorder.none,
                   contentPadding: const EdgeInsets.symmetric(vertical: 10),
@@ -587,7 +788,8 @@ class _ProgramListScreenState extends State<ProgramListScreen> {
   Widget _buildFilterChips() {
     return Consumer<ProgramListViewModel>(
       builder: (context, viewModel, _) {
-        final bool isSearchActive = viewModel.filter.searchQuery?.isNotEmpty ?? false;
+        final bool isSearchActive =
+            viewModel.filter.searchQuery?.isNotEmpty ?? false;
 
         if (!viewModel.filter.hasActiveFilters) {
           return const SizedBox.shrink();
@@ -596,133 +798,159 @@ class _ProgramListScreenState extends State<ProgramListScreen> {
         final List<Widget> filterChips = [];
 
         if (viewModel.filter.universityName != null) {
-          filterChips.add(_buildFilterChip(
-            'Uni: ${viewModel.filter.universityName!}',
-                () {
+          filterChips.add(
+            _buildFilterChip('Uni: ${viewModel.filter.universityName!}', () {
               viewModel.removeUniversityFilter();
               WidgetsBinding.instance.addPostFrameCallback((_) {
                 if (mounted) setState(() {});
               });
-            },
-          ));
+            }),
+          );
         }
 
         if (viewModel.filter.universityIds.isNotEmpty) {
-          filterChips.add(_buildFilterChip(
-            viewModel.filter.universityIds.length == 1
-                ? '1 university'
-                : '${viewModel.filter.universityIds.length} universities',
-                () {
-              viewModel.removeUniversityFilter();
-              WidgetsBinding.instance.addPostFrameCallback((_) {
-                if (mounted) setState(() {});
-              });
-            },
-          ));
+          filterChips.add(
+            _buildFilterChip(
+              viewModel.filter.universityIds.length == 1
+                  ? '1 university'
+                  : '${viewModel.filter.universityIds.length} universities',
+                  () {
+                viewModel.removeUniversityFilter();
+                WidgetsBinding.instance.addPostFrameCallback((_) {
+                  if (mounted) setState(() {});
+                });
+              },
+            ),
+          );
+        }
+
+        // Countries Filter
+        if (viewModel.filter.countries.isNotEmpty) {
+          filterChips.add(
+            _buildFilterChip(
+              viewModel.filter.countries.length == 1
+                  ? viewModel.filter.countries.first
+                  : '${viewModel.filter.countries.length} Countries',
+                  () {
+                viewModel.removeCountriesFilter();
+                WidgetsBinding.instance.addPostFrameCallback((_) {
+                  if (mounted) setState(() {});
+                });
+              },
+            ),
+          );
         }
 
         // Search filter
         if (isSearchActive) {
-          filterChips.add(_buildFilterChip(
-            viewModel.filter.searchQuery!,
-                () {
+          filterChips.add(
+            _buildFilterChip(viewModel.filter.searchQuery!, () {
               viewModel.removeSearchFilter();
               _searchController.clear();
               WidgetsBinding.instance.addPostFrameCallback((_) {
                 if (mounted) setState(() {});
               });
-            },
-          ));
+            }),
+          );
         }
 
         // Subject area filter
-        if (viewModel.filter.subjectArea != null) {
-          filterChips.add(_buildFilterChip(
-            viewModel.filter.subjectArea!,
-                () {
-              viewModel.removeSubjectAreaFilter();
-              WidgetsBinding.instance.addPostFrameCallback((_) {
-                if (mounted) setState(() {});
-              });
-            },
-          ));
+        if (viewModel.filter.subjectArea.isNotEmpty) {
+          filterChips.add(
+            _buildFilterChip(
+              viewModel.filter.subjectArea.length == 1
+                  ? viewModel.filter.subjectArea.first
+                  : '${viewModel.filter.subjectArea.length} Subject Area',
+                  () {
+                viewModel.removeSubjectAreaFilter();
+                WidgetsBinding.instance.addPostFrameCallback((_) {
+                  if (mounted) setState(() {});
+                });
+              },
+            ),
+          );
         }
 
         // Study modes filter
         if (viewModel.filter.studyModes.isNotEmpty) {
-          filterChips.add(_buildFilterChip(
-            viewModel.filter.studyModes.length == 1
-                ? viewModel.filter.studyModes.first
-                : '${viewModel.filter.studyModes.length} modes',
-                () {
-              viewModel.removeStudyModesFilter();
-              WidgetsBinding.instance.addPostFrameCallback((_) {
-                if (mounted) setState(() {});
-              });
-            },
-          ));
+          filterChips.add(
+            _buildFilterChip(
+              viewModel.filter.studyModes.length == 1
+                  ? viewModel.filter.studyModes.first
+                  : '${viewModel.filter.studyModes.length} Modes',
+                  () {
+                viewModel.removeStudyModesFilter();
+                WidgetsBinding.instance.addPostFrameCallback((_) {
+                  if (mounted) setState(() {});
+                });
+              },
+            ),
+          );
         }
 
         // Study levels filter
         if (viewModel.filter.studyLevels.isNotEmpty) {
-          filterChips.add(_buildFilterChip(
-            viewModel.filter.studyLevels.length == 1
-                ? viewModel.filter.studyLevels.first
-                : '${viewModel.filter.studyLevels.length} levels',
-                () {
-              viewModel.removeStudyLevelsFilter();
-              WidgetsBinding.instance.addPostFrameCallback((_) {
-                if (mounted) setState(() {});
-              });
-            },
-          ));
+          filterChips.add(
+            _buildFilterChip(
+              viewModel.filter.studyLevels.length == 1
+                  ? viewModel.filter.studyLevels.first
+                  : '${viewModel.filter.studyLevels.length} levels',
+                  () {
+                viewModel.removeStudyLevelsFilter();
+                WidgetsBinding.instance.addPostFrameCallback((_) {
+                  if (mounted) setState(() {});
+                });
+              },
+            ),
+          );
         }
 
         // Intake months filter
         if (viewModel.filter.intakeMonths.isNotEmpty) {
-          filterChips.add(_buildFilterChip(
-            viewModel.filter.intakeMonths.length == 1
-                ? viewModel.filter.intakeMonths.first
-                : '${viewModel.filter.intakeMonths.length} months',
-                () {
-              viewModel.removeIntakeMonthsFilter();
+          filterChips.add(
+            _buildFilterChip(
+              viewModel.filter.intakeMonths.length == 1
+                  ? viewModel.filter.intakeMonths.first
+                  : '${viewModel.filter.intakeMonths.length} months',
+                  () {
+                viewModel.removeIntakeMonthsFilter();
+                WidgetsBinding.instance.addPostFrameCallback((_) {
+                  if (mounted) setState(() {});
+                });
+              },
+            ),
+          );
+        }
+
+        // ✅ CHANGED: Top N filter (replaces min/max ranking)
+        if (viewModel.filter.topN != null) {
+          final topNLabel = viewModel.filter.countries.isNotEmpty
+              ? 'Top ${viewModel.filter.topN} in ${viewModel.filter.countries.join(", ")}'
+              : 'Top ${viewModel.filter.topN}';
+
+          filterChips.add(
+            _buildFilterChip(topNLabel, () {
+              viewModel.removeTopNFilter();
               WidgetsBinding.instance.addPostFrameCallback((_) {
                 if (mounted) setState(() {});
               });
-            },
-          ));
+            }),
+          );
         }
 
-        // Ranking range filter
-        if (viewModel.filter.minSubjectRanking != null ||
-            viewModel.filter.maxSubjectRanking != null) {
-          final minRank = viewModel.filter.minSubjectRanking?.toInt() ?? 1;
-          final maxRank = viewModel.filter.maxSubjectRanking?.toInt() ?? 500;
-          filterChips.add(_buildFilterChip(
-            'Rank #$minRank - #$maxRank',
-                () {
-              viewModel.removeRankingFilter();
-              WidgetsBinding.instance.addPostFrameCallback((_) {
-                if (mounted) setState(() {});
-              });
-            },
-          ));
-        }
-
-        // Ranking sort filter
+        // ✅ NEW: Ranking sort filter (independent)
         if (viewModel.filter.rankingSortOrder != null) {
           final sortLabel = viewModel.filter.rankingSortOrder == 'asc'
               ? 'Rank: ↑'
               : 'Rank: ↓';
-          filterChips.add(_buildFilterChip(
-            sortLabel,
-                () {
+          filterChips.add(
+            _buildFilterChip(sortLabel, () {
               viewModel.removeRankingSortFilter();
               WidgetsBinding.instance.addPostFrameCallback((_) {
                 if (mounted) setState(() {});
               });
-            },
-          ));
+            }),
+          );
         }
 
         // Duration filter
@@ -730,15 +958,17 @@ class _ProgramListScreenState extends State<ProgramListScreen> {
             viewModel.filter.maxDurationYears != null) {
           final minDuration = viewModel.filter.minDurationYears ?? 1.0;
           final maxDuration = viewModel.filter.maxDurationYears ?? 6.0;
-          filterChips.add(_buildFilterChip(
-            '${minDuration.toStringAsFixed(1)} - ${maxDuration.toStringAsFixed(1)} years',
-                () {
-              viewModel.removeDurationFilter();
-              WidgetsBinding.instance.addPostFrameCallback((_) {
-                if (mounted) setState(() {});
-              });
-            },
-          ));
+          filterChips.add(
+            _buildFilterChip(
+              '${minDuration.toStringAsFixed(1)} - ${maxDuration.toStringAsFixed(1)} years',
+                  () {
+                viewModel.removeDurationFilter();
+                WidgetsBinding.instance.addPostFrameCallback((_) {
+                  if (mounted) setState(() {});
+                });
+              },
+            ),
+          );
         }
 
         // Tuition filter
@@ -746,15 +976,17 @@ class _ProgramListScreenState extends State<ProgramListScreen> {
             viewModel.filter.maxTuitionFeeMYR != null) {
           final minFee = viewModel.filter.minTuitionFeeMYR ?? 0;
           final maxFee = viewModel.filter.maxTuitionFeeMYR ?? 500000;
-          filterChips.add(_buildFilterChip(
-            '${CurrencyUtils.formatMYR(minFee)} - ${CurrencyUtils.formatMYR(maxFee)}',
-                () {
-              viewModel.removeTuitionFilter();
-              WidgetsBinding.instance.addPostFrameCallback((_) {
-                if (mounted) setState(() {});
-              });
-            },
-          ));
+          filterChips.add(
+            _buildFilterChip(
+              '${CurrencyUtils.formatMYR(minFee)} - ${CurrencyUtils.formatMYR(maxFee)}',
+                  () {
+                viewModel.removeTuitionFilter();
+                WidgetsBinding.instance.addPostFrameCallback((_) {
+                  if (mounted) setState(() {});
+                });
+              },
+            ),
+          );
         }
 
         return Container(
@@ -828,28 +1060,57 @@ class _ProgramListScreenState extends State<ProgramListScreen> {
   Widget _buildCompareFAB() {
     return Consumer<ProgramListViewModel>(
       builder: (context, viewModel, _) {
-        if (viewModel.compareList.isEmpty) {
+        final compareCount = viewModel.compareCount;
+
+        if (compareCount == 0) {
           return const SizedBox.shrink();
         }
 
-        return FloatingActionButton(
-          onPressed: () {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('Navigate to Compare Screen (Placeholder)...'),
-                behavior: SnackBarBehavior.floating,
+        return FloatingActionButton.extended(
+          onPressed: () async {
+            // Fetch from repo to get ALL compared items
+            final comparisonItems = await _getComparisonItemsFromRepo(
+              viewModel,
+            );
+
+            await Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) =>
+                    ComparisonScreen(initialItems: comparisonItems, fromProgramList: true),
               ),
             );
+
+            if (mounted) {
+              await viewModel.loadComparisonState();
+              setState(() {});
+            }
           },
-          backgroundColor: AppColors.primary.withOpacity(0.7),
+          backgroundColor: AppColors.primary,
           elevation: 4.0,
-          child: Badge(
-            label: Text('${viewModel.compareList.length}'),
-            isLabelVisible: viewModel.compareList.isNotEmpty,
+          icon: Badge(
+            label: Text('$compareCount'),
             child: const Icon(Icons.compare_arrows, color: Colors.white),
+          ),
+          label: const Text(
+            'Compare',
+            style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
           ),
         );
       },
+    );
+  }
+
+  Future<List<ComparisonItem>> _getComparisonItemsFromRepo(
+    ProgramListViewModel viewModel,
+  ) async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return [];
+
+    final repo = ComparisonRepository.instance;
+    return await repo.getComparisonItems(
+      userId: user.uid,
+      type: ComparisonType.programs,
     );
   }
 
@@ -901,13 +1162,11 @@ class _ProgramListScreenState extends State<ProgramListScreen> {
   }
 
   Widget _buildProgramList() {
-    return Consumer<ProgramListViewModel>(
-      builder: (context, programVM, _) {
+    return Consumer2<ProgramListViewModel, ComparisonViewModel>(
+      builder: (context, programVM, compareVM, _) {
         // Initial Loading State
         if (programVM.programs.isEmpty && programVM.isLoading) {
-          return AppLoadingContent(
-            statusText: programVM.getLoadingStatus(),
-          );
+          return AppLoadingContent(statusText: programVM.getLoadingStatus());
         }
 
         // Empty State
@@ -963,63 +1222,194 @@ class _ProgramListScreenState extends State<ProgramListScreen> {
             controller: _scrollController,
             physics: const AlwaysScrollableScrollPhysics(),
             slivers: [
-              SliverToBoxAdapter(child: _buildResultCountInfo(programVM)),
-              SliverList(
-                delegate: SliverChildBuilderDelegate(
-                      (context, index) {
-                    final program = programVM.programs[index];
+              if (!widget.showOnlyRecommended) ...[
+                SliverToBoxAdapter(child: _navigateAIScreen(programVM)),
+                SliverToBoxAdapter(child: _buildResultCountInfo(programVM)),
+              ],
 
-                    // Load program details if not cached
-                    if (!_universityCache.containsKey(program.universityId) ||
-                        !_branchCache.containsKey(program.branchId)) {
-                      _loadProgramDetails(program);
-                    }
-
-                    final university = _universityCache[program.universityId];
-                    final branch = _branchCache[program.branchId];
-                    final isLoadingDetails = _loadingDetails.contains(program.programId);
-
-                    return ProgramCard(
-                      program: program,
-                      university: university,
-                      branch: branch,
-                      isLoadingDetails: isLoadingDetails,
-                      onTap: () => _navigateToDetails(program),
-                      onCompare: () {
-                        if (!programVM.canCompare &&
-                            !programVM.isInCompareList(program.programId)) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: const Text(
-                                'Maximum 3 programs can be compared at once',
-                                style: TextStyle(fontWeight: FontWeight.w500),
-                              ),
-                              backgroundColor: AppColors.accent,
-                              behavior: SnackBarBehavior.floating,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(10),
-                              ),
-                              action: SnackBarAction(
-                                label: 'Clear',
-                                textColor: Colors.white,
-                                onPressed: programVM.clearCompare,
+              if (widget.showOnlyRecommended) ...[
+                SliverToBoxAdapter(
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+                    child: Container(
+                      clipBehavior: Clip.antiAlias,
+                      decoration: BoxDecoration(
+                        color: AppColors.primary.withOpacity(0.90),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          // Use a lighter border for better contrast on the gradient
+                          color: AppColors.textWhite.withOpacity(0.5),
+                          // <-- CHANGED
+                          width: 1,
+                        ),
+                        boxShadow: [
+                          BoxShadow(
+                            color: AppColors.primary.withOpacity(0.15),
+                            blurRadius: 6,
+                            offset: const Offset(0, 2),
+                          ),
+                        ],
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          ListTile(
+                            leading: Icon(
+                              Icons.auto_awesome,
+                              color: AppColors.textWhite, // <-- CHANGED
+                              size: 28,
+                            ),
+                            title: Text(
+                              'AI-Matched Programs',
+                              style: TextStyle(
+                                fontSize: 17,
+                                fontWeight: FontWeight.bold,
+                                color: AppColors.textWhite, // <-- CHANGED
                               ),
                             ),
-                          );
-                        } else {
-                          programVM.toggleCompare(program);
-                        }
-                      },
-                      isInCompareList: programVM.isInCompareList(program.programId),
-                      canCompare: programVM.canCompare,
-                    );
-                  },
-                  childCount: programVM.programs.length,
+                            subtitle: Text(
+                              'Showing ${programVM.programs.length} programs matched to your profile',
+                              style: TextStyle(
+                                fontSize: 14,
+                                // Use white with slight transparency to maintain hierarchy
+                                color: AppColors.textWhite.withOpacity(
+                                  0.85,
+                                ), // <-- CHANGED
+                              ),
+                            ),
+                            dense: true,
+                            visualDensity: VisualDensity.compact,
+                          ),
+
+                          // --- Actions ---
+                          if (widget.showOnlyRecommended &&
+                              widget.aiRecommendations != null)
+                            Padding(
+                              padding: const EdgeInsets.fromLTRB(16, 0, 8, 4),
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.end,
+                                children: [
+                                  TextButton(
+                                    // Style the TextButton to use white
+                                    style: TextButton.styleFrom(
+                                      foregroundColor:
+                                          AppColors.textWhite, // <-- CHANGED
+                                    ),
+                                    child: const Text('VIEW RATIONALE'),
+                                    onPressed: () =>
+                                        _navigateToAIRationaleScreen(),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  OutlinedButton.icon(
+                                    icon: const Icon(
+                                      Icons.refresh_rounded,
+                                      size: 18,
+                                    ),
+                                    label: const Text('MATCH AGAIN'),
+                                    // Style the OutlinedButton to use white
+                                    style: OutlinedButton.styleFrom(
+                                      foregroundColor: AppColors.textWhite,
+                                      // <-- CHANGED
+                                      side: BorderSide(
+                                        color: AppColors.textWhite.withOpacity(
+                                          0.8,
+                                        ), // <-- CHANGED
+                                      ),
+                                    ),
+                                    onPressed: () async {
+                                      await Navigator.push(
+                                        context,
+                                        MaterialPageRoute(
+                                          builder: (context) =>
+                                              const AIMatchScreen(),
+                                        ),
+                                      );
+                                      if (mounted) {
+                                        final viewModel = context
+                                            .read<ProgramListViewModel>();
+                                        await viewModel.forceRefresh();
+                                      }
+                                    },
+                                  ),
+                                ],
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
+                  ),
                 ),
+              ],
+
+              SliverList(
+                delegate: SliverChildBuilderDelegate((context, index) {
+                  final program = programVM.programs[index];
+
+                  // Load program details if not cached
+                  if (!_universityCache.containsKey(program.universityId) ||
+                      !_branchCache.containsKey(program.branchId)) {
+                    _loadProgramDetails(program);
+                  }
+
+                  final university = _universityCache[program.universityId];
+                  final branch = _branchCache[program.branchId];
+                  final isLoadingDetails = _loadingDetails.contains(
+                    program.programId,
+                  );
+
+                  return ProgramCard(
+                    program: program,
+                    university: university,
+                    branch: branch,
+                    isLoadingDetails: isLoadingDetails,
+                    onTap: () => _navigateToDetails(program),
+                    onCompare: () async {
+                      // Check if limit is reached AND item is not already added
+                      if (!programVM.canCompare &&
+                          !programVM.isInCompareList(program.programId)) {
+
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: const Text(
+                              'Maximum 3 programs can be compared at once',
+                              style: TextStyle(fontWeight: FontWeight.w500),
+                            ),
+                            backgroundColor: AppColors.accent,
+                            behavior: SnackBarBehavior.floating,
+                            margin: const EdgeInsets.all(16),
+
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            action: SnackBarAction(
+                              label: 'View',
+                              textColor: Colors.white,
+                              onPressed: () {
+                                final comparisonItems = programVM.getComparisonItems();
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (context) => ComparisonScreen(
+                                      initialItems: comparisonItems,
+                                    ),
+                                  ),
+                                );
+                              },
+                            ),
+                          ),
+                        );
+                      } else {
+                        await programVM.toggleCompare(program);
+                      }
+                    },
+                    isInCompareList: programVM.isInCompareList(
+                      program.programId,
+                    ),
+                    canCompare: programVM.canCompare,
+                  );
+                }, childCount: programVM.programs.length),
               ),
-              SliverToBoxAdapter(
-                child: _buildLoaderOrEndIndicator(programVM),
-              ),
+              SliverToBoxAdapter(child: _buildLoaderOrEndIndicator(programVM)),
             ],
           ),
         );
@@ -1031,9 +1421,7 @@ class _ProgramListScreenState extends State<ProgramListScreen> {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => ProgramDetailScreen(
-          programId: program.programId,
-        ),
+        builder: (context) => ProgramDetailScreen(programId: program.programId),
       ),
     );
   }

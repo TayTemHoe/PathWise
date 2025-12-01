@@ -4,6 +4,8 @@ import '../model/program_filter.dart';
 import '../utils/app_color.dart';
 import '../utils/currency_utils.dart';
 import '../viewModel/program_filter_view_model.dart';
+import 'form_components.dart';
+import 'multi_select_dropdown.dart';
 
 class ProgramFilterBottomSheet extends StatefulWidget {
   final ProgramFilterModel initialFilter;
@@ -23,8 +25,7 @@ class ProgramFilterBottomSheet extends StatefulWidget {
 
 class _ProgramFilterBottomSheetState extends State<ProgramFilterBottomSheet> {
   // Text Controllers
-  final TextEditingController _minRankingController = TextEditingController();
-  final TextEditingController _maxRankingController = TextEditingController();
+  final TextEditingController _topNController = TextEditingController();
   final TextEditingController _minDurationController = TextEditingController();
   final TextEditingController _maxDurationController = TextEditingController();
   final TextEditingController _minTuitionController = TextEditingController();
@@ -32,15 +33,16 @@ class _ProgramFilterBottomSheetState extends State<ProgramFilterBottomSheet> {
   final TextEditingController _universitySearchController = TextEditingController();
 
   String? _rankingSortOrder;
-  String? _selectedSubjectArea;
+  List<String> _selectedSubjectArea = [];
   List<String> _selectedStudyModes = [];
   List<String> _selectedStudyLevels = [];
   List<String> _selectedIntakeMonths = [];
   List<String> _selectedUniversityIds = [];
+  List<String> _selectedCountries = [];
   List<Map<String, String>> _filteredUniversities = [];
 
   // Validation error messages
-  String? _rankingError;
+  String? _topNError;
   String? _durationError;
   String? _tuitionError;
 
@@ -61,11 +63,8 @@ class _ProgramFilterBottomSheetState extends State<ProgramFilterBottomSheet> {
     if (_isDisposed) return;
 
     // Initialize ranking fields
-    if (widget.initialFilter.minSubjectRanking != null) {
-      _minRankingController.text = widget.initialFilter.minSubjectRanking!.toString();
-    }
-    if (widget.initialFilter.maxSubjectRanking != null) {
-      _maxRankingController.text = widget.initialFilter.maxSubjectRanking!.toString();
+    if (widget.initialFilter.topN != null) {
+      _topNController.text = widget.initialFilter.topN!.toString();
     }
     _rankingSortOrder = widget.initialFilter.rankingSortOrder;
 
@@ -86,11 +85,11 @@ class _ProgramFilterBottomSheetState extends State<ProgramFilterBottomSheet> {
     }
 
     // Initialize selections
-    _selectedSubjectArea = widget.initialFilter.subjectArea;
+    _selectedSubjectArea = List.from(widget.initialFilter.subjectArea);
     _selectedStudyModes = List.from(widget.initialFilter.studyModes);
     _selectedStudyLevels = List.from(widget.initialFilter.studyLevels);
     _selectedIntakeMonths = List.from(widget.initialFilter.intakeMonths);
-
+    _selectedCountries = List.from(widget.initialFilter.countries);
     _selectedUniversityIds = List.from(widget.initialFilter.universityIds);
     if (widget.initialFilter.universityName != null) {
       _universitySearchController.text = widget.initialFilter.universityName!;
@@ -105,27 +104,23 @@ class _ProgramFilterBottomSheetState extends State<ProgramFilterBottomSheet> {
     bool isValid = true;
 
     // Validate ranking
-    if (_minRankingController.text.isNotEmpty || _maxRankingController.text.isNotEmpty) {
-      final minRank = int.tryParse(_minRankingController.text);
-      final maxRank = int.tryParse(_maxRankingController.text);
+    if (_topNController.text.isNotEmpty) {
+      final topN = int.tryParse(_topNController.text);
 
-      if (_minRankingController.text.isNotEmpty && minRank == null) {
-        setState(() => _rankingError = 'Invalid minimum ranking');
+      if (topN == null) {
+        setState(() => _topNError = 'Invalid number');
         isValid = false;
-      } else if (_maxRankingController.text.isNotEmpty && maxRank == null) {
-        setState(() => _rankingError = 'Invalid maximum ranking');
+      } else if (topN < 1) {
+        setState(() => _topNError = 'Must be at least 1');
         isValid = false;
-      } else if (minRank != null && maxRank != null && minRank > maxRank) {
-        setState(() => _rankingError = 'Min ranking cannot exceed max ranking');
-        isValid = false;
-      } else if (minRank != null && minRank < 1) {
-        setState(() => _rankingError = 'Ranking must be at least 1');
+      } else if (topN > 500) {
+        setState(() => _topNError = 'Cannot exceed 500');
         isValid = false;
       } else {
-        setState(() => _rankingError = null);
+        setState(() => _topNError = null);
       }
     } else {
-      setState(() => _rankingError = null);
+      setState(() => _topNError = null);
     }
 
     // Validate duration
@@ -194,8 +189,7 @@ class _ProgramFilterBottomSheetState extends State<ProgramFilterBottomSheet> {
   @override
   void dispose() {
     _isDisposed = true;
-    _minRankingController.dispose();
-    _maxRankingController.dispose();
+    _topNController.dispose();
     _minDurationController.dispose();
     _maxDurationController.dispose();
     _minTuitionController.dispose();
@@ -236,21 +230,23 @@ class _ProgramFilterBottomSheetState extends State<ProgramFilterBottomSheet> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  _buildUniversityFilter(filterVM), // ADD THIS LINE
+                  _buildUniversityFilter(filterVM),
                   const SizedBox(height: 24),
-                  _buildSubjectRankingFilter(filterVM),
+                  _buildCountryFilter(filterVM), // ✅ Move this BEFORE Top N
+                  const SizedBox(height: 24),
+                  _buildTopNFilter(filterVM), // ✅ NEW: Replaces _buildSubjectRankingFilter
                   const SizedBox(height: 24),
                   _buildSubjectAreaFilter(filterVM),
+                  const SizedBox(height: 24),
+                  _buildDurationFilter(filterVM),
+                  const SizedBox(height: 24),
+                  _buildTuitionFilter(filterVM),
                   const SizedBox(height: 24),
                   _buildStudyModeFilter(filterVM),
                   const SizedBox(height: 24),
                   _buildStudyLevelFilter(filterVM),
                   const SizedBox(height: 24),
-                  _buildDurationFilter(filterVM),
-                  const SizedBox(height: 24),
                   _buildIntakeMonthFilter(filterVM),
-                  const SizedBox(height: 24),
-                  _buildTuitionFilter(filterVM),
                   const SizedBox(height: 24),
                 ],
               ),
@@ -410,7 +406,7 @@ class _ProgramFilterBottomSheetState extends State<ProgramFilterBottomSheet> {
             Wrap(
               spacing: 8,
               runSpacing: 8,
-              children: _selectedUniversityIds.map((id) {
+              children: (_selectedUniversityIds).map((id) {
                 final uni = filterVM.availableUniversities.firstWhere(
                       (u) => u['id'] == id,
                   orElse: () => {'id': id, 'name': 'Unknown'},
@@ -431,11 +427,31 @@ class _ProgramFilterBottomSheetState extends State<ProgramFilterBottomSheet> {
     );
   }
 
-  Widget _buildSubjectRankingFilter(ProgramFilterViewModel filterVM) {
+  Widget _buildCountryFilter(ProgramFilterViewModel filterVM) {
     return _buildFilterSection(
-      title: 'Subject Ranking',
+      title: 'Country/Location',
+      icon: Icons.public,
+      child: MultiSelectField(
+        icon: Icons.public,
+        items: filterVM.availableCountries,
+        selectedItems: _selectedCountries,
+        hint: 'Select one or more countries',
+        isSearchable: true, // Enable search for countries
+        onChanged: (selected) {
+          setState(() {
+            _selectedCountries.clear();
+            _selectedCountries.addAll(selected);
+          });
+        },
+      ),
+    );
+  }
+
+  Widget _buildTopNFilter(ProgramFilterViewModel filterVM) {
+    return _buildFilterSection(
+      title: 'Top Programs by Subject Ranking',
       icon: Icons.emoji_events,
-      error: _rankingError,
+      error: _topNError,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -445,7 +461,10 @@ class _ProgramFilterBottomSheetState extends State<ProgramFilterBottomSheet> {
               const SizedBox(width: 6),
               Expanded(
                 child: Text(
-                  'Filter by subject ranking range, or sort by rank',
+                  widget.filterViewModel.availableCountries.isNotEmpty &&
+                      _selectedCountries.isNotEmpty
+                      ? 'View top ranked programs in ${_selectedCountries.join(", ")}'
+                      : 'View top ranked programs globally',
                   style: TextStyle(
                     fontSize: 12,
                     color: Colors.grey[600],
@@ -456,38 +475,14 @@ class _ProgramFilterBottomSheetState extends State<ProgramFilterBottomSheet> {
             ],
           ),
           const SizedBox(height: 12),
-          Text(
-            'Ranking Range (Optional)',
-            style: TextStyle(
-              fontSize: 13,
-              fontWeight: FontWeight.w600,
-              color: Colors.grey[700],
-            ),
-          ),
-          const SizedBox(height: 8),
-          Row(
-            children: [
-              Expanded(
-                child: _buildNumberTextField(
-                  controller: _minRankingController,
-                  label: 'Min Ranking',
-                  hint: '1',
-                  onChanged: (_) => _validateInputs(),
-                ),
-              ),
-              const Padding(
-                padding: EdgeInsets.only(top: 10, left: 12, right: 12),
-                child: Text('to', style: TextStyle(fontSize: 15)),
-              ),
-              Expanded(
-                child: _buildNumberTextField(
-                  controller: _maxRankingController,
-                  label: 'Max Ranking',
-                  hint: '500',
-                  onChanged: (_) => _validateInputs(),
-                ),
-              ),
-            ],
+          NumberStepperField(
+            controller: _topNController,
+            label: 'Top N Programs',
+            hint: 'Enter a number (e.g., 50)',
+            min: 1,
+            max: 500,
+            step: 1,
+            onChanged: (_) => _validateInputs(),
           ),
           const SizedBox(height: 16),
           const Text(
@@ -502,14 +497,51 @@ class _ProgramFilterBottomSheetState extends State<ProgramFilterBottomSheet> {
           Row(
             children: [
               Expanded(
-                child: _buildSortOption('Ascending', 'asc', Icons.arrow_upward),
+                child: _buildSortOption(
+                  'Best First',
+                  'asc',
+                  Icons.arrow_upward,
+                ),
               ),
               const SizedBox(width: 12),
               Expanded(
-                child: _buildSortOption('Descending', 'desc', Icons.arrow_downward),
+                child: _buildSortOption(
+                  'Worst First',
+                  'desc',
+                  Icons.arrow_downward,
+                ),
               ),
             ],
           ),
+          if (_topNController.text.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: AppColors.primary.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: AppColors.primary.withOpacity(0.3)),
+              ),
+              child: Row(
+                children: [
+                  Icon(Icons.info, size: 16, color: AppColors.primary),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      _selectedCountries.isNotEmpty
+                          ? 'Showing top ${_topNController.text} programs in ${_selectedCountries.join(", ")}'
+                          : 'Showing top ${_topNController.text} programs globally',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: AppColors.primary,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
         ],
       ),
     );
@@ -519,17 +551,17 @@ class _ProgramFilterBottomSheetState extends State<ProgramFilterBottomSheet> {
     return _buildFilterSection(
       title: 'Subject Area',
       icon: Icons.book,
-      child: _buildDropdown(
-        label: 'Subject Area',
-        value: _selectedSubjectArea,
+      child: MultiSelectField(
+        icon: Icons.book,
         items: filterVM.availableSubjectAreas,
-        onChanged: (value) {
-          if (_isDisposed) return;
+        selectedItems: _selectedSubjectArea,
+        hint: 'Select one or more Subject Area',
+        onChanged: (selected) {
           setState(() {
-            _selectedSubjectArea = value;
+            _selectedSubjectArea.clear();
+            _selectedSubjectArea.addAll(selected);
           });
         },
-        hint: 'Select Subject Area',
       ),
     );
   }
@@ -541,7 +573,7 @@ class _ProgramFilterBottomSheetState extends State<ProgramFilterBottomSheet> {
       child: Wrap(
         spacing: 8,
         runSpacing: 8,
-        children: filterVM.availableStudyModes.map((mode) {
+        children: (filterVM.availableStudyModes ?? []).map((mode) {
           final isSelected = _selectedStudyModes.contains(mode);
           return _buildChipOption(mode, isSelected, () {
             if (_isDisposed) return;
@@ -565,7 +597,7 @@ class _ProgramFilterBottomSheetState extends State<ProgramFilterBottomSheet> {
       child: Wrap(
         spacing: 8,
         runSpacing: 8,
-        children: filterVM.availableStudyLevels.map((level) {
+        children: (filterVM.availableStudyLevels ?? []).map((level) {
           final isSelected = _selectedStudyLevels.contains(level);
           return _buildChipOption(level, isSelected, () {
             if (_isDisposed) return;
@@ -636,7 +668,7 @@ class _ProgramFilterBottomSheetState extends State<ProgramFilterBottomSheet> {
       child: Wrap(
         spacing: 8,
         runSpacing: 8,
-        children: filterVM.availableIntakeMonths.map((month) {
+        children: (filterVM.availableIntakeMonths ?? []).map((month) {
           final isSelected = _selectedIntakeMonths.contains(month);
           return _buildChipOption(month, isSelected, () {
             if (_isDisposed) return;
@@ -813,13 +845,14 @@ class _ProgramFilterBottomSheetState extends State<ProgramFilterBottomSheet> {
     );
   }
 
-  Widget _buildDropdown({
+  Widget _buildDropdown<T>({
     required String label,
-    required String? value,
     required List<String> items,
-    required Function(String?) onChanged,
     required String hint,
     bool enabled = true,
+    bool isMultiSelect = false,
+    T? value, // supports String? or List<String>
+    required ValueChanged<T> onChanged, // ✅ strong typed callback
   }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -834,15 +867,45 @@ class _ProgramFilterBottomSheetState extends State<ProgramFilterBottomSheet> {
         ),
         const SizedBox(height: 8),
         Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
           decoration: BoxDecoration(
             color: enabled ? Colors.white : Colors.grey[100],
             borderRadius: BorderRadius.circular(8),
             border: Border.all(color: Colors.grey[300]!),
           ),
-          child: DropdownButtonHideUnderline(
+          child: isMultiSelect
+              ? Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: items.map((item) {
+              final selectedValues = value as List<String>? ?? [];
+              final isSelected = selectedValues.contains(item);
+
+              // --- START OF CHANGE ---
+              // Replaced FilterChip with _buildChipOption for consistency
+              return _buildChipOption(
+                item,
+                isSelected,
+                enabled
+                    ? () {
+                  if (_isDisposed) return;
+                  final updated = List<String>.from(selectedValues);
+                  if (isSelected) {
+                    updated.remove(item);
+                  } else {
+                    updated.add(item);
+                  }
+                  onChanged(updated as T);
+                }
+                    : () {}, // Pass empty function if disabled
+              );
+              // --- END OF CHANGE ---
+
+            }).toList(),
+          )
+              : DropdownButtonHideUnderline(
             child: DropdownButton<String>(
-              value: value,
+              value: value as String?,
               isExpanded: true,
               hint: Text(hint),
               items: items.map((item) {
@@ -851,7 +914,7 @@ class _ProgramFilterBottomSheetState extends State<ProgramFilterBottomSheet> {
                   child: Text(item),
                 );
               }).toList(),
-              onChanged: enabled ? onChanged : null,
+              onChanged: enabled ? (val) => onChanged(val as T) : null,
             ),
           ),
         ),
@@ -1004,12 +1067,12 @@ class _ProgramFilterBottomSheetState extends State<ProgramFilterBottomSheet> {
     if (_isDisposed) return;
 
     setState(() {
-      _minRankingController.clear();
-      _maxRankingController.clear();
+      _topNController.clear();
+      _selectedCountries.clear();
       _rankingSortOrder = null;
       _minDurationController.clear();
       _maxDurationController.clear();
-      _selectedSubjectArea = null;
+      _selectedSubjectArea.clear();
       _selectedStudyModes.clear();
       _selectedStudyLevels.clear();
       _selectedIntakeMonths.clear();
@@ -1019,7 +1082,7 @@ class _ProgramFilterBottomSheetState extends State<ProgramFilterBottomSheet> {
       _selectedUniversityIds.clear();
       _filteredUniversities.clear();
       _showUniversityDropdown = false;
-      _rankingError = null;
+      _topNError = null;
       _durationError = null;
       _tuitionError = null;
     });
@@ -1037,11 +1100,8 @@ class _ProgramFilterBottomSheetState extends State<ProgramFilterBottomSheet> {
           ? _universitySearchController.text
           : null,
       universityIds: _selectedUniversityIds,
-      minSubjectRanking: _minRankingController.text.isNotEmpty
-          ? int.tryParse(_minRankingController.text)
-          : null,
-      maxSubjectRanking: _maxRankingController.text.isNotEmpty
-          ? int.tryParse(_maxRankingController.text)
+      topN: _topNController.text.isNotEmpty
+          ? int.tryParse(_topNController.text)
           : null,
       rankingSortOrder: _rankingSortOrder,
       minDurationYears: _minDurationController.text.isNotEmpty
@@ -1060,6 +1120,7 @@ class _ProgramFilterBottomSheetState extends State<ProgramFilterBottomSheet> {
       maxTuitionFeeMYR: _maxTuitionController.text.isNotEmpty
           ? double.tryParse(_maxTuitionController.text)
           : null,
+      countries: _selectedCountries,
     );
 
     widget.onApply(filter);

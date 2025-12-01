@@ -1,6 +1,7 @@
+// lib/viewModel/filter_view_model_v2.dart
 import 'package:flutter/material.dart';
 import '../model/university_filter.dart';
-import '../repository/university_filter_repository.dart';
+import '../repository/filter_repository.dart';
 import '../utils/currency_utils.dart';
 
 class FilterViewModel extends ChangeNotifier {
@@ -13,11 +14,11 @@ class FilterViewModel extends ChangeNotifier {
 
   // Ranges
   int _minStudentsRange = 0;
-  int _maxStudentsRange = 1282000;
+  int _maxStudentsRange = 100000;
   double _minTuitionRange = 0;
-  double _maxTuitionRange = 2100000;
+  double _maxTuitionRange = 500000;
   int _minRankingRange = 1;
-  int _maxRankingRange = 1400;
+  int _maxRankingRange = 2000;
 
   // Loading states
   bool _isLoadingOptions = false;
@@ -49,22 +50,14 @@ class FilterViewModel extends ChangeNotifier {
   String? get errorMessage => _errorMessage;
   bool get currencyRatesLoaded => _currencyRatesLoaded;
 
-  /// Initialize currency rates in background
-  Future<void> _initializeCurrencyRates() async {
-    try {
-      await CurrencyUtils.fetchExchangeRates();
-      _currencyRatesLoaded = true;
-      debugPrint('✅ Currency rates initialized');
-    } catch (e) {
-      debugPrint('⚠️ Currency rates initialization failed: $e');
-      // Will use fallback rates
-      _currencyRatesLoaded = false;
-    }
+  /// Initialize and load filter options
+  Future<void> initialize() async {
+    await loadFilterOptions();
+    await _repository.warmUpCache(); // Preload all metadata
   }
 
+  /// Load filter options
   Future<void> loadFilterOptions() async {
-    if (_isLoadingOptions) return;
-
     _isLoadingOptions = true;
     _isLoadingRanges = true;
     _hasError = false;
@@ -72,32 +65,42 @@ class FilterViewModel extends ChangeNotifier {
     notifyListeners();
 
     try {
-      debugPrint('🔄 Loading filter options...');
+      debugPrint('🔄 Loading university filter options...');
 
       // Ensure currency rates are loaded first
       if (!_currencyRatesLoaded) {
-        await CurrencyUtils.fetchExchangeRates();
-        _currencyRatesLoaded = true;
+        try {
+          await CurrencyUtils.fetchExchangeRates();
+          _currencyRatesLoaded = true;
+        } catch (e) {
+          debugPrint('⚠️ Currency rates unavailable: $e');
+        }
       }
 
       // Load all metadata at once
-      final metadata = await _repository.loadAllFilterMetadata();
+      final metadata = await _repository.loadUniversityFilterMetadata();
 
       // Extract all data
-      _availableCountries = metadata['countries'] as List<String>;
-      _institutionTypes = metadata['institutionTypes'] as List<String>;
+      _availableCountries = metadata['countries'] as List<String>? ?? [];
+      _institutionTypes = metadata['institutionTypes'] as List<String>? ?? [];
 
-      final studentRange = metadata['studentRange'] as (int, int);
-      _minStudentsRange = studentRange.$1;
-      _maxStudentsRange = studentRange.$2;
+      final studentRange = metadata['studentRange'] as (int, int)?;
+      if (studentRange != null) {
+        _minStudentsRange = studentRange.$1;
+        _maxStudentsRange = studentRange.$2;
+      }
 
-      final tuitionRange = metadata['tuitionRange'] as (double, double);
-      _minTuitionRange = tuitionRange.$1;
-      _maxTuitionRange = tuitionRange.$2;
+      final tuitionRange = metadata['tuitionRange'] as (double, double)?;
+      if (tuitionRange != null) {
+        _minTuitionRange = tuitionRange.$1;
+        _maxTuitionRange = tuitionRange.$2;
+      }
 
-      final rankingRange = metadata['rankingRange'] as (int, int);
-      _minRankingRange = rankingRange.$1;
-      _maxRankingRange = rankingRange.$2;
+      final rankingRange = metadata['rankingRange'] as (int, int)?;
+      if (rankingRange != null) {
+        _minRankingRange = rankingRange.$1;
+        _maxRankingRange = rankingRange.$2;
+      }
 
       debugPrint('✅ Filter options loaded successfully');
       debugPrint('   - ${_availableCountries.length} countries');
@@ -146,12 +149,24 @@ class FilterViewModel extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Search universities (for autocomplete)
+  Future<List<String>> searchUniversities(String query) async {
+    if (query.isEmpty) return [];
+
+    try {
+      return await _repository.searchUniversities(query, limit: 5);
+    } catch (e) {
+      debugPrint('❌ Error searching universities: $e');
+      return [];
+    }
+  }
+
   /// Refresh all filter data
   Future<void> refreshFilterData() async {
     debugPrint('🔄 Refreshing all filter data...');
 
-    // Clear cache
-    FilterRepository.clearCache();
+    // Clear caches
+    _repository.clearCache();
     CurrencyUtils.clearCache();
 
     // Reload everything
@@ -262,6 +277,11 @@ class FilterViewModel extends ChangeNotifier {
     } catch (e) {
       debugPrint('❌ Error refreshing currency rates: $e');
     }
+  }
+
+  /// Get cache statistics
+  Map<String, dynamic> getCacheStats() {
+    return _repository.getCacheStats();
   }
 
   @override

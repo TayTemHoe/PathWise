@@ -1,54 +1,82 @@
 // lib/main.dart
 import 'dart:async';
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
-import 'package:path_wise/services/firebase_service.dart';
-import 'package:path_wise/utils/currency_utils.dart';
+import 'package:path_wise/repository/ai_match_repository.dart';
+import 'package:path_wise/services/shared_preference_services.dart';
+import 'package:path_wise/view/comparison_screen.dart';
+import 'package:path_wise/viewModel/ai_match_view_model.dart';
+import 'package:path_wise/viewModel/comparison_view_model.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:path_wise/services/app_initialization_service.dart';
 import 'package:path_wise/utils/shared_preferences_helper.dart';
 import 'package:path_wise/view/auth_screen.dart';
 import 'package:path_wise/view/program_list_screen.dart';
 import 'package:path_wise/view/university_list_screen.dart';
 import 'package:path_wise/viewModel/auth_view_model.dart';
 import 'package:path_wise/viewModel/branch_view_model.dart';
-import 'package:path_wise/viewModel/filter_view_model.dart';
+import 'package:path_wise/viewModel/university_filter_view_model.dart';
 import 'package:path_wise/viewModel/notification_view_model.dart';
-import 'package:path_wise/viewModel/program_detail_view_model.dart';
 import 'package:path_wise/viewModel/program_filter_view_model.dart';
 import 'package:path_wise/viewModel/program_list_view_model.dart';
-import 'package:path_wise/viewModel/university_detail_view_model.dart';
-import 'package:path_wise/viewModel/university_list_view_model.dart';
 import 'package:path_wise/widgets/app_loading_screen.dart';
-import 'package:path_wise/widgets/firebase_request_monitor.dart';
 import 'package:provider/provider.dart';
 import 'package:timezone/data/latest.dart' as tz;
+import 'package:path_wise/viewModel/university_detail_view_model.dart';
+import 'package:path_wise/viewModel/university_list_view_model.dart';
+import 'package:path_wise/viewModel/program_detail_view_model.dart';
+
+import 'config/supabase_config.dart';
 import 'firebase_options.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   try {
+    debugPrint('🚀 Starting PathWise initialization...');
+
     // Initialize timezone
     tz.initializeTimeZones();
 
-    // Initialize Firebase
     await Firebase.initializeApp(
       options: DefaultFirebaseOptions.currentPlatform,
     );
-    debugPrint('✅ Firebase initialized');
+    debugPrint('âœ… Firebase initialized');
 
-    // Enable Firestore offline persistence
-    await _enableFirestoreOffline();
+    // Initialize Supabase
+    await Supabase.initialize(
+      url: SupabaseConfig.supabaseUrl,
+      anonKey: SupabaseConfig.supabaseAnonKey,
+      debug: true, // Set to false in production
+    );
+    debugPrint('✅ Supabase initialized');
 
     // Initialize SharedPreferences
     await SharedPreferencesHelper.init();
     debugPrint('✅ SharedPreferences initialized');
 
-    // Pre-load currency rates (non-blocking)
-    _initializeCurrencyRates();
+    await SharedPreferenceService.instance.initialize();
+    debugPrint('✅ AI Match Storage initialized');
 
-    // Pre-warm Firestore cache (non-blocking)
-    _prewarmFirestoreCache();
+    // Initialize three-layer architecture (SQLite + Sync)
+    await AppInitializationService.instance.initialize(
+      onProgress: (message, progress) {
+        debugPrint('📊 Init Progress: $message (${(progress * 100).toStringAsFixed(0)}%)');
+      },
+    );
+    debugPrint('✅ Three-layer architecture initialized');
+
+    // Schedule periodic sync (every 6 hours)
+    AppInitializationService.instance.schedulePeriodicSync();
+    debugPrint('✅ Periodic sync scheduled');
+
+    final repo = AIMatchRepository.instance;
+    final isConnected = await repo.testGeminiConnection();
+
+    if (!isConnected) {
+      print('⚠️ Gemini API connection failed');
+      print('Please check your API key and model configuration');
+    }
   } catch (e) {
     debugPrint('❌ Initialization error: $e');
   }
@@ -56,8 +84,11 @@ Future<void> main() async {
   runApp(
     MultiProvider(
       providers: [
+        // Auth & Notifications (unchanged)
         ChangeNotifierProvider(create: (_) => AuthViewModel()),
         ChangeNotifierProvider(create: (_) => NotificationViewModel()),
+
+        // V2 ViewModels (NEW - Three-layer architecture)
         ChangeNotifierProvider(create: (_) => UniversityListViewModel()),
         ChangeNotifierProvider(create: (_) => UniversityDetailViewModel()),
         ChangeNotifierProvider(create: (_) => BranchViewModel()),
@@ -65,62 +96,12 @@ Future<void> main() async {
         ChangeNotifierProvider(create: (_) => ProgramListViewModel()),
         ChangeNotifierProvider(create: (_) => ProgramFilterViewModel()),
         ChangeNotifierProvider(create: (_) => ProgramDetailViewModel()),
+        ChangeNotifierProvider(create: (_) => ComparisonViewModel()),
+        ChangeNotifierProvider(create: (_) => AIMatchViewModel()),
       ],
       child: const PathWiseApp(),
     ),
   );
-}
-
-/// Enable Firestore offline persistence for better caching
-Future<void> _enableFirestoreOffline() async {
-  try {
-    // Enable offline persistence with large cache size
-    FirebaseFirestore.instance.settings = const Settings(
-      persistenceEnabled: true,
-      cacheSizeBytes: Settings.CACHE_SIZE_UNLIMITED,
-    );
-    debugPrint('✅ Firestore offline persistence enabled');
-  } catch (e) {
-    debugPrint('⚠️ Could not enable offline persistence: $e');
-  }
-}
-
-/// Initialize currency rates in background
-void _initializeCurrencyRates() {
-  Future.microtask(() async {
-    try {
-      await CurrencyUtils.fetchExchangeRates();
-      debugPrint('✅ Currency rates loaded');
-    } catch (e) {
-      debugPrint('⚠️ Currency rates failed, using fallback: $e');
-    }
-  });
-}
-
-/// Pre-warm Firestore cache by loading critical data
-void _prewarmFirestoreCache() {
-  Future.microtask(() async {
-    try {
-      debugPrint('🔥 Pre-warming Firestore cache...');
-
-      // Pre-load Malaysian branches (most common query)
-      await FirebaseFirestore.instance
-          .collection('branches')
-          .where('country', isEqualTo: 'Malaysia')
-          .get(const GetOptions(source: Source.server));
-
-      // Pre-load top 20 universities for immediate display
-      await FirebaseFirestore.instance
-          .collection('universities')
-          .orderBy('university_id')
-          .limit(20)
-          .get(const GetOptions(source: Source.server));
-
-      debugPrint('✅ Firestore cache pre-warmed');
-    } catch (e) {
-      debugPrint('⚠️ Cache pre-warming failed: $e');
-    }
-  });
 }
 
 class PathWiseApp extends StatefulWidget {
@@ -155,15 +136,11 @@ class _PathWiseAppState extends State<PathWiseApp> with WidgetsBindingObserver {
 
       case AppLifecycleState.paused:
         debugPrint('⏸️ App paused');
-        // Log Firebase usage before pausing
-        final requestCount = FirebaseService.getRequestCount();
-        debugPrint('📊 Firebase requests this session: $requestCount');
+        _logSyncStatus();
         break;
 
       case AppLifecycleState.detached:
         debugPrint('🛑 App detached');
-        // Clear caches to free memory
-        FirebaseService.clearAllCaches();
         break;
 
       default:
@@ -174,13 +151,26 @@ class _PathWiseAppState extends State<PathWiseApp> with WidgetsBindingObserver {
   void _checkAndRefreshData() {
     Future.microtask(() async {
       try {
-        // Only refresh if cache is stale (12+ hours)
-        if (!CurrencyUtils.hasValidCache) {
-          await CurrencyUtils.refreshRates();
-          debugPrint('🔄 Currency rates refreshed');
+        // Perform incremental sync when app resumes
+        final initService = AppInitializationService.instance;
+        if (initService.hasInternet) {
+          debugPrint('🔄 Performing background sync...');
+          await initService.manualSync();
+          debugPrint('✅ Background sync completed');
         }
       } catch (e) {
-        debugPrint('⚠️ Refresh failed: $e');
+        debugPrint('⚠️ Background sync failed: $e');
+      }
+    });
+  }
+
+  void _logSyncStatus() {
+    Future.microtask(() async {
+      try {
+        final status = await AppInitializationService.instance.getStatus();
+        debugPrint('📊 Sync Status: ${status['sync_statistics']}');
+      } catch (e) {
+        debugPrint('⚠️ Could not get sync status: $e');
       }
     });
   }
@@ -194,7 +184,7 @@ class _PathWiseAppState extends State<PathWiseApp> with WidgetsBindingObserver {
         fontFamily: 'SF Pro Display',
         useMaterial3: true,
       ),
-      home: FirebaseRequestMonitor(child: const AuthWrapper()),
+      home: const AuthWrapper(),
       routes: {
         '/login': (context) => const AuthScreen(),
         '/home': (context) => const UniversityListScreen(),
@@ -215,7 +205,7 @@ class AuthWrapper extends StatefulWidget {
 class _AuthWrapperState extends State<AuthWrapper> {
   bool _isInitialized = false;
   String _initStatus = 'Initializing PathWise...';
-  int _progress = 0;
+  double _progress = 0.0;
 
   @override
   void initState() {
@@ -235,66 +225,65 @@ class _AuthWrapperState extends State<AuthWrapper> {
         listen: false,
       );
 
-      // Step 1: Initialize auth (0-30%)
+      // Step 1: Initialize auth (0-20%)
       setState(() {
         _initStatus = 'Checking authentication...';
-        _progress = 10;
+        _progress = 0.1;
       });
       await authViewModel.init();
-      setState(() => _progress = 30);
+      setState(() => _progress = 0.2);
       debugPrint('✅ Auth initialized');
 
-      // Step 2: Initialize user services (30-60%)
+      // Step 2: Initialize user services (20-40%)
       if (authViewModel.isUserLoggedIn() && authViewModel.currentUser != null) {
         final userId = authViewModel.currentUser!.userId;
 
         setState(() {
           _initStatus = 'Setting up notifications...';
-          _progress = 40;
+          _progress = 0.3;
         });
         await notificationViewModel.initializeForUser(userId);
-        setState(() => _progress = 60);
+        setState(() => _progress = 0.4);
         debugPrint('✅ Notifications initialized');
 
-        // Step 3: Load initial data (60-100%)
+        // Step 3: Initialize view model with sync check (40-90%)
         setState(() {
-          _initStatus = 'Loading universities...';
-          _progress = 70;
+          _initStatus = 'Loading data from Supabase...';
+          _progress = 0.5;
         });
 
-        // OPTIMIZATION: Load from cache first, don't wait for network
-        try {
-          await universityListViewModel.loadUniversities().timeout(
-            const Duration(seconds: 5),
-            onTimeout: () {
-              debugPrint('⚠️ Initial load timed out, continuing with cache');
-            },
-          );
-        } catch (e) {
-          debugPrint('⚠️ Initial load error: $e');
-        }
+        // Initialize university list (checks sync status)
+        await universityListViewModel.initialize();
 
-        setState(() => _progress = 100);
-        debugPrint('✅ Initial data loaded');
+        setState(() => _progress = 0.9);
+        debugPrint('✅ Data loaded from SQLite');
       }
 
-      // Log total Firebase requests during initialization
-      final requestCount = FirebaseService.getRequestCount();
-      debugPrint(
-        '📊 Initialization complete. Firebase requests: $requestCount',
-      );
+      // Step 4: Get final status (90-100%)
+      setState(() {
+        _initStatus = 'Finalizing...';
+        _progress = 0.95;
+      });
 
-      await Future.delayed(const Duration(milliseconds: 500));
+      final appStatus = await AppInitializationService.instance.getStatus();
+      debugPrint('📊 App Status: ${appStatus['initialized']}');
+      debugPrint('📊 Database Size: ${(appStatus['database_size'] / 1024 / 1024).toStringAsFixed(2)} MB');
+
+      await Future.delayed(const Duration(milliseconds: 300));
 
       setState(() {
         _isInitialized = true;
         _initStatus = 'Ready!';
+        _progress = 1.0;
       });
+
+      debugPrint('✅ App initialization complete');
     } catch (e) {
       debugPrint('❌ Error initializing app: $e');
       setState(() {
         _isInitialized = true;
         _initStatus = 'Ready with errors';
+        _progress = 1.0;
       });
     }
   }
@@ -304,7 +293,10 @@ class _AuthWrapperState extends State<AuthWrapper> {
     if (!_isInitialized) {
       return Scaffold(
         backgroundColor: Colors.white,
-        body: AppLoadingContent(progress: _progress, statusText: _initStatus),
+        body: AppLoadingContent(
+          progress: (_progress * 100).toInt(),
+          statusText: _initStatus,
+        ),
       );
     }
 

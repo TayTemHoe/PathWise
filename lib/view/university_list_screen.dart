@@ -1,3 +1,4 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:path_wise/utils/formatters.dart';
@@ -7,22 +8,23 @@ import 'package:path_wise/viewModel/university_list_view_model.dart';
 import 'package:path_wise/widgets/university_card.dart';
 import 'package:provider/provider.dart';
 import 'dart:async';
+import '../model/comparison.dart';
 import '../model/university.dart';
-import '../repository/program_detail_repository.dart';
-import '../repository/program_repository.dart';
-import '../repository/university_detail_repository.dart';
-import '../repository/university_filter_repository.dart';
-import '../repository/university_repository.dart';
+import '../model/university_filter.dart';
+import '../repository/comparison_repository.dart';
+import '../services/app_initialization_service.dart';
 import '../services/firebase_service.dart';
 import '../utils/app_color.dart';
 import '../utils/currency_utils.dart';
 import '../viewModel/auth_view_model.dart';
 import '../viewModel/branch_view_model.dart';
-import '../viewModel/filter_view_model.dart';
+import '../viewModel/university_filter_view_model.dart';
 import '../viewModel/program_list_view_model.dart';
 import '../viewModel/university_detail_view_model.dart';
 import '../widgets/app_loading_screen.dart';
 import '../widgets/filter_bottom_sheet.dart';
+import 'ai_match_screen.dart';
+import 'comparison_screen.dart';
 
 class UniversityListScreen extends StatefulWidget {
   const UniversityListScreen({Key? key}) : super(key: key);
@@ -38,7 +40,6 @@ class _UniversityListScreenState extends State<UniversityListScreen> {
 
   bool _showSuggestions = false;
   List<String> _suggestions = [];
-  bool _isSearching = false;
   bool _isLoadingMore = false;
 
   // ENHANCED: Debounce timer for search
@@ -57,6 +58,15 @@ class _UniversityListScreenState extends State<UniversityListScreen> {
 
       // Load filter options in background
       filterVM.loadFilterOptions();
+
+      // CRITICAL: Ensure Malaysian default is set
+      if (viewModel.filter.shouldDefaultToMalaysia == false &&
+          viewModel.filter.country == null) {
+        // Reset to Malaysian default
+        viewModel.applyFilter(
+          const UniversityFilterModel(shouldDefaultToMalaysia: true),
+        );
+      }
 
       // Load initial Malaysian universities if not loaded
       if (viewModel.universities.isEmpty && !viewModel.isLoading) {
@@ -162,11 +172,12 @@ class _UniversityListScreenState extends State<UniversityListScreen> {
         elevation: 0,
         centerTitle: true,
 
-        title: SizedBox(
-          height: 40,
-          child: Image.asset(
-            'assets/images/carFixer_logo.png',
-            fit: BoxFit.contain,
+        title: const Text(
+          'University',
+          style: TextStyle(
+            fontSize: 20,
+            fontWeight: FontWeight.bold,
+            color: AppColors.textPrimary,
           ),
         ),
 
@@ -203,51 +214,35 @@ class _UniversityListScreenState extends State<UniversityListScreen> {
                   ),
                 );
 
+                final viewModel = context.read<UniversityListViewModel>();
+
                 if (confirmed == true && mounted) {
                   ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Row(
-                        children: [
-                          SizedBox(
-                            width: 20,
-                            height: 20,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              color: Colors.white,
-                            ),
-                          ),
-                          SizedBox(width: 12),
-                          Text('Clearing cache...'),
-                        ],
-                      ),
-                      duration: Duration(seconds: 2),
-                    ),
+                    const SnackBar(content: Text('Clearing local database...')),
                   );
 
-                  // Clear all caches
-                  FilterRepository.clearCache();
-                  UniversityRepository.clearCaches();
-                  UniversityDetailRepository.clearCaches();
-                  ProgramRepository.clearCaches();
-                  ProgramDetailRepository.clearCaches();
-                  FirebaseService.clearAllCaches();
-                  CurrencyUtils.clearCache();
+                  try {
+                    // Reset database and resync
+                    await AppInitializationService.instance.resetAppData();
+                    await viewModel.performInitialSync();
 
-                  // Reload data
-                  final viewModel = context.read<UniversityListViewModel>();
-                  final filterVM = context.read<FilterViewModel>();
-
-                  await filterVM.loadFilterOptions();
-                  await viewModel.forceRefresh();
-
-                  if (mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('✅ Cache cleared successfully!'),
-                        backgroundColor: Colors.green,
-                        behavior: SnackBarBehavior.floating,
-                      ),
-                    );
+                    if (mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('✅ Cache cleared and resynced!'),
+                          backgroundColor: Colors.green,
+                        ),
+                      );
+                    }
+                  } catch (e) {
+                    if (mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text('❌ Error: $e'),
+                          backgroundColor: Colors.red,
+                        ),
+                      );
+                    }
                   }
                 }
               },
@@ -270,32 +265,68 @@ class _UniversityListScreenState extends State<UniversityListScreen> {
           ),
         ],
       ),
-      body: SafeArea(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _buildSearchBar(),
-
-            Expanded(
-              child: Stack(
+      body: Consumer<UniversityListViewModel>(
+        builder: (context, viewModel, _) {
+          // Show sync progress if syncing
+          if (viewModel.isSyncing) {
+            return Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Positioned.fill(
-                    child: Column(
-                      children: [
-                        _buildFilterChips(),
-                        // This Expanded now has a valid height to fill
-                        Expanded(child: _buildUniversityList()),
-                      ],
+                  CircularProgressIndicator(value: viewModel.syncProgress),
+                  const SizedBox(height: 16),
+                  Text(
+                    'Syncing data: ${(viewModel.syncProgress * 100).toStringAsFixed(0)}%',
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w500,
                     ),
                   ),
-                  if (_showSuggestions) _buildSuggestions(),
+                  const SizedBox(height: 8),
+                  Text(
+                    viewModel.currentTable.isNotEmpty
+                        ? 'Syncing ${viewModel.currentTable}...'
+                        : 'Please wait...',
+                    style: TextStyle(fontSize: 14, color: Colors.grey[600]),
+                  ),
                 ],
               ),
+            );
+          }
+
+          return SafeArea(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _buildSearchBar(),
+
+                Expanded(
+                  child: Stack(
+                    children: [
+                      Positioned.fill(
+                        child: Column(
+                          children: [
+                            _buildFilterChips(),
+                            // This Expanded now has a valid height to fill
+                            Expanded(child: _buildUniversityList()),
+                          ],
+                        ),
+                      ),
+                      Positioned(
+                        bottom: 16,
+                        right: 16,
+                        child: _buildCompareFAB(),
+                      ),
+
+                      if (_showSuggestions) _buildSuggestions(),
+                    ],
+                  ),
+                ),
+              ],
             ),
-          ],
-        ),
+          );
+        },
       ),
-      floatingActionButton: _buildCompareFAB(),
     );
   }
 
@@ -489,7 +520,8 @@ class _UniversityListScreenState extends State<UniversityListScreen> {
           color: AppColors.background,
           padding: const EdgeInsets.symmetric(horizontal: 20),
           child: Container(
-            constraints: const BoxConstraints(maxHeight: 150), // From our previous discussion
+            constraints: const BoxConstraints(maxHeight: 150),
+            // From our previous discussion
             decoration: BoxDecoration(
               color: Colors.white,
               borderRadius: BorderRadius.circular(12),
@@ -599,92 +631,83 @@ class _UniversityListScreenState extends State<UniversityListScreen> {
   Widget _buildFilterChips() {
     return Consumer<UniversityListViewModel>(
       builder: (context, viewModel, _) {
-        final bool isSearchActive = viewModel.filter.searchQuery?.isNotEmpty ?? false;
+        final bool isSearchActive =
+            viewModel.filter.searchQuery?.isNotEmpty ?? false;
+        final bool isNotMalaysianDefault =
+            !viewModel.filter.shouldDefaultToMalaysia ||
+                viewModel.filter.country != null;
 
-        if (!viewModel.filter.hasActiveFilters) {
+        // Check if we have any active filters besides Malaysian default
+        if (!viewModel.filter.hasActiveFilters && !isNotMalaysianDefault) {
           return const SizedBox.shrink();
         }
 
         final List<Widget> filterChips = [];
 
-        if(isSearchActive){
+        // Search filter
+        if (isSearchActive) {
           filterChips.add(
-            _buildFilterChip(
-              viewModel.filter.searchQuery!,
-                  () {
-                viewModel.removeSearchFilter();
-                _searchController.clear();
-                WidgetsBinding.instance.addPostFrameCallback((_) {
-                  if (mounted) setState(() {});
-                });
-              },
-            ),
+            _buildFilterChip('Search: "${viewModel.filter.searchQuery}"', () {
+              viewModel.removeSearchFilter();
+              _searchController.clear();
+              WidgetsBinding.instance.addPostFrameCallback((_) {
+                if (mounted) setState(() {});
+              });
+            }),
           );
         }
 
         // Country filter
         if (viewModel.filter.country != null) {
           filterChips.add(
-            _buildFilterChip(
-              viewModel.filter.country!,
-                  () {
-                viewModel.removeCountryFilter();
-                // Force immediate update
-                WidgetsBinding.instance.addPostFrameCallback((_) {
-                  if (mounted) setState(() {});
-                });
-              },
-            ),
+            _buildFilterChip(viewModel.filter.country!, () {
+              viewModel.removeCountryFilter();
+              WidgetsBinding.instance.addPostFrameCallback((_) {
+                if (mounted) setState(() {});
+              });
+            }),
           );
         }
 
         // City filter
         if (viewModel.filter.city != null) {
           filterChips.add(
-            _buildFilterChip(
-              viewModel.filter.city!,
-                  () {
-                viewModel.removeCityFilter();
-                WidgetsBinding.instance.addPostFrameCallback((_) {
-                  if (mounted) setState(() {});
-                });
-              },
-            ),
+            _buildFilterChip(viewModel.filter.city!, () {
+              viewModel.removeCityFilter();
+              WidgetsBinding.instance.addPostFrameCallback((_) {
+                if (mounted) setState(() {});
+              });
+            }),
           );
         }
 
-        // Ranking range filter (only show if specified by user)
-        if (viewModel.filter.minRanking != null || viewModel.filter.maxRanking != null) {
-          final minRank = viewModel.filter.minRanking?.toInt() ?? 1;
-          final maxRank = viewModel.filter.maxRanking?.toInt() ?? 2000;
+        // Top N filter
+        if (viewModel.filter.topN != null) {
+          final topNLabel = viewModel.filter.country != null
+              ? 'Top ${viewModel.filter.topN} in ${viewModel.filter.country}'
+              : 'Top ${viewModel.filter.topN} Global';
           filterChips.add(
-            _buildFilterChip(
-              'Rank #$minRank - #$maxRank',
-                  () {
-                viewModel.removeRankingFilter();
-                WidgetsBinding.instance.addPostFrameCallback((_) {
-                  if (mounted) setState(() {});
-                });
-              },
-            ),
+            _buildFilterChip(topNLabel, () {
+              viewModel.removeTopNFilter();
+              WidgetsBinding.instance.addPostFrameCallback((_) {
+                if (mounted) setState(() {});
+              });
+            }),
           );
         }
 
-        // Ranking sort filter (independent of range)
+        // Ranking sort filter (independent of Top N)
         if (viewModel.filter.rankingSortOrder != null) {
           final sortLabel = viewModel.filter.rankingSortOrder == 'asc'
-              ? 'Rank: ↑'
-              : 'Rank: ↓';
+              ? 'Best Ranked First'
+              : 'Worst Ranked First';
           filterChips.add(
-            _buildFilterChip(
-              sortLabel,
-                  () {
-                viewModel.removeRankingSortFilter();
-                WidgetsBinding.instance.addPostFrameCallback((_) {
-                  if (mounted) setState(() {});
-                });
-              },
-            ),
+            _buildFilterChip(sortLabel, () {
+              viewModel.removeRankingSortFilter();
+              WidgetsBinding.instance.addPostFrameCallback((_) {
+                if (mounted) setState(() {});
+              });
+            }),
           );
         }
 
@@ -727,16 +750,18 @@ class _UniversityListScreenState extends State<UniversityListScreen> {
         // Institution type filter
         if (viewModel.filter.institutionType != null) {
           filterChips.add(
-            _buildFilterChip(
-              viewModel.filter.institutionType!,
-                  () {
-                viewModel.removeInstitutionTypeFilter();
-                WidgetsBinding.instance.addPostFrameCallback((_) {
-                  if (mounted) setState(() {});
-                });
-              },
-            ),
+            _buildFilterChip(viewModel.filter.institutionType!, () {
+              viewModel.removeInstitutionTypeFilter();
+              WidgetsBinding.instance.addPostFrameCallback((_) {
+                if (mounted) setState(() {});
+              });
+            }),
           );
+        }
+
+        // If no chips to show, return empty
+        if (filterChips.isEmpty) {
+          return const SizedBox.shrink();
         }
 
         return Container(
@@ -747,18 +772,14 @@ class _UniversityListScreenState extends State<UniversityListScreen> {
               Expanded(
                 child: SingleChildScrollView(
                   scrollDirection: Axis.horizontal,
-                  child: Center(
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: filterChips,
-                    ),
-                  ),
+                  child: Row(children: filterChips),
                 ),
               ),
               Container(width: 1, height: 30, color: Colors.grey[300]),
               TextButton.icon(
                 onPressed: () {
                   viewModel.clearFilter();
+                  _searchController.clear();
                   WidgetsBinding.instance.addPostFrameCallback((_) {
                     if (mounted) setState(() {});
                   });
@@ -789,12 +810,15 @@ class _UniversityListScreenState extends State<UniversityListScreen> {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Text(
-            label,
-            style: const TextStyle(
-              color: AppColors.primary,
-              fontSize: 13,
-              fontWeight: FontWeight.w600,
+          Flexible(
+            child: Text(
+              label,
+              style: const TextStyle(
+                color: AppColors.primary,
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+              ),
+              overflow: TextOverflow.ellipsis,
             ),
           ),
           const SizedBox(width: 4),
@@ -810,28 +834,60 @@ class _UniversityListScreenState extends State<UniversityListScreen> {
   Widget _buildCompareFAB() {
     return Consumer<UniversityListViewModel>(
       builder: (context, viewModel, _) {
-        if (viewModel.compareList.isEmpty) {
+        final compareCount = viewModel.compareCount;
+
+        if (compareCount == 0) {
           return const SizedBox.shrink();
         }
 
-        return FloatingActionButton(
-          onPressed: () {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('Navigate to Compare Screen (Placeholder)...'),
-                behavior: SnackBarBehavior.floating,
+        return FloatingActionButton.extended(
+          onPressed: () async {
+            final comparisonItems = await _getComparisonItemsFromRepo(viewModel);
+
+            await Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => ComparisonScreen(
+                  initialItems: comparisonItems,
+                  fromUniversityList: true,
+                ),
               ),
             );
+
+            // Reload comparison state when returning
+            if (mounted) {
+              await viewModel.loadComparisonState();
+              setState(() {});
+            }
           },
-          backgroundColor: AppColors.primary.withOpacity(0.7),
+          backgroundColor: AppColors.primary,
           elevation: 4.0,
-          child: Badge(
-            label: Text('${viewModel.compareList.length}'),
-            isLabelVisible: viewModel.compareList.isNotEmpty,
+          icon: Badge(
+            label: Text('$compareCount'), // Shows actual count
             child: const Icon(Icons.compare_arrows, color: Colors.white),
+          ),
+          label: const Text(
+            'Compare',
+            style: TextStyle(
+              color: Colors.white,
+              fontWeight: FontWeight.w600,
+            ),
           ),
         );
       },
+    );
+  }
+
+  Future<List<ComparisonItem>> _getComparisonItemsFromRepo(
+      UniversityListViewModel viewModel
+      ) async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return [];
+
+    final repo = ComparisonRepository.instance;
+    return await repo.getComparisonItems(
+      userId: user.uid,
+      type: ComparisonType.universities,
     );
   }
 
@@ -888,9 +944,7 @@ class _UniversityListScreenState extends State<UniversityListScreen> {
       builder: (context, universityVM, branchVM, _) {
         // --- 1. Initial Loading State ---
         if (universityVM.universities.isEmpty && universityVM.isLoading) {
-          return AppLoadingContent(
-            statusText: universityVM.getLoadingStatus(),
-          );
+          return AppLoadingContent(statusText: universityVM.getLoadingStatus());
         }
 
         if (universityVM.universities.isEmpty) {
@@ -939,7 +993,9 @@ class _UniversityListScreenState extends State<UniversityListScreen> {
         }
 
         return RefreshIndicator(
-          onRefresh: () => universityVM.forceRefresh(),
+          onRefresh: () async {
+            await universityVM.performIncrementalSync();
+          },
           color: AppColors.primary,
           child: CustomScrollView(
             controller: _scrollController,
@@ -947,71 +1003,90 @@ class _UniversityListScreenState extends State<UniversityListScreen> {
             slivers: [
               SliverToBoxAdapter(child: _buildResultCountInfo(universityVM)),
               SliverList(
-                delegate: SliverChildBuilderDelegate(
-                      (context, index) {
-                    // ... (your existing list builder logic)
-                    final university = universityVM.universities[index];
-                    final branches = branchVM.getBranches(
-                      university.universityId,
-                    );
-                    final bool isLoadingBranches = branchVM.isLoadingBranches(
-                      university.universityId,
-                    );
-                    final bool hasRequestedBranches = branchVM
-                        .hasRequestedBranches(university.universityId);
+                delegate: SliverChildBuilderDelegate((context, index) {
+                  // ... (your existing list builder logic)
+                  final university = universityVM.universities[index];
+                  final branches = branchVM.getBranches(
+                    university.universityId,
+                  );
+                  final bool isLoadingBranches = branchVM.isLoadingBranches(
+                    university.universityId,
+                  );
+                  final bool hasRequestedBranches = branchVM
+                      .hasRequestedBranches(university.universityId);
 
-                    if (branches.isEmpty &&
-                        !isLoadingBranches &&
-                        !hasRequestedBranches) {
-                      WidgetsBinding.instance.addPostFrameCallback((_) {
-                        if (mounted) {
-                          branchVM.loadBranches(university.universityId);
-                        }
-                      });
-                    }
-                    return UniversityCard(
-                      university: university,
-                      onTap: () => _navigateToDetails(university),
-                      onCompare: () {
-                        if (!universityVM.canCompare &&
-                            !universityVM.isInCompareList(
-                              university.universityId,
-                            )) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: const Text(
-                                'Maximum 3 universities can be compared at once',
-                                style: TextStyle(fontWeight: FontWeight.w500),
-                              ),
-                              backgroundColor: AppColors.accent,
-                              behavior: SnackBarBehavior.floating,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(10),
-                              ),
-                              action: SnackBarAction(
-                                label: 'Clear',
-                                textColor: Colors.white,
-                                onPressed: universityVM.clearCompare,
-                              ),
+                  if (branches.isEmpty &&
+                      !isLoadingBranches &&
+                      !hasRequestedBranches) {
+                    WidgetsBinding.instance.addPostFrameCallback((_) {
+                      if (mounted) {
+                        branchVM.loadBranches(university.universityId);
+                      }
+                    });
+                  }
+
+                  return UniversityCard(
+                    university: university,
+                    onTap: () => _navigateToDetails(university),
+                    onCompare: () async {
+                      // Check if limit is reached AND item is not already added
+                      if (!universityVM.canCompare &&
+                          !universityVM.isInCompareList(university.universityId)) {
+
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: const Text(
+                              'Maximum 3 universities can be compared at once',
+                              style: TextStyle(fontWeight: FontWeight.w500),
                             ),
-                          );
-                        } else {
-                          universityVM.toggleCompare(university);
-                        }
-                      },
-                      onViewPrograms: () {
-                        _navigateToPrograms(university);
-                      },
-                      isInCompareList: universityVM.isInCompareList(
-                        university.universityId,
-                      ),
-                      canCompare: universityVM.canCompare,
-                      branches: branches,
-                      isLoadingBranches: isLoadingBranches,
-                    );
-                  },
-                  childCount: universityVM.universities.length,
-                ),
+                            backgroundColor: AppColors.accent,
+                            behavior: SnackBarBehavior.floating,
+                            margin: const EdgeInsets.all(16),
+
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            action: SnackBarAction(
+                              label: 'View',
+                              textColor: Colors.white,
+                              onPressed: () {
+                                final comparisonItems = universityVM.getComparisonItems();
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (context) => ComparisonScreen(
+                                      initialItems: comparisonItems,
+                                    ),
+                                  ),
+                                );
+                              },
+                            ),
+                            // action: SnackBarAction(
+                            //   label: 'Clear',
+                            //   textColor: Colors.white,
+                            //   onPressed: universityVM.clearCompare,
+                            // ),
+                          ),
+                        );
+                      } else {
+                        await universityVM.toggleCompare(university);
+                      }
+                    },
+                    onViewPrograms: () {
+                      _navigateToPrograms(university);
+                    },
+                    isInCompareList: universityVM.isInCompareList(
+                      university.universityId,
+                    ),
+                    canCompare: universityVM.canCompare,
+                    branches: branches,
+                    isLoadingBranches: isLoadingBranches,
+                    programCount: universityVM.getProgramCount(
+                      university.universityId,
+                    ),
+                    countryRank: university.countryRank,
+                  );
+                }, childCount: universityVM.universities.length),
               ),
               SliverToBoxAdapter(
                 child: _buildLoaderOrEndIndicator(universityVM),

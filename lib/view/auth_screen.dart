@@ -231,12 +231,12 @@ class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateM
                 children: [
                   const SizedBox(height: 40),
 
-                  // Logo
-                  Image.asset(
-                    "assets/images/carFixer_logo.png",
-                    height: 40,
-                    fit: BoxFit.contain,
-                  ),
+                  // // Logo
+                  // Image.asset(
+                  //   "assets/images/carFixer_logo.png",
+                  //   height: 40,
+                  //   fit: BoxFit.contain,
+                  // ),
 
                   const SizedBox(height: 24),
 

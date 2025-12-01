@@ -4,8 +4,6 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:provider/provider.dart';
 import '../model/program.dart';
 import '../utils/app_color.dart';
-import '../utils/currency_utils.dart';
-import '../utils/formatters.dart';
 import '../viewModel/program_detail_view_model.dart';
 import '../widgets/app_loading_screen.dart';
 import '../widgets/expandable_html_content.dart';
@@ -586,17 +584,17 @@ class _ProgramDetailScreenState extends State<ProgramDetailScreen>
                       label: 'Study Mode',
                       value: program.studyMode!,
                     ),
-                  if (university != null && branch != null)
-                    InfoRow(
-                      icon: Icons.business,
-                      label: 'Institution',
-                      value: _formatInstitutionInfo(university.universityName, branch),
-                    ),
                   if (program.intakePeriod.isNotEmpty)
                     InfoRow(
                       icon: Icons.calendar_today,
                       label: 'Intake Periods',
                       value: program.intakePeriod.join(', '),
+                    ),
+                  if (university != null && branch != null)
+                    InfoRow(
+                      icon: Icons.business,
+                      label: 'Institution',
+                      value: _formatInstitutionInfo(university.universityName, branch),
                     ),
                 ],
               ),
@@ -725,7 +723,7 @@ class _ProgramDetailScreenState extends State<ProgramDetailScreen>
     final hasAdmissions = admissions.isNotEmpty;
     final hasEntryRequirement = program.entryRequirement != null &&
         program.entryRequirement!.isNotEmpty;
-
+    print("Admissions: $hasAdmissions");
     if (!hasAdmissions && !hasEntryRequirement) {
       return Container(
         color: Colors.white,
@@ -758,9 +756,54 @@ class _ProgramDetailScreenState extends State<ProgramDetailScreen>
     return Container(
       color: AppColors.background,
       child: SingleChildScrollView(
-        padding: const EdgeInsets.all(20.0),
+        padding: const EdgeInsets.only(
+          left: 20.0,
+          right: 20.0,
+          bottom: 20.0,
+        ),
         child: Column(
           children: [
+            const SizedBox(height: 16),
+            // Entry Requirements
+            if (hasEntryRequirement) ...[
+              if (hasAdmissions) const SizedBox(height: 16),
+              Container(
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(12.0),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Icon(
+                          Icons.info_outline,
+                          color: AppColors.secondary,
+                          size: 20,
+                        ),
+                        const SizedBox(width: 8),
+                        const Text(
+                          'Entry Requirements',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            color: AppColors.textPrimary,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    ExpandableHtmlContent(
+                      htmlData: program.entryRequirement!,
+                      collapsedMaxLines: 6,
+                    ),
+                  ],
+                ),
+              ),
+            ],
+
             // Admission Requirements
             if (hasAdmissions) ...[
               Container(
@@ -837,46 +880,6 @@ class _ProgramDetailScreenState extends State<ProgramDetailScreen>
                       itemBuilder: (context, index) {
                         return ProgramAdmissionCard(admission: admissions[index]);
                       },
-                    ),
-                  ],
-                ),
-              ),
-            ],
-
-            // Entry Requirements
-            if (hasEntryRequirement) ...[
-              if (hasAdmissions) const SizedBox(height: 16),
-              Container(
-                padding: const EdgeInsets.all(20),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(12.0),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Icon(
-                          Icons.info_outline,
-                          color: AppColors.secondary,
-                          size: 20,
-                        ),
-                        const SizedBox(width: 8),
-                        const Text(
-                          'Entry Requirements',
-                          style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                            color: AppColors.textPrimary,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-                    ExpandableHtmlContent(
-                      htmlData: program.entryRequirement!,
-                      collapsedMaxLines: 6,
                     ),
                   ],
                 ),

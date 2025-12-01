@@ -1,4 +1,3 @@
-// lib/model/program_admission.dart
 class ProgramAdmissionModel {
   final String progAdmissionId;
   final String programId;
@@ -28,5 +27,15 @@ class ProgramAdmissionModel {
       'prog_admission_label': progAdmissionLabel,
       'prog_admission_value': progAdmissionValue,
     };
+  }
+
+  @override
+  String toString() {
+    return 'ProgramAdmissionModel('
+        'progAdmissionId: $progAdmissionId, '
+        'programId: $programId, '
+        'progAdmissionLabel: $progAdmissionLabel, '
+        'progAdmissionValue: $progAdmissionValue'
+        ')';
   }
 }

@@ -1,6 +1,5 @@
-// lib/viewModel/university_detail_view_model.dart
+// lib/viewModel/university_detail_view_model_v2.dart
 import 'package:flutter/material.dart';
-import 'package:path_wise/services/firebase_service.dart';
 import '../model/branch.dart';
 import '../model/program.dart';
 import '../model/university.dart';
@@ -8,17 +7,7 @@ import '../model/university_admission.dart';
 import '../repository/university_detail_repository.dart';
 
 class UniversityDetailViewModel extends ChangeNotifier {
-  late final UniversityDetailRepository _repository;
-
-  UniversityDetailViewModel() {
-    final firebaseService = FirebaseService();
-    _repository = UniversityDetailRepository(firebaseService);
-  }
-
-  // For testing with dependency injection
-  UniversityDetailViewModel.withRepository(UniversityDetailRepository repository) {
-    _repository = repository;
-  }
+  final UniversityDetailRepository _repository = UniversityDetailRepository();
 
   UniversityModel? _university;
   List<BranchModel> _branches = [];
@@ -42,22 +31,30 @@ class UniversityDetailViewModel extends ChangeNotifier {
     notifyListeners();
 
     try {
-      // Load complete university details
-      _university = await _repository.getCompleteUniversityDetails(universityId);
+      debugPrint('📥 Loading university details for $universityId...');
 
-      // Load branches (already cached from getCompleteUniversityDetails)
-      _branches = await _repository.getBranchesByUniversity(universityId);
+      // Load all data concurrently
+      final results = await Future.wait([
+        _repository.getCompleteUniversityDetails(universityId),
+        _repository.getBranchesByUniversity(universityId),
+        _repository.getProgramsByStudyLevel(universityId),
+        _repository.getAdmissionsByUniversity(universityId),
+      ]);
 
-      // Load programs grouped by level
-      _programsByLevel = await _repository.getProgramsByStudyLevel(universityId);
+      _university = results[0] as UniversityModel?;
+      _branches = results[1] as List<BranchModel>;
+      _programsByLevel = results[2] as Map<String, List<ProgramModel>>;
+      _admissions = results[3] as List<UniversityAdmissionModel>;
 
-      // Load admissions
-      _admissions = await _repository.getAdmissionsByUniversity(universityId);
+      if (_university == null) {
+        throw Exception('University not found');
+      }
 
       _error = null;
+      debugPrint('✅ University details loaded successfully');
     } catch (e) {
       _error = e.toString();
-      debugPrint('Error loading university details: $e');
+      debugPrint('❌ Error loading university details: $e');
     } finally {
       _isLoading = false;
       notifyListeners();
@@ -84,6 +81,7 @@ class UniversityDetailViewModel extends ChangeNotifier {
     _programsByLevel = {};
     _expandedLevels.clear();
     _error = null;
+    _repository.clearCache();
     notifyListeners();
   }
 
