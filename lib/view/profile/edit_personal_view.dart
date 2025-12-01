@@ -5,7 +5,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import 'package:permission_handler/permission_handler.dart'; // Import permission_handler
-import 'package:path_wise/ViewModel/profile_view_model.dart';
+import 'package:path_wise/viewModel/profile_view_model.dart';
 
 class EditPersonalInfoScreen extends StatefulWidget {
   const EditPersonalInfoScreen({super.key});

@@ -1,9 +1,9 @@
 // lib/view/roadmap/create_roadmap_view.dart
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:path_wise/ViewModel/careerroadmap_view_model.dart';
+import 'package:path_wise/viewModel/careerroadmap_view_model.dart';
 import 'package:path_wise/viewModel/career_view_model.dart';
-import 'package:path_wise/ViewModel/profile_view_model.dart';
+import 'package:path_wise/viewModel/profile_view_model.dart';
 import 'package:path_wise/view/roadmap/roadmap_detail_view.dart';
 
 /// Screen for creating a new career roadmap
