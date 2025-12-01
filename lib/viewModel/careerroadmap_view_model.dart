@@ -3,7 +3,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 import 'package:path_wise/model/careerroadmap_model.dart';
 import 'package:path_wise/model/user_profile.dart';
-import 'package:path_wise/services/gemini_service.dart';
+import 'package:path_wise/services/gemini_service2.dart';
 import 'package:path_wise/services/roadmap_service.dart';
 import 'package:path_wise/viewModel/profile_view_model.dart';
 

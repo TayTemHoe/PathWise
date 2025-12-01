@@ -1,7 +1,7 @@
 // lib/viewmodel/career_view_model.dart
 import 'package:flutter/foundation.dart';
 import 'package:path_wise/model/career_suggestion.dart';
-import 'package:path_wise/services/gemini_service.dart';
+import 'package:path_wise/services/gemini_service2.dart';
 import 'package:path_wise/services/career_service.dart';
 import 'package:path_wise/viewModel/profile_view_model.dart';
 
