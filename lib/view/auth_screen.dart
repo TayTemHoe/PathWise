@@ -40,6 +40,13 @@ class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateM
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
 
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final viewModel = Provider.of<AuthViewModel>(context, listen: false);
+      setState(() {
+        _rememberMe = viewModel.rememberMe;
+      });
+    });
+
     final viewModel = Provider.of<AuthViewModel>(context, listen: false);
     _tabController.addListener(() {
       // Check if the controller's animation is finished to avoid multiple calls

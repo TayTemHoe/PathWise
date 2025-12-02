@@ -179,7 +179,9 @@ class AuthRepository {
 
   // Check if user is logged in
   bool isUserLoggedIn() {
-    return SharedPreferencesHelper.isLoggedIn() && _auth.currentUser != null;
+    final isLoggedIn = SharedPreferencesHelper.isLoggedIn();
+    final rememberMe = SharedPreferencesHelper.getRememberMe();
+    return isLoggedIn && rememberMe && _auth.currentUser != null;
   }
 
   // Logout user

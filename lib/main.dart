@@ -41,7 +41,7 @@ Future<void> main() async {
     await Firebase.initializeApp(
       options: DefaultFirebaseOptions.currentPlatform,
     );
-    debugPrint('âœ… Firebase initialized');
+    debugPrint('Firebase initialized');
 
     // Initialize Supabase
     await Supabase.initialize(
@@ -210,7 +210,9 @@ class _AuthWrapperState extends State<AuthWrapper> {
   @override
   void initState() {
     super.initState();
-    _initializeApp();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _initializeApp();
+    });
   }
 
   Future<void> _initializeApp() async {

@@ -41,6 +41,7 @@ class AuthViewModel extends ChangeNotifier {
   // Initialize
   Future<void> init() async {
     try {
+      _rememberMe = SharedPreferencesHelper.getRememberMe();
       // Check if user is logged in and get current user data
       if (_authRepository.isUserLoggedIn()) {
         _currentUser = _authRepository.getCurrentUser();
@@ -71,8 +72,6 @@ class AuthViewModel extends ChangeNotifier {
       // If there's any error during initialization, clear the session
       await logout();
     }
-
-    notifyListeners();
   }
 
   void setAuthMode(int index) {
@@ -196,9 +195,13 @@ class AuthViewModel extends ChangeNotifier {
   Future<void> logout() async {
     try {
       _setLoading(true);
+      final shouldRemember = _rememberMe;
       await _authRepository.logoutUser();
       _currentUser = null;
       _isFormValid = false;
+      if (shouldRemember) {
+        await SharedPreferencesHelper.setRememberMe(true);
+      }
       _setLoading(false);
     } catch (e) {
       _setError(e.toString().replaceFirst('Exception: ', ''));
