@@ -17,12 +17,16 @@ class ComparisonRepository {
   final LocalDataSource _localDataSource = LocalDataSource.instance;
 
   // In-memory cache to minimize SQLite reads
+  String? _currentCachedUserId;
   final Map<String, ProgramModel> _programCache = {};
   final Map<String, UniversityModel> _universityCache = {};
   final Map<String, BranchModel> _branchCache = {};
   final Map<String, List<ProgramAdmissionModel>> _programAdmissionsCache = {};
   final Map<String, List<UniversityAdmissionModel>> _universityAdmissionsCache = {};
   final Map<String, List<BranchModel>> _universityBranchesCache = {};
+  bool _cacheValidForUser(String userId) {
+    return _currentCachedUserId == userId;
+  }
 
   ComparisonRepository._init();
 
@@ -34,6 +38,7 @@ class ComparisonRepository {
     required ComparisonItem item,
   }) async {
     try {
+      _validateUserCache(userId);
       // Check limit before adding
       final itemType = item.type == ComparisonType.programs ? 'program' : 'university';
       final currentCount = await _dbHelper.getComparisonCount(
@@ -160,6 +165,7 @@ class ComparisonRepository {
     ComparisonType? type,
   }) async {
     try {
+      _validateUserCache(userId);
       final itemType = type != null
           ? (type == ComparisonType.programs ? 'program' : 'university')
           : null;
@@ -263,6 +269,10 @@ class ComparisonRepository {
   /// Get program with cache
   Future<ProgramModel?> _getProgramWithCache(String programId) async {
     // Check cache first
+    if (!_cacheValidForUser(_currentCachedUserId ?? '')) {
+      clearCache();
+    }
+
     if (_programCache.containsKey(programId)) {
       return _programCache[programId];
     }
@@ -442,5 +452,13 @@ class ComparisonRepository {
       'university_admissions': _universityAdmissionsCache.length,
       'university_branches': _universityBranchesCache.length,
     };
+  }
+
+  void _validateUserCache(String userId) {
+    if (_currentCachedUserId != userId) {
+      debugPrint('🔄 User changed from $_currentCachedUserId to $userId - clearing cache');
+      clearCache();
+      _currentCachedUserId = userId;
+    }
   }
 }

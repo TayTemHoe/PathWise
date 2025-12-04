@@ -1,6 +1,7 @@
 // lib/viewModel/mbti_test_view_model.dart
 
 import 'dart:async';
+import 'package:firebase_auth/firebase_auth.dart'; // Import FirebaseAuth
 import 'package:flutter/foundation.dart';
 import '../model/mbti.dart';
 import '../repository/mbti_repository.dart';
@@ -8,6 +9,7 @@ import '../repository/mbti_repository.dart';
 class MBTITestViewModel extends ChangeNotifier {
   final MBTIRepository _repository = MBTIRepository.instance;
 
+  String? _lastLoadedUserId;
   // State
   List<MBTIQuestion> _questions = [];
   final Map<String, int> _answers = {}; // questionId -> value
@@ -32,6 +34,9 @@ class MBTITestViewModel extends ChangeNotifier {
   String? get errorMessage => _errorMessage;
   MBTIResult? get result => _result;
 
+  // Helper to get current user ID
+  String? get _userId => FirebaseAuth.instance.currentUser?.uid;
+
   bool get hasAnsweredCurrent =>
       _currentQuestionIndex < _questions.length &&
           _answers.containsKey(_questions[_currentQuestionIndex].id);
@@ -55,16 +60,31 @@ class MBTITestViewModel extends ChangeNotifier {
 
   /// Initialize the test
   Future<void> initialize() async {
+    if (_userId == null) {
+      _errorMessage = 'User not logged in';
+      notifyListeners();
+      return;
+    }
+
+    if (_lastLoadedUserId != null && _lastLoadedUserId != _userId) {
+      debugPrint('🔄 User changed - clearing test data');
+      _clearTestData();
+      _lastLoadedUserId = _userId; // ✅ SET IMMEDIATELY
+      notifyListeners(); // ✅ FORCE UI UPDATE
+      return; // ✅ EXIT EARLY, LET USER RE-INITIALIZE
+    }
+    _lastLoadedUserId = _userId;
+
     _isLoading = true;
     _errorMessage = null;
     notifyListeners();
 
     try {
-      debugPrint('🚀 Initializing MBTI test...');
+      debugPrint('🚀 Initializing MBTI test for user: $_userId...');
 
-      // Load saved progress
-      final savedProgress = await _repository.loadProgress();
-      final savedGender = await _repository.loadGender();
+      // Load saved progress with userId
+      final savedProgress = await _repository.loadProgress(_userId!);
+      final savedGender = await _repository.loadGender(_userId!);
 
       if (savedProgress != null) {
         debugPrint('📂 Found saved progress: ${savedProgress.answers.length} answers');
@@ -81,8 +101,8 @@ class MBTITestViewModel extends ChangeNotifier {
       _questions = await _repository.getQuestions();
       debugPrint('✅ Loaded ${_questions.length} questions');
 
-      // Check if test was already completed
-      final savedResult = await _repository.loadResult();
+      // Check if test was already completed with userId
+      final savedResult = await _repository.loadResult(_userId!);
       if (savedResult != null) {
         debugPrint('📊 Found saved result: ${savedResult.fullCode}');
         _result = savedResult;
@@ -99,8 +119,10 @@ class MBTITestViewModel extends ChangeNotifier {
 
   /// Set gender selection
   void setGender(String gender) {
+    if (_userId == null) return;
+
     _selectedGender = gender;
-    _repository.saveGender(gender);
+    _repository.saveGender(_userId!, gender);
     notifyListeners();
   }
 
@@ -154,7 +176,7 @@ class MBTITestViewModel extends ChangeNotifier {
 
   /// Auto-save progress
   Future<void> _autoSave() async {
-    if (!_hasUnsavedChanges) return;
+    if (!_hasUnsavedChanges || _userId == null) return;
 
     try {
       final progress = MBTITestProgress(
@@ -165,7 +187,7 @@ class MBTITestViewModel extends ChangeNotifier {
         lastUpdated: DateTime.now(),
       );
 
-      await _repository.saveProgress(progress);
+      await _repository.saveProgress(_userId!, progress);
       _hasUnsavedChanges = false;
       debugPrint('💾 Auto-saved progress: ${_answers.length} answers');
     } catch (e) {
@@ -182,6 +204,12 @@ class MBTITestViewModel extends ChangeNotifier {
       return;
     }
 
+    if (_userId == null) {
+      _errorMessage = 'User session invalid. Please login again.';
+      notifyListeners();
+      return;
+    }
+
     _isSubmitting = true;
     _errorMessage = null;
     notifyListeners();
@@ -193,7 +221,9 @@ class MBTITestViewModel extends ChangeNotifier {
           .map((e) => MBTIAnswer(questionId: e.key, value: e.value))
           .toList();
 
+      // Submit with userId
       _result = await _repository.submitTest(
+        userId: _userId!,
         answers: answersList,
         gender: _selectedGender!,
       );
@@ -211,8 +241,11 @@ class MBTITestViewModel extends ChangeNotifier {
 
   /// Restart test
   Future<void> restartTest() async {
+    if (_userId == null) return;
+
     try {
-      await _repository.restartTest();
+      // Restart with userId
+      await _repository.restartTest(_userId!);
 
       _answers.clear();
       _currentQuestionIndex = 0;
@@ -259,11 +292,29 @@ class MBTITestViewModel extends ChangeNotifier {
 
   @override
   void dispose() {
+    _isDisposed = true;
     _autoSaveTimer?.cancel();
     // Perform final auto-save
     if (_hasUnsavedChanges) {
       _autoSave();
     }
     super.dispose();
+  }
+
+  void _clearTestData() {
+    _questions = [];
+    _answers.clear();
+    _currentQuestionIndex = 0;
+    _result = null;
+    _errorMessage = null;
+    _hasUnsavedChanges = false;
+    // Add any other state variables specific to each test
+  }
+
+  void reset() {
+    _clearTestData();
+    _lastLoadedUserId = null;
+    notifyListeners();
+    debugPrint('🧹 MBTI ViewModel reset');
   }
 }

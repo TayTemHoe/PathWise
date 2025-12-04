@@ -11,6 +11,8 @@ class SharedPreferenceService {
   final Map<String, dynamic> _cache = {};
   bool _isCacheValid = false;
 
+  String? _cachedUserId;
+
   // UPDATED Keys (removed _keyCurrentPage)
   static const String _keyEducationLevel = 'ai_match_education_level';
   static const String _keyOtherEducation = 'ai_match_other_education';
@@ -36,8 +38,12 @@ class SharedPreferenceService {
     return _prefs!;
   }
 
+  // Helper to generate user-specific keys
+  String _getUserKey(String key, String userId) => '${key}_$userId';
+
   /// Save complete progress with matched programs
   Future<void> saveProgressWithPrograms({
+    required String userId,
     EducationLevel? educationLevel,
     String? otherEducationText,
     required List<AcademicRecord> academicRecords,
@@ -54,46 +60,46 @@ class SharedPreferenceService {
 
       final futures = <Future>[
         if (educationLevel != null)
-          sp.setString(_keyEducationLevel, educationLevel.name)
+          sp.setString(_getUserKey(_keyEducationLevel, userId), educationLevel.name)
         else
-          sp.remove(_keyEducationLevel),
+          sp.remove(_getUserKey(_keyEducationLevel, userId)),
 
         if (otherEducationText != null && otherEducationText.isNotEmpty)
-          sp.setString(_keyOtherEducation, otherEducationText)
+          sp.setString(_getUserKey(_keyOtherEducation, userId), otherEducationText)
         else
-          sp.remove(_keyOtherEducation),
+          sp.remove(_getUserKey(_keyOtherEducation, userId)),
 
         sp.setString(
-          _keyAcademicRecords,
+          _getUserKey(_keyAcademicRecords, userId),
           jsonEncode(academicRecords.map((r) => r.toJson()).toList()),
         ),
 
         sp.setString(
-          _keyEnglishTests,
+          _getUserKey(_keyEnglishTests, userId),
           jsonEncode(englishTests.map((t) => t.toJson()).toList()),
         ),
 
         if (personality != null)
-          sp.setString(_keyPersonality, jsonEncode(personality.toJson()))
+          sp.setString(_getUserKey(_keyPersonality, userId), jsonEncode(personality.toJson()))
         else
-          sp.remove(_keyPersonality),
+          sp.remove(_getUserKey(_keyPersonality, userId)),
 
-        sp.setString(_keyInterests, jsonEncode(interests)),
+        sp.setString(_getUserKey(_keyInterests, userId), jsonEncode(interests)),
 
-        sp.setString(_keyPreferences, jsonEncode(preferences.toJson())),
+        sp.setString(_getUserKey(_keyPreferences, userId), jsonEncode(preferences.toJson())),
 
         if (matchResponse != null)
-          sp.setString(_keyMatchResponse, jsonEncode(matchResponse.toJson()))
+          sp.setString(_getUserKey(_keyMatchResponse, userId), jsonEncode(matchResponse.toJson()))
         else
-          sp.remove(_keyMatchResponse),
+          sp.remove(_getUserKey(_keyMatchResponse, userId)),
 
         if (matchedProgramIds != null && matchedProgramIds.isNotEmpty)
-          sp.setString(_keyMatchedPrograms, jsonEncode(matchedProgramIds))
+          sp.setString(_getUserKey(_keyMatchedPrograms, userId), jsonEncode(matchedProgramIds))
         else
-          sp.remove(_keyMatchedPrograms),
+          sp.remove(_getUserKey(_keyMatchedPrograms, userId)),
 
-        sp.setInt(_keyMatchTimestamp, DateTime.now().millisecondsSinceEpoch),
-        sp.setInt(_keyLastSaved, DateTime.now().millisecondsSinceEpoch),
+        sp.setInt(_getUserKey(_keyMatchTimestamp, userId), DateTime.now().millisecondsSinceEpoch),
+        sp.setInt(_getUserKey(_keyLastSaved, userId), DateTime.now().millisecondsSinceEpoch),
       ];
 
       await Future.wait(futures);
@@ -102,7 +108,7 @@ class SharedPreferenceService {
       _cache.clear();
 
       stopwatch.stop();
-      debugPrint('✅ Progress saved in ${stopwatch.elapsedMilliseconds}ms');
+      debugPrint('✅ Progress saved in ${stopwatch.elapsedMilliseconds}ms for user: $userId');
     } catch (e) {
       debugPrint('❌ Error saving progress: $e');
       rethrow;
@@ -110,44 +116,59 @@ class SharedPreferenceService {
   }
 
   /// Load complete progress including matched programs
-  Future<AIMatchProgressData?> loadProgressWithPrograms({bool forceRefresh = false}) async {
+  Future<AIMatchProgressData?> loadProgressWithPrograms({
+    required String userId,
+    bool forceRefresh = false,
+  }) async {
     try {
       final stopwatch = Stopwatch()..start();
 
-      // ✅ FIX: Always reload from disk if forceRefresh is true
+      // Always reload from disk if forceRefresh is true
       if (forceRefresh) {
-        debugPrint('🔄 Force refresh: Clearing cache and reloading from disk');
+        debugPrint('🔄 Force refresh: Clearing cache and reloading from disk for user: $userId');
         _isCacheValid = false;
         _cache.clear();
+        _cachedUserId = null;
       }
 
-      if (_isCacheValid && _cache.isNotEmpty && !forceRefresh) {
+      // CRITICAL FIX: Validate that the cache belongs to the requested userId
+      if (_isCacheValid &&
+          _cache.isNotEmpty &&
+          !forceRefresh &&
+          _cachedUserId == userId) {
         debugPrint('⚡ Loaded from cache in ${stopwatch.elapsedMilliseconds}ms');
         return _buildProgressDataFromCache();
       }
 
       final sp = await prefs;
 
-      // Check if any data exists
-      if (!sp.containsKey(_keyEducationLevel) &&
-          !sp.containsKey(_keyAcademicRecords)) {
-        debugPrint('ℹ️ No saved progress found');
+      // Check if any data exists for this user on disk
+      if (!sp.containsKey(_getUserKey(_keyEducationLevel, userId)) &&
+          !sp.containsKey(_getUserKey(_keyAcademicRecords, userId))) {
+        debugPrint('ℹ️ No saved progress found for user: $userId');
+
+        // If we switched users and the new user has no data, clear the old cache
+        if (_cachedUserId != userId) {
+          _cache.clear();
+          _isCacheValid = false;
+          _cachedUserId = null;
+        }
         return null;
       }
 
-      // Load all data
-      final educationLevelStr = sp.getString(_keyEducationLevel);
-      final otherEducation = sp.getString(_keyOtherEducation);
-      final academicJson = sp.getString(_keyAcademicRecords);
-      final englishJson = sp.getString(_keyEnglishTests);
-      final personalityJson = sp.getString(_keyPersonality);
-      final interestsJson = sp.getString(_keyInterests);
-      final prefsJson = sp.getString(_keyPreferences);
-      final matchResponseJson = sp.getString(_keyMatchResponse);
-      final matchedProgramsJson = sp.getString(_keyMatchedPrograms);
-      final matchTimestamp = sp.getInt(_keyMatchTimestamp);
+      // Load all data using user-specific keys
+      final educationLevelStr = sp.getString(_getUserKey(_keyEducationLevel, userId));
+      final otherEducation = sp.getString(_getUserKey(_keyOtherEducation, userId));
+      final academicJson = sp.getString(_getUserKey(_keyAcademicRecords, userId));
+      final englishJson = sp.getString(_getUserKey(_keyEnglishTests, userId));
+      final personalityJson = sp.getString(_getUserKey(_keyPersonality, userId));
+      final interestsJson = sp.getString(_getUserKey(_keyInterests, userId));
+      final prefsJson = sp.getString(_getUserKey(_keyPreferences, userId));
+      final matchResponseJson = sp.getString(_getUserKey(_keyMatchResponse, userId));
+      final matchedProgramsJson = sp.getString(_getUserKey(_keyMatchedPrograms, userId));
+      final matchTimestamp = sp.getInt(_getUserKey(_keyMatchTimestamp, userId));
 
-      debugPrint('📋 Loaded matched programs JSON: $matchedProgramsJson');
+      debugPrint('📋 Loaded matched programs JSON for user $userId: $matchedProgramsJson');
 
       // Parse data
       EducationLevel? educationLevel;
@@ -204,10 +225,13 @@ class SharedPreferenceService {
       _cache['matchResponse'] = matchResponse;
       _cache['matchedProgramIds'] = matchedProgramIds;
       _cache['matchTimestamp'] = matchTimestamp;
+
+      // Mark cache as valid for this specific user
+      _cachedUserId = userId;
       _isCacheValid = true;
 
       stopwatch.stop();
-      debugPrint('✅ Progress loaded in ${stopwatch.elapsedMilliseconds}ms');
+      debugPrint('✅ Progress loaded in ${stopwatch.elapsedMilliseconds}ms for user: $userId');
 
       return AIMatchProgressData(
         educationLevel: educationLevel,
@@ -248,42 +272,42 @@ class SharedPreferenceService {
     );
   }
 
-  Future<bool> hasSavedProgress() async {
+  Future<bool> hasSavedProgress(String userId) async {
     final sp = await prefs;
-    return sp.containsKey(_keyEducationLevel) ||
-        sp.containsKey(_keyAcademicRecords);
+    return sp.containsKey(_getUserKey(_keyEducationLevel, userId)) ||
+        sp.containsKey(_getUserKey(_keyAcademicRecords, userId));
   }
 
-  Future<DateTime?> getLastSavedTime() async {
+  Future<DateTime?> getLastSavedTime(String userId) async {
     final sp = await prefs;
-    final timestamp = sp.getInt(_keyLastSaved);
+    final timestamp = sp.getInt(_getUserKey(_keyLastSaved, userId));
     return timestamp != null
         ? DateTime.fromMillisecondsSinceEpoch(timestamp)
         : null;
   }
 
-  Future<void> clearProgress() async {
+  Future<void> clearProgress(String userId) async {
     try {
       final sp = await prefs;
 
       await Future.wait([
-        sp.remove(_keyEducationLevel),
-        sp.remove(_keyOtherEducation),
-        sp.remove(_keyAcademicRecords),
-        sp.remove(_keyEnglishTests),
-        sp.remove(_keyPersonality),
-        sp.remove(_keyInterests),
-        sp.remove(_keyPreferences),
-        sp.remove(_keyMatchResponse),
-        sp.remove(_keyMatchedPrograms),
-        sp.remove(_keyMatchTimestamp),
-        sp.remove(_keyLastSaved),
+        sp.remove(_getUserKey(_keyEducationLevel, userId)),
+        sp.remove(_getUserKey(_keyOtherEducation, userId)),
+        sp.remove(_getUserKey(_keyAcademicRecords, userId)),
+        sp.remove(_getUserKey(_keyEnglishTests, userId)),
+        sp.remove(_getUserKey(_keyPersonality, userId)),
+        sp.remove(_getUserKey(_keyInterests, userId)),
+        sp.remove(_getUserKey(_keyPreferences, userId)),
+        sp.remove(_getUserKey(_keyMatchResponse, userId)),
+        sp.remove(_getUserKey(_keyMatchedPrograms, userId)),
+        sp.remove(_getUserKey(_keyMatchTimestamp, userId)),
+        sp.remove(_getUserKey(_keyLastSaved, userId)),
       ]);
 
       _cache.clear();
       _isCacheValid = false;
 
-      debugPrint('✅ Saved progress cleared');
+      debugPrint('✅ Saved progress cleared for user: $userId');
     } catch (e) {
       debugPrint('❌ Error clearing progress: $e');
     }

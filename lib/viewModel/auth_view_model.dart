@@ -165,6 +165,7 @@ class AuthViewModel extends ChangeNotifier {
     required String phone,
     required String dob,
     required String address,
+    required String userRole,
   }) async {
     try {
       _setLoading(true);
@@ -178,6 +179,7 @@ class AuthViewModel extends ChangeNotifier {
         phone: phone,
         dob: dob,
         address: address,
+        userRole: userRole,
       );
 
       _currentUser = newUser;

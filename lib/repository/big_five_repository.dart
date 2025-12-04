@@ -12,7 +12,7 @@ class BigFiveRepository {
   final BigFiveApiService _apiService = BigFiveApiService.instance;
   final BigFiveStorageService _storageService = BigFiveStorageService.instance;
 
-  /// Fetch all test questions
+  /// Fetch all test questions (Shared data, no userId needed)
   Future<List<BigFiveQuestion>> getQuestions({String lang = 'en'}) async {
     try {
       return await _apiService.getQuestions(lang: lang);
@@ -24,11 +24,12 @@ class BigFiveRepository {
 
   /// Submit test answers and save result
   Future<BigFiveResult> submitTest({
+    required String userId, // ADDED
     required List<BigFiveAnswer> answers,
     String lang = 'en',
   }) async {
     try {
-      debugPrint('📤 Submitting Big Five test (${answers.length} answers)...');
+      debugPrint('📤 Submitting Big Five test (${answers.length} answers) for user: $userId...');
 
       // Submit to API
       final result = await _apiService.submitAnswers(
@@ -36,11 +37,11 @@ class BigFiveRepository {
         lang: lang,
       );
 
-      // Save result locally
-      await _storageService.saveResult(result);
+      // Save result locally with userId
+      await _storageService.saveResult(userId, result);
 
       // Clear progress after successful submission
-      await _storageService.clearProgress();
+      await _storageService.clearProgress(userId);
 
       debugPrint('✅ Big Five test submitted and saved');
       return result;
@@ -51,9 +52,9 @@ class BigFiveRepository {
   }
 
   /// Save test progress (auto-save)
-  Future<void> saveProgress(BigFiveTestProgress progress) async {
+  Future<void> saveProgress(String userId, BigFiveTestProgress progress) async {
     try {
-      await _storageService.saveProgress(progress);
+      await _storageService.saveProgress(userId, progress);
     } catch (e) {
       debugPrint('❌ Repository error saving progress: $e');
       // Don't rethrow - auto-save failure shouldn't break the app
@@ -61,9 +62,9 @@ class BigFiveRepository {
   }
 
   /// Load saved test progress
-  Future<BigFiveTestProgress?> loadProgress() async {
+  Future<BigFiveTestProgress?> loadProgress(String userId) async {
     try {
-      return await _storageService.loadProgress();
+      return await _storageService.loadProgress(userId);
     } catch (e) {
       debugPrint('❌ Repository error loading progress: $e');
       return null;
@@ -71,9 +72,9 @@ class BigFiveRepository {
   }
 
   /// Check if there's saved progress
-  Future<bool> hasProgress() async {
+  Future<bool> hasProgress(String userId) async {
     try {
-      return await _storageService.hasProgress();
+      return await _storageService.hasProgress(userId);
     } catch (e) {
       debugPrint('❌ Repository error checking progress: $e');
       return false;
@@ -81,9 +82,9 @@ class BigFiveRepository {
   }
 
   /// Clear test progress
-  Future<void> clearProgress() async {
+  Future<void> clearProgress(String userId) async {
     try {
-      await _storageService.clearProgress();
+      await _storageService.clearProgress(userId);
     } catch (e) {
       debugPrint('❌ Repository error clearing progress: $e');
       rethrow;
@@ -91,9 +92,9 @@ class BigFiveRepository {
   }
 
   /// Load saved test result
-  Future<BigFiveResult?> loadResult() async {
+  Future<BigFiveResult?> loadResult(String userId) async {
     try {
-      return await _storageService.loadResult();
+      return await _storageService.loadResult(userId);
     } catch (e) {
       debugPrint('❌ Repository error loading result: $e');
       return null;
@@ -101,9 +102,9 @@ class BigFiveRepository {
   }
 
   /// Clear test result
-  Future<void> clearResult() async {
+  Future<void> clearResult(String userId) async {
     try {
-      await _storageService.clearResult();
+      await _storageService.clearResult(userId);
     } catch (e) {
       debugPrint('❌ Repository error clearing result: $e');
       rethrow;
@@ -111,10 +112,10 @@ class BigFiveRepository {
   }
 
   /// Restart test (clear all data)
-  Future<void> restartTest() async {
+  Future<void> restartTest(String userId) async {
     try {
-      debugPrint('🔄 Restarting Big Five test...');
-      await _storageService.clearAll();
+      debugPrint('🔄 Restarting Big Five test for user: $userId...');
+      await _storageService.clearAll(userId);
       debugPrint('✅ Big Five test restarted');
     } catch (e) {
       debugPrint('❌ Repository error restarting test: $e');

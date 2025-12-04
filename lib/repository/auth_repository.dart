@@ -17,6 +17,7 @@ class AuthRepository {
     required String phone,
     required String dob,
     required String address,
+    required String userRole,
   }) async {
     try {
       // 1. Create user in Firebase Authentication first
@@ -38,6 +39,7 @@ class AuthRepository {
         email: email.trim().toLowerCase(),
         dob: dob.trim(),
         address: address.trim(),
+        userRole: userRole,
       );
 
       // 4. Create user data map and add custom ID

@@ -14,13 +14,16 @@ class MBTIStorageService {
   static const String _resultKey = 'mbti_test_result';
   static const String _genderKey = 'mbti_test_gender';
 
+  // Helper to generate user-specific keys
+  String _getUserKey(String key, String userId) => '${key}_$userId';
+
   /// Save test progress (auto-save)
-  Future<void> saveProgress(MBTITestProgress progress) async {
+  Future<void> saveProgress(String userId, MBTITestProgress progress) async {
     try {
       final prefs = await SharedPreferences.getInstance();
       final jsonString = jsonEncode(progress.toJson());
-      await prefs.setString(_progressKey, jsonString);
-      debugPrint('✅ MBTI test progress saved (${progress.answers.length} answers)');
+      await prefs.setString(_getUserKey(_progressKey, userId), jsonString);
+      debugPrint('✅ MBTI test progress saved (${progress.answers.length} answers) for user: $userId');
     } catch (e) {
       debugPrint('❌ Error saving MBTI progress: $e');
       rethrow;
@@ -28,13 +31,13 @@ class MBTIStorageService {
   }
 
   /// Load saved test progress
-  Future<MBTITestProgress?> loadProgress() async {
+  Future<MBTITestProgress?> loadProgress(String userId) async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      final jsonString = prefs.getString(_progressKey);
+      final jsonString = prefs.getString(_getUserKey(_progressKey, userId));
 
       if (jsonString == null) {
-        debugPrint('ℹ️ No saved MBTI test progress found');
+        debugPrint('ℹ️ No saved MBTI test progress found for user: $userId');
         return null;
       }
 
@@ -50,10 +53,10 @@ class MBTIStorageService {
   }
 
   /// Check if there's saved progress
-  Future<bool> hasProgress() async {
+  Future<bool> hasProgress(String userId) async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      return prefs.containsKey(_progressKey);
+      return prefs.containsKey(_getUserKey(_progressKey, userId));
     } catch (e) {
       debugPrint('❌ Error checking MBTI progress: $e');
       return false;
@@ -61,11 +64,11 @@ class MBTIStorageService {
   }
 
   /// Clear test progress
-  Future<void> clearProgress() async {
+  Future<void> clearProgress(String userId) async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      await prefs.remove(_progressKey);
-      debugPrint('🗑️ MBTI test progress cleared');
+      await prefs.remove(_getUserKey(_progressKey, userId));
+      debugPrint('🗑️ MBTI test progress cleared for user: $userId');
     } catch (e) {
       debugPrint('❌ Error clearing MBTI progress: $e');
       rethrow;
@@ -73,12 +76,12 @@ class MBTIStorageService {
   }
 
   /// Save test result
-  Future<void> saveResult(MBTIResult result) async {
+  Future<void> saveResult(String userId, MBTIResult result) async {
     try {
       final prefs = await SharedPreferences.getInstance();
       final jsonString = jsonEncode(result.toJson());
-      await prefs.setString(_resultKey, jsonString);
-      debugPrint('✅ MBTI test result saved: ${result.fullCode}');
+      await prefs.setString(_getUserKey(_resultKey, userId), jsonString);
+      debugPrint('✅ MBTI test result saved: ${result.fullCode} for user: $userId');
     } catch (e) {
       debugPrint('❌ Error saving MBTI result: $e');
       rethrow;
@@ -86,13 +89,13 @@ class MBTIStorageService {
   }
 
   /// Load saved test result
-  Future<MBTIResult?> loadResult() async {
+  Future<MBTIResult?> loadResult(String userId) async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      final jsonString = prefs.getString(_resultKey);
+      final jsonString = prefs.getString(_getUserKey(_resultKey, userId));
 
       if (jsonString == null) {
-        debugPrint('ℹ️ No saved MBTI test result found');
+        debugPrint('ℹ️ No saved MBTI test result found for user: $userId');
         return null;
       }
 
@@ -108,11 +111,11 @@ class MBTIStorageService {
   }
 
   /// Clear test result
-  Future<void> clearResult() async {
+  Future<void> clearResult(String userId) async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      await prefs.remove(_resultKey);
-      debugPrint('🗑️ MBTI test result cleared');
+      await prefs.remove(_getUserKey(_resultKey, userId));
+      debugPrint('🗑️ MBTI test result cleared for user: $userId');
     } catch (e) {
       debugPrint('❌ Error clearing MBTI result: $e');
       rethrow;
@@ -120,11 +123,11 @@ class MBTIStorageService {
   }
 
   /// Save selected gender
-  Future<void> saveGender(String gender) async {
+  Future<void> saveGender(String userId, String gender) async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      await prefs.setString(_genderKey, gender);
-      debugPrint('✅ Gender saved: $gender');
+      await prefs.setString(_getUserKey(_genderKey, userId), gender);
+      debugPrint('✅ Gender saved: $gender for user: $userId');
     } catch (e) {
       debugPrint('❌ Error saving gender: $e');
       rethrow;
@@ -132,10 +135,10 @@ class MBTIStorageService {
   }
 
   /// Load saved gender
-  Future<String?> loadGender() async {
+  Future<String?> loadGender(String userId) async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      return prefs.getString(_genderKey);
+      return prefs.getString(_getUserKey(_genderKey, userId));
     } catch (e) {
       debugPrint('❌ Error loading gender: $e');
       return null;
@@ -143,13 +146,13 @@ class MBTIStorageService {
   }
 
   /// Clear all MBTI test data
-  Future<void> clearAll() async {
+  Future<void> clearAll(String userId) async {
     try {
-      await clearProgress();
-      await clearResult();
+      await clearProgress(userId);
+      await clearResult(userId);
       final prefs = await SharedPreferences.getInstance();
-      await prefs.remove(_genderKey);
-      debugPrint('🗑️ All MBTI test data cleared');
+      await prefs.remove(_getUserKey(_genderKey, userId));
+      debugPrint('🗑️ All MBTI test data cleared for user: $userId');
     } catch (e) {
       debugPrint('❌ Error clearing all MBTI data: $e');
       rethrow;

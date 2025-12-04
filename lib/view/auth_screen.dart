@@ -7,6 +7,7 @@ import '../viewModel/auth_view_model.dart';
 import '../viewModel/notification_view_model.dart';
 import '../widgets/custom_text_field.dart';
 import '../widgets/custom_button.dart';
+import '../widgets/role_selection_widget.dart';
 
 class AuthScreen extends StatefulWidget {
   const AuthScreen({super.key});
@@ -34,6 +35,8 @@ class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateM
   final _dobController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
   final _addressController = TextEditingController();
+
+  String _selectedRole = 'education';
 
   @override
   void initState() {
@@ -89,30 +92,34 @@ class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateM
   Future<void> _handleLogin() async {
     if (_loginFormKey.currentState?.validate() ?? false) {
       final authViewModel = Provider.of<AuthViewModel>(context, listen: false);
-      // final carViewModel = Provider.of<CarViewModel>(context, listen: false); // Get CarViewModel
       authViewModel.setRememberMe(_rememberMe);
 
       final success = await authViewModel.login(
         email: _loginEmailController.text,
         password: _loginPasswordController.text,
-        // carViewModel: carViewModel, // Pass it here
       );
 
-      if (success && mounted) {
+      // Check mounted here (initial check)
+      if (!mounted) return;
+
+      if (success) {
         final notificationViewModel = Provider.of<NotificationViewModel>(
             context,
             listen: false
         );
 
-        // Get the userId from the authViewModel after successful login
         final userId = authViewModel.currentUser?.userId;
-        print(userId);
         if (userId != null) {
+          // This is an async call!
           await notificationViewModel.initializeForUser(userId);
         }
 
+        // [FIX] CRITICAL: Check mounted again because we awaited above.
+        // If the user left the screen during initialization, we must stop.
+        if (!mounted) return;
+
         Navigator.of(context).pushReplacementNamed('/home');
-      } else if (mounted) {
+      } else {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(authViewModel.errorMessage ?? 'Login failed'),
@@ -135,9 +142,12 @@ class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateM
         phone: _phoneController.text,
         dob: _dobController.text,
         address: _addressController.text,
+        userRole: _selectedRole,
       );
 
-      if (success && mounted) {
+      if (!mounted) return;
+
+      if (success) {
         final notificationViewModel = Provider.of<NotificationViewModel>(
             context,
             listen: false
@@ -145,7 +155,7 @@ class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateM
 
         final userId = viewModel.currentUser?.userId;
         final userName = "${viewModel.currentUser!.firstName} ${viewModel.currentUser!.lastName}";
-        print(userId);
+
         if (userId != null) {
           await notificationViewModel.initializeForUser(userId);
           await NotificationService.createWelcomeNotification(
@@ -154,8 +164,11 @@ class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateM
           );
         }
 
+        // [FIX] Check mounted again after async operations
+        if (!mounted) return;
+
         Navigator.of(context).pushReplacementNamed('/home');
-      } else if (mounted) {
+      } else {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(viewModel.errorMessage ?? 'Registration failed'),
@@ -180,14 +193,16 @@ class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateM
     final viewModel = Provider.of<AuthViewModel>(context, listen: false);
     final success = await viewModel.resetPassword(_loginEmailController.text);
 
-    if (success && mounted) {
+    if (!mounted) return;
+
+    if (success) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Password reset email sent!'),
           backgroundColor: Colors.green,
         ),
       );
-    } else if (mounted) {
+    } else {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(viewModel.errorMessage ?? 'Failed to send reset email'),
@@ -675,13 +690,26 @@ class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateM
             onChanged: (_) => _validateRegisterForm(),
           ),
 
-          const SizedBox(height: 40),
+          const SizedBox(height: 20),
+
+          RoleSelectionWidget(
+            selectedRole: _selectedRole,
+            onRoleSelected: (role) {
+              setState(() {
+                _selectedRole = role;
+              });
+            },
+          ),
+
+          const SizedBox(height: 32),
 
           Consumer<AuthViewModel>(
             builder: (context, viewModel, child) {
               return CustomButton(
                 text: 'Register',
-                onPressed: _handleRegister,
+                onPressed: () {
+                  _handleRegister();
+                },
                 isLoading: viewModel.isLoading,
                 isEnabled: viewModel.isFormValid,
               );
@@ -693,5 +721,4 @@ class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateM
       ),
     );
   }
-
 }

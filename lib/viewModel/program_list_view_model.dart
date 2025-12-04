@@ -641,6 +641,15 @@ class ProgramListViewModel extends ChangeNotifier {
     }
   }
 
+  void resetUserSpecificData() {
+    _compareSet.clear();
+    _userId = null;
+    _matchedProgramIds = null;
+    _isAIFilterActive = false;
+    notifyListeners();
+    debugPrint('🧹 ProgramList ViewModel user data reset');
+  }
+
   @override
   void dispose() {
     debugPrint('🗑️ ProgramListViewModel disposed');

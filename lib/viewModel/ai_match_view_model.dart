@@ -1,5 +1,5 @@
-// lib/viewModel/ai_match_view_model.dart - MODIFIED VERSION
 import 'dart:convert';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 import '../model/ai_match_model.dart';
 import '../model/program.dart';
@@ -11,7 +11,7 @@ class AIMatchViewModel extends ChangeNotifier {
   final AIMatchRepository _repository = AIMatchRepository.instance;
   final SharedPreferenceService _storage = SharedPreferenceService.instance;
 
-  // Progress tracking (REMOVED _currentPage)
+  // Progress tracking
   int _currentPage = 0;
   double _progress = 0.0;
 
@@ -62,6 +62,9 @@ class AIMatchViewModel extends ChangeNotifier {
   List<String> get availableCountries => _availableCountries;
   (double, double) get tuitionRange => _tuitionRange;
 
+  String? get _userId => FirebaseAuth.instance.currentUser?.uid;
+  String? _lastLoadedUserId;
+
   bool get canProceed {
     switch (_currentPage) {
       case 0: // Education + Academic
@@ -111,8 +114,10 @@ class AIMatchViewModel extends ChangeNotifier {
 
   // UPDATED: Save progress
   Future<void> saveProgress() async {
+    if (_userId == null) return;
     try {
       await _storage.saveProgressWithPrograms(
+        userId: _userId!,
         educationLevel: _educationLevel,
         otherEducationText: _otherEducationLevelText,
         academicRecords: _academicRecords,
@@ -130,19 +135,57 @@ class AIMatchViewModel extends ChangeNotifier {
     }
   }
 
+  // Helper to clear ALL memory data
+  void _clearInMemoryData() {
+    _currentPage = 0;
+    _progress = 0.0;
+    _educationLevel = null;
+    _otherEducationLevelText = null;
+    _academicRecords.clear();
+    _englishTests.clear();
+    _personalityProfile = null;
+    _interests.clear();
+    _preferences = UserPreferences();
+    _matchResponse = null;
+    _matchedPrograms = null;
+    _matchedProgramIds = null;
+    _matchTimestamp = null;
+    _errorMessage = null;
+  }
+
   // UPDATED: Load progress
   Future<void> loadProgress({bool forceRefresh = false}) async {
+    if (_userId == null) {
+      // If no user, clear everything immediately
+      _clearInMemoryData();
+      notifyListeners();
+      return;
+    }
+
+    if (_lastLoadedUserId != null && _lastLoadedUserId != _userId) {
+      debugPrint('🔄 User changed from $_lastLoadedUserId to $_userId');
+      _clearInMemoryData();
+      forceRefresh = true; // Force reload for new user
+    }
+    _lastLoadedUserId = _userId;
+    notifyListeners();
+
     try {
       if (forceRefresh) {
         debugPrint('🔄 Force refreshing AI match data from storage');
       }
 
       final progressData = await _storage.loadProgressWithPrograms(
+        userId: _userId!,
         forceRefresh: forceRefresh,
       );
 
       if (progressData == null) {
-        debugPrint('ℹ️ No saved progress to load');
+        debugPrint('ℹ️ No saved progress found for user $_userId. Resetting state.');
+        // CRITICAL: Reset state so previous user data doesn't persist
+        _clearInMemoryData();
+        _updateProgress();
+        notifyListeners();
         return;
       }
 
@@ -171,7 +214,6 @@ class AIMatchViewModel extends ChangeNotifier {
 
       if (_matchedProgramIds != null) {
         debugPrint('📊 Loaded ${_matchedProgramIds!.length} matched programs');
-        debugPrint('📋 Program IDs: $_matchedProgramIds');
       }
 
       notifyListeners();
@@ -181,11 +223,18 @@ class AIMatchViewModel extends ChangeNotifier {
   }
 
   Future<void> clearSavedProgress() async {
-    await _storage.clearProgress();
+    if (_userId != null) {
+      await _storage.clearProgress(_userId!);
+      // Also clear memory
+      _clearInMemoryData();
+      _updateProgress();
+      notifyListeners();
+    }
   }
 
   Future<bool> hasSavedProgress() async {
-    return await _storage.hasSavedProgress();
+    if (_userId == null) return false;
+    return await _storage.hasSavedProgress(_userId!);
   }
 
   void _autoSaveProgress() {
@@ -193,6 +242,8 @@ class AIMatchViewModel extends ChangeNotifier {
       saveProgress();
     });
   }
+
+  // ... [Keep Navigation, _updateProgress, Data modification methods exactly as they are] ...
 
   // Navigation
   void nextPage() {
@@ -345,8 +396,6 @@ class AIMatchViewModel extends ChangeNotifier {
         preferences: _preferences,
       );
 
-      await _repository.saveMatchRequest(request);
-
       // Generate matches
       _matchResponse = await _repository.generateMatches(request);
       debugPrint('✅ AI matches generated: ${_matchResponse!.recommendedSubjectAreas.length}');
@@ -377,28 +426,27 @@ class AIMatchViewModel extends ChangeNotifier {
     }
   }
 
+  // ... [Keep other existing methods] ...
+
   Future<ProgramFilterModel?> getAIRecommendationFilter() async {
     if (_matchResponse == null) return null;
 
-    // Get Malaysian branch IDs if needed
     Set<String>? malaysianBranchIds;
     if (_preferences.locations.any((loc) => loc.toLowerCase().contains('malaysia'))) {
       malaysianBranchIds = await _repository.getMalaysianBranchIds();
     }
 
-    // Extract subject areas
     final subjectAreas = _matchResponse!.recommendedSubjectAreas
         .map((rec) => rec.subjectArea)
         .toList();
 
-    // ✅ FIXED: Use topN instead of min/maxSubjectRanking
     return ProgramFilterModel(
       subjectArea: subjectAreas,
       studyLevels: _preferences.studyLevel,
       studyModes: _preferences.mode,
       minTuitionFeeMYR: null,
       maxTuitionFeeMYR: _preferences.tuitionMax,
-      topN: _preferences.maxRanking, // ✅ Use maxRanking as Top N
+      topN: _preferences.maxRanking,
       malaysianBranchIds: malaysianBranchIds,
       countries: _preferences.locations,
       rankingSortOrder: 'asc',
@@ -413,22 +461,12 @@ class AIMatchViewModel extends ChangeNotifier {
   }
 
   void reset() {
-    _currentPage = 0;
-    _progress = 0.0;
-    _educationLevel = null;
-    _otherEducationLevelText = null;
-    _academicRecords.clear();
-    _englishTests.clear();
-    _personalityProfile = null;
-    _interests.clear();
-    _preferences = UserPreferences();
-    _matchResponse = null;
-    _matchedPrograms = null;
-    _matchedProgramIds = null;
-    _matchTimestamp = null;
-    _errorMessage = null;
+    _clearInMemoryData();
+    _lastLoadedUserId = null;
+    _storage.invalidateCache();
     clearSavedProgress();
     notifyListeners();
+    debugPrint('🧹 AIMatch ViewModel reset complete');
   }
 
   Future<List<String>> getSubjectAreas() async {

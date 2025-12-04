@@ -1,6 +1,7 @@
 // lib/viewModel/big_five_test_view_model.dart
 
 import 'dart:async';
+import 'package:firebase_auth/firebase_auth.dart'; // Import FirebaseAuth
 import 'package:flutter/foundation.dart';
 import '../model/big_five_model.dart';
 import '../repository/big_five_repository.dart';
@@ -20,6 +21,7 @@ class BigFiveTestViewModel extends ChangeNotifier {
   // Auto-save timer
   Timer? _autoSaveTimer;
   bool _hasUnsavedChanges = false;
+  String? _lastLoadedUserId;
 
   // Getters
   List<BigFiveQuestion> get questions => _questions;
@@ -29,6 +31,9 @@ class BigFiveTestViewModel extends ChangeNotifier {
   bool get isSubmitting => _isSubmitting;
   String? get errorMessage => _errorMessage;
   BigFiveResult? get result => _result;
+
+  // Helper to get current user ID
+  String? get _userId => FirebaseAuth.instance.currentUser?.uid;
 
   bool get hasAnsweredCurrent =>
       _currentQuestionIndex < _questions.length &&
@@ -53,15 +58,30 @@ class BigFiveTestViewModel extends ChangeNotifier {
 
   /// Initialize the test
   Future<void> initialize() async {
+    if (_userId == null) {
+      _errorMessage = 'User not logged in';
+      notifyListeners();
+      return;
+    }
+
+    if (_lastLoadedUserId != null && _lastLoadedUserId != _userId) {
+      debugPrint('🔄 User changed - clearing test data');
+      _clearTestData();
+      _lastLoadedUserId = _userId; // ✅ SET IMMEDIATELY
+      notifyListeners(); // ✅ FORCE UI UPDATE
+      return; // ✅ EXIT EARLY, LET USER RE-INITIALIZE
+    }
+    _lastLoadedUserId = _userId;
+
     _isLoading = true;
     _errorMessage = null;
     notifyListeners();
 
     try {
-      debugPrint('🚀 Initializing Big Five test...');
+      debugPrint('🚀 Initializing Big Five test for user: $_userId...');
 
-      // Load saved progress
-      final savedProgress = await _repository.loadProgress();
+      // Load saved progress with userId
+      final savedProgress = await _repository.loadProgress(_userId!);
 
       if (savedProgress != null) {
         debugPrint('📂 Found saved progress: ${savedProgress.answers.length} answers');
@@ -73,12 +93,12 @@ class BigFiveTestViewModel extends ChangeNotifier {
         _currentQuestionIndex = savedProgress.currentQuestionIndex;
       }
 
-      // Fetch questions
+      // Fetch questions (shared data, no userId needed)
       _questions = await _repository.getQuestions();
       debugPrint('✅ Loaded ${_questions.length} questions');
 
-      // Check if test was already completed
-      final savedResult = await _repository.loadResult();
+      // Check if test was already completed with userId
+      final savedResult = await _repository.loadResult(_userId!);
       if (savedResult != null) {
         debugPrint('📊 Found saved result');
         _result = savedResult;
@@ -148,7 +168,7 @@ class BigFiveTestViewModel extends ChangeNotifier {
 
   /// Auto-save progress
   Future<void> _autoSave() async {
-    if (!_hasUnsavedChanges) return;
+    if (!_hasUnsavedChanges || _userId == null) return;
 
     try {
       final progress = BigFiveTestProgress(
@@ -157,7 +177,7 @@ class BigFiveTestViewModel extends ChangeNotifier {
         lastUpdated: DateTime.now(),
       );
 
-      await _repository.saveProgress(progress);
+      await _repository.saveProgress(_userId!, progress);
       _hasUnsavedChanges = false;
       debugPrint('💾 Auto-saved progress: ${_answers.length} answers');
     } catch (e) {
@@ -174,6 +194,12 @@ class BigFiveTestViewModel extends ChangeNotifier {
       return;
     }
 
+    if (_userId == null) {
+      _errorMessage = 'User session invalid. Please login again.';
+      notifyListeners();
+      return;
+    }
+
     _isSubmitting = true;
     _errorMessage = null;
     notifyListeners();
@@ -183,7 +209,9 @@ class BigFiveTestViewModel extends ChangeNotifier {
 
       final answersList = _answers.values.toList();
 
+      // Submit with userId
       _result = await _repository.submitTest(
+        userId: _userId!,
         answers: answersList,
       );
 
@@ -200,8 +228,11 @@ class BigFiveTestViewModel extends ChangeNotifier {
 
   /// Restart test
   Future<void> restartTest() async {
+    if (_userId == null) return;
+
     try {
-      await _repository.restartTest();
+      // Restart with userId
+      await _repository.restartTest(_userId!);
 
       _answers.clear();
       _currentQuestionIndex = 0;
@@ -254,5 +285,22 @@ class BigFiveTestViewModel extends ChangeNotifier {
       _autoSave();
     }
     super.dispose();
+  }
+
+  void _clearTestData() {
+    _questions = [];
+    _answers.clear();
+    _currentQuestionIndex = 0;
+    _result = null;
+    _errorMessage = null;
+    _hasUnsavedChanges = false;
+    // Add any other state variables specific to each test
+  }
+
+  void reset() {
+    _clearTestData();
+    _lastLoadedUserId = null;
+    notifyListeners();
+    debugPrint('🧹 Big Five ViewModel reset');
   }
 }

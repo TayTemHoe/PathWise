@@ -12,7 +12,7 @@ class MBTIRepository {
   final MBTIApiService _apiService = MBTIApiService.instance;
   final MBTIStorageService _storageService = MBTIStorageService.instance;
 
-  /// Fetch all test questions
+  /// Fetch all test questions (Shared data)
   Future<List<MBTIQuestion>> getQuestions() async {
     try {
       return await _apiService.getQuestions();
@@ -24,11 +24,12 @@ class MBTIRepository {
 
   /// Submit test answers and save result
   Future<MBTIResult> submitTest({
+    required String userId, // ADDED
     required List<MBTIAnswer> answers,
     required String gender,
   }) async {
     try {
-      debugPrint('📤 Submitting MBTI test (${answers.length} answers)...');
+      debugPrint('📤 Submitting MBTI test (${answers.length} answers) for user: $userId...');
 
       // Submit to API
       final result = await _apiService.submitAnswers(
@@ -36,11 +37,11 @@ class MBTIRepository {
         gender: gender,
       );
 
-      // Save result locally
-      await _storageService.saveResult(result);
+      // Save result locally with userId
+      await _storageService.saveResult(userId, result);
 
       // Clear progress after successful submission
-      await _storageService.clearProgress();
+      await _storageService.clearProgress(userId);
 
       debugPrint('✅ MBTI test submitted and saved: ${result.fullCode}');
       return result;
@@ -51,9 +52,9 @@ class MBTIRepository {
   }
 
   /// Save test progress (auto-save)
-  Future<void> saveProgress(MBTITestProgress progress) async {
+  Future<void> saveProgress(String userId, MBTITestProgress progress) async {
     try {
-      await _storageService.saveProgress(progress);
+      await _storageService.saveProgress(userId, progress);
     } catch (e) {
       debugPrint('❌ Repository error saving progress: $e');
       // Don't rethrow - auto-save failure shouldn't break the app
@@ -61,9 +62,9 @@ class MBTIRepository {
   }
 
   /// Load saved test progress
-  Future<MBTITestProgress?> loadProgress() async {
+  Future<MBTITestProgress?> loadProgress(String userId) async {
     try {
-      return await _storageService.loadProgress();
+      return await _storageService.loadProgress(userId);
     } catch (e) {
       debugPrint('❌ Repository error loading progress: $e');
       return null;
@@ -71,9 +72,9 @@ class MBTIRepository {
   }
 
   /// Check if there's saved progress
-  Future<bool> hasProgress() async {
+  Future<bool> hasProgress(String userId) async {
     try {
-      return await _storageService.hasProgress();
+      return await _storageService.hasProgress(userId);
     } catch (e) {
       debugPrint('❌ Repository error checking progress: $e');
       return false;
@@ -81,9 +82,9 @@ class MBTIRepository {
   }
 
   /// Clear test progress
-  Future<void> clearProgress() async {
+  Future<void> clearProgress(String userId) async {
     try {
-      await _storageService.clearProgress();
+      await _storageService.clearProgress(userId);
     } catch (e) {
       debugPrint('❌ Repository error clearing progress: $e');
       rethrow;
@@ -91,9 +92,9 @@ class MBTIRepository {
   }
 
   /// Load saved test result
-  Future<MBTIResult?> loadResult() async {
+  Future<MBTIResult?> loadResult(String userId) async {
     try {
-      return await _storageService.loadResult();
+      return await _storageService.loadResult(userId);
     } catch (e) {
       debugPrint('❌ Repository error loading result: $e');
       return null;
@@ -101,9 +102,9 @@ class MBTIRepository {
   }
 
   /// Clear test result
-  Future<void> clearResult() async {
+  Future<void> clearResult(String userId) async {
     try {
-      await _storageService.clearResult();
+      await _storageService.clearResult(userId);
     } catch (e) {
       debugPrint('❌ Repository error clearing result: $e');
       rethrow;
@@ -111,9 +112,9 @@ class MBTIRepository {
   }
 
   /// Save selected gender
-  Future<void> saveGender(String gender) async {
+  Future<void> saveGender(String userId, String gender) async {
     try {
-      await _storageService.saveGender(gender);
+      await _storageService.saveGender(userId, gender);
     } catch (e) {
       debugPrint('❌ Repository error saving gender: $e');
       // Don't rethrow - gender save failure shouldn't break the app
@@ -121,9 +122,9 @@ class MBTIRepository {
   }
 
   /// Load saved gender
-  Future<String?> loadGender() async {
+  Future<String?> loadGender(String userId) async {
     try {
-      return await _storageService.loadGender();
+      return await _storageService.loadGender(userId);
     } catch (e) {
       debugPrint('❌ Repository error loading gender: $e');
       return null;
@@ -131,10 +132,10 @@ class MBTIRepository {
   }
 
   /// Restart test (clear all data)
-  Future<void> restartTest() async {
+  Future<void> restartTest(String userId) async {
     try {
-      debugPrint('🔄 Restarting MBTI test...');
-      await _storageService.clearAll();
+      debugPrint('🔄 Restarting MBTI test for user: $userId...');
+      await _storageService.clearAll(userId);
       debugPrint('✅ MBTI test restarted');
     } catch (e) {
       debugPrint('❌ Repository error restarting test: $e');

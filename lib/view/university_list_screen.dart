@@ -171,7 +171,10 @@ class _UniversityListScreenState extends State<UniversityListScreen> {
         backgroundColor: AppColors.background,
         elevation: 0,
         centerTitle: true,
-
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () => Navigator.pop(context),
+        ),
         title: const Text(
           'University',
           style: TextStyle(
@@ -180,13 +183,11 @@ class _UniversityListScreenState extends State<UniversityListScreen> {
             color: AppColors.textPrimary,
           ),
         ),
-
-        // This prevents the default "back" button from appearing
-        // Remove this line if you need a back button
         automaticallyImplyLeading: false,
         actions: [
           if (kDebugMode) // Only show in debug mode
             IconButton(
+              padding: EdgeInsets.symmetric(horizontal: 16),
               icon: const Icon(Icons.cleaning_services, color: Colors.orange),
               tooltip: 'Clear Cache',
               onPressed: () async {
@@ -247,22 +248,6 @@ class _UniversityListScreenState extends State<UniversityListScreen> {
                 }
               },
             ),
-          Container(
-            margin: const EdgeInsets.only(right: 16.0),
-            child: IconButton(
-              icon: const Icon(Icons.logout),
-              onPressed: () async {
-                final authViewModel = Provider.of<AuthViewModel>(
-                  context,
-                  listen: false,
-                );
-                await authViewModel.logout();
-                if (context.mounted) {
-                  Navigator.of(context).pushReplacementNamed('/login');
-                }
-              },
-            ),
-          ),
         ],
       ),
       body: Consumer<UniversityListViewModel>(

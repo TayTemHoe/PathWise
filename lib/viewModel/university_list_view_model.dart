@@ -534,6 +534,13 @@ class UniversityListViewModel extends ChangeNotifier {
     }).toList();
   }
 
+  void resetUserSpecificData() {
+    _compareSet.clear();
+    _userId = null;
+    notifyListeners();
+    debugPrint('🧹 UniversityList ViewModel user data reset');
+  }
+
   @override
   void dispose() {
     debugPrint('🗑️ UniversityListViewModel disposed');
