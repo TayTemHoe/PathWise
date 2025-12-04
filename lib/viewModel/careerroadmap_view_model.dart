@@ -84,8 +84,7 @@ class CareerRoadmapViewModel extends ChangeNotifier {
   bool get profileOutdated => _profileOutdated;
 
   // Helper getters
-  //String get uid => _auth.currentUser?.uid ?? 'U0001';
-  String get uid =>  'U0001';
+  String? get uid =>  FirebaseAuth.instance.currentUser?.uid;
   bool isStageExpanded(int index) => _expandedStages[index.toString()] ?? false;
   bool get hasRoadmap => _currentRoadmap != null;
   bool get hasSkillGap => _currentSkillGap != null;
@@ -292,7 +291,7 @@ class CareerRoadmapViewModel extends ChangeNotifier {
     }
 
     // Load roadmap
-    _currentRoadmap = await _roadmapService.getCareerRoadmap(uid, _currentRoadmapId!);
+    _currentRoadmap = await _roadmapService.getCareerRoadmap(uid!, _currentRoadmapId!);
 
     if (_currentRoadmap == null) {
       throw Exception('Roadmap not found');
@@ -302,14 +301,14 @@ class CareerRoadmapViewModel extends ChangeNotifier {
 
     // Load skill gap
     if (_currentSkillGapId != null) {
-      _currentSkillGap = await _roadmapService.getSkillGap(uid, _currentSkillGapId!);
+      _currentSkillGap = await _roadmapService.getSkillGap(uid!, _currentSkillGapId!);
     } else {
       // Try to find skill gap by roadmap ID
-      _currentSkillGap = await _roadmapService.getSkillGapByRoadmapId(uid, _currentRoadmapId!);
+      _currentSkillGap = await _roadmapService.getSkillGapByRoadmapId(uid!, _currentRoadmapId!);
 
       // If found, update the skill gap ID
       if (_currentSkillGap != null) {
-        final skillGapSnapshot = await _roadmapService.getAllSkillGaps(uid);
+        final skillGapSnapshot = await _roadmapService.getAllSkillGaps(uid!);
         for (var sgData in skillGapSnapshot) {
           if (sgData['careerRoadmapId'] == _currentRoadmapId) {
             _currentSkillGapId = sgData['id'];
@@ -323,7 +322,7 @@ class CareerRoadmapViewModel extends ChangeNotifier {
     if (_currentSkillGapId != null) {
       try {
         _currentLearningResources = await _roadmapService.getLatestLearningResources(
-            uid,
+            uid!,
             _currentSkillGapId!
         );
 
@@ -363,14 +362,14 @@ class CareerRoadmapViewModel extends ChangeNotifier {
 
       // Generate learning resources via AI Service
       _currentLearningResourceId = await _aiService.saveLearningResourcesToFirestore(
-        uid: uid,
+        uid: uid!,
         skillGapId: _currentSkillGapId!,
         skillGaps: _currentSkillGap!.skillgaps,
       );
 
       // Load the generated resources
       _currentLearningResources = await _roadmapService.getLearningResource(
-        uid,
+        uid!,
         _currentLearningResourceId!,
       );
 
@@ -409,7 +408,7 @@ class CareerRoadmapViewModel extends ChangeNotifier {
       notifyListeners();
 
       _currentLearningResources = await _roadmapService.getLatestLearningResources(
-        uid,
+        uid!,
         _currentSkillGapId!,
       );
 
@@ -487,7 +486,7 @@ class CareerRoadmapViewModel extends ChangeNotifier {
   /// Get all roadmaps for current user
   Future<List<Map<String, dynamic>>> getAllRoadmaps() async {
     try {
-      return await _roadmapService.getAllCareerRoadmaps(uid);
+      return await _roadmapService.getAllCareerRoadmaps(uid!);
     } catch (e) {
       debugPrint('❌ Error fetching all roadmaps: $e');
       return [];
@@ -497,7 +496,7 @@ class CareerRoadmapViewModel extends ChangeNotifier {
   /// Get roadmap summary for current user
   Future<List<Map<String, dynamic>>> getRoadmapSummary() async {
     try {
-      return await _roadmapService.getRoadmapSummary(uid);
+      return await _roadmapService.getRoadmapSummary(uid!);
     } catch (e) {
       debugPrint('❌ Error fetching roadmap summary: $e');
       return [];
@@ -513,7 +512,7 @@ class CareerRoadmapViewModel extends ChangeNotifier {
     }
 
     try {
-      await _roadmapService.deleteCompleteRoadmap(uid, _currentRoadmapId!);
+      await _roadmapService.deleteCompleteRoadmap(uid!, _currentRoadmapId!);
 
       // Clear current state
       clearRoadmapData();
@@ -684,17 +683,17 @@ class CareerRoadmapViewModel extends ChangeNotifier {
 
   /// Stream roadmap updates in real-time
   Stream<CareerRoadmap?> streamRoadmap(String roadmapId) {
-    return _roadmapService.streamCareerRoadmap(uid, roadmapId);
+    return _roadmapService.streamCareerRoadmap(uid!, roadmapId);
   }
 
   /// Stream skill gap updates in real-time
   Stream<SkillGap?> streamSkillGap(String skillGapId) {
-    return _roadmapService.streamSkillGap(uid, skillGapId);
+    return _roadmapService.streamSkillGap(uid!, skillGapId);
   }
 
   /// Stream learning resources updates in real-time
   Stream<LearningResource?> streamLearningResources(String skillGapId) {
-    return _roadmapService.streamLatestLearningResources(uid, skillGapId);
+    return _roadmapService.streamLatestLearningResources(uid!, skillGapId);
   }
 
   /// Start listening to current roadmap in real-time

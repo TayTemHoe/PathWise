@@ -66,8 +66,7 @@ class ResumeViewModel extends ChangeNotifier {
   String? get error => _error;
   String? get successMessage => _successMessage;
 
-  //String get uid => _auth.currentUser?.uid ?? 'U0001';
-  String get uid => 'U0001';
+  String? get uid => FirebaseAuth.instance.currentUser?.uid;
   // =============================
   // State Setters
   // =============================
@@ -137,7 +136,7 @@ class ResumeViewModel extends ChangeNotifier {
       // Load resumes and profile in parallel
       final results = await Future.wait([
         _resumeService.listResumes(),
-        _profileService.getUserWithSubcollections(uid),
+        _profileService.getUserWithSubcollections(uid!),
       ]);
 
       _resumes = results[0] as List<ResumeDoc>;
@@ -195,7 +194,7 @@ class ResumeViewModel extends ChangeNotifier {
     try {
       // Validate user profile
       if (_userProfile == null) {
-        await _profileService.getUserWithSubcollections(uid);
+        await _profileService.getUserWithSubcollections(uid!);
         if (_userProfile == null) {
           _setError('Please complete your profile before creating a resume');
           return false;
@@ -320,7 +319,7 @@ class ResumeViewModel extends ChangeNotifier {
       }
 
       if (_userProfile == null) {
-        _userProfile = await _profileService.getUserWithSubcollections(uid);
+        _userProfile = await _profileService.getUserWithSubcollections(uid!);
       }
 
       if (_userProfile == null) {
@@ -352,7 +351,7 @@ class ResumeViewModel extends ChangeNotifier {
 
     try {
       if (_userProfile == null) {
-        _userProfile = await _profileService.getUserWithSubcollections(uid);
+        _userProfile = await _profileService.getUserWithSubcollections(uid!);
       }
 
       if (_userProfile == null) {
@@ -382,7 +381,7 @@ class ResumeViewModel extends ChangeNotifier {
 
     try {
       if (_userProfile == null) {
-        _userProfile = await _profileService.getUserWithSubcollections(uid);
+        _userProfile = await _profileService.getUserWithSubcollections(uid!);
       }
 
       if (_userProfile == null) {

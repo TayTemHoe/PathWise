@@ -45,9 +45,7 @@ class ProfileViewModel extends ChangeNotifier {
 
   String? get error => _error;
 
-  String get uid => 'U0001';
-  //final u = _auth.currentUser;
-  //return u?.uid ?? 'U0001'; // fallback for local testing
+  String get uid => FirebaseAuth.instance.currentUser?.uid ?? '';
 
 
   // ------------- Internal setters -------------
