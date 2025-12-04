@@ -1,5 +1,6 @@
 // lib/repository/ai_match_repository.dart - OPTIMIZED VERSION
 import 'dart:io';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 import '../model/ai_match_model.dart';
 import '../model/program.dart';
@@ -21,10 +22,14 @@ class AIMatchRepository {
   List<String>? _cachedCountries;
   (double, double)? _cachedTuitionRange;
   Set<String>? _cachedMalaysianBranchIds;
+  String? _currentCachedUserId;
 
   /// Generate AI match recommendations with validation
   Future<AIMatchResponse> generateMatches(AIMatchRequest request) async {
     try {
+      final userId = FirebaseAuth.instance.currentUser?.uid;
+      if (userId == null) throw Exception('User not authenticated');
+      _validateUserCache(userId);
       debugPrint('🎯 Starting AI match generation...');
 
       // Get available study areas from cache or database
@@ -247,16 +252,11 @@ class AIMatchRepository {
     return await _geminiService.testConnection();
   }
 
-  /// Save match request to local storage
-  Future<void> saveMatchRequest(AIMatchRequest request) async {
-    // TODO: Implement local storage saving if needed
-    debugPrint('💾 Match request saved (implement local storage if needed)');
-  }
-
-  /// Load saved match request
-  Future<AIMatchRequest?> loadSavedMatchRequest() async {
-    // TODO: Implement local storage loading if needed
-    debugPrint('📂 Loading saved match request (implement local storage if needed)');
-    return null;
+  void _validateUserCache(String userId) {
+    if (_currentCachedUserId != userId) {
+      debugPrint('🔄 User changed - clearing AI match cache');
+      clearCache();
+      _currentCachedUserId = userId;
+    }
   }
 }

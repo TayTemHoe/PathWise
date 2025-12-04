@@ -13,13 +13,16 @@ class BigFiveStorageService {
   static const String _progressKey = 'big_five_test_progress';
   static const String _resultKey = 'big_five_test_result';
 
+  // Helper to generate user-specific keys
+  String _getUserKey(String key, String userId) => '${key}_$userId';
+
   /// Save test progress (auto-save)
-  Future<void> saveProgress(BigFiveTestProgress progress) async {
+  Future<void> saveProgress(String userId, BigFiveTestProgress progress) async {
     try {
       final prefs = await SharedPreferences.getInstance();
       final jsonString = jsonEncode(progress.toJson());
-      await prefs.setString(_progressKey, jsonString);
-      debugPrint('✅ Big Five test progress saved (${progress.answers.length} answers)');
+      await prefs.setString(_getUserKey(_progressKey, userId), jsonString);
+      debugPrint('✅ Big Five test progress saved (${progress.answers.length} answers) for user: $userId');
     } catch (e) {
       debugPrint('❌ Error saving Big Five progress: $e');
       rethrow;
@@ -27,13 +30,13 @@ class BigFiveStorageService {
   }
 
   /// Load saved test progress
-  Future<BigFiveTestProgress?> loadProgress() async {
+  Future<BigFiveTestProgress?> loadProgress(String userId) async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      final jsonString = prefs.getString(_progressKey);
+      final jsonString = prefs.getString(_getUserKey(_progressKey, userId));
 
       if (jsonString == null) {
-        debugPrint('ℹ️ No saved Big Five test progress found');
+        debugPrint('ℹ️ No saved Big Five test progress found for user: $userId');
         return null;
       }
 
@@ -49,10 +52,10 @@ class BigFiveStorageService {
   }
 
   /// Check if there's saved progress
-  Future<bool> hasProgress() async {
+  Future<bool> hasProgress(String userId) async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      return prefs.containsKey(_progressKey);
+      return prefs.containsKey(_getUserKey(_progressKey, userId));
     } catch (e) {
       debugPrint('❌ Error checking Big Five progress: $e');
       return false;
@@ -60,11 +63,11 @@ class BigFiveStorageService {
   }
 
   /// Clear test progress
-  Future<void> clearProgress() async {
+  Future<void> clearProgress(String userId) async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      await prefs.remove(_progressKey);
-      debugPrint('🗑️ Big Five test progress cleared');
+      await prefs.remove(_getUserKey(_progressKey, userId));
+      debugPrint('🗑️ Big Five test progress cleared for user: $userId');
     } catch (e) {
       debugPrint('❌ Error clearing Big Five progress: $e');
       rethrow;
@@ -72,12 +75,12 @@ class BigFiveStorageService {
   }
 
   /// Save test result
-  Future<void> saveResult(BigFiveResult result) async {
+  Future<void> saveResult(String userId, BigFiveResult result) async {
     try {
       final prefs = await SharedPreferences.getInstance();
       final jsonString = jsonEncode(result.toJson());
-      await prefs.setString(_resultKey, jsonString);
-      debugPrint('✅ Big Five test result saved');
+      await prefs.setString(_getUserKey(_resultKey, userId), jsonString);
+      debugPrint('✅ Big Five test result saved for user: $userId');
     } catch (e) {
       debugPrint('❌ Error saving Big Five result: $e');
       rethrow;
@@ -85,13 +88,13 @@ class BigFiveStorageService {
   }
 
   /// Load saved test result
-  Future<BigFiveResult?> loadResult() async {
+  Future<BigFiveResult?> loadResult(String userId) async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      final jsonString = prefs.getString(_resultKey);
+      final jsonString = prefs.getString(_getUserKey(_resultKey, userId));
 
       if (jsonString == null) {
-        debugPrint('ℹ️ No saved Big Five test result found');
+        debugPrint('ℹ️ No saved Big Five test result found for user: $userId');
         return null;
       }
 
@@ -107,11 +110,11 @@ class BigFiveStorageService {
   }
 
   /// Clear test result
-  Future<void> clearResult() async {
+  Future<void> clearResult(String userId) async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      await prefs.remove(_resultKey);
-      debugPrint('🗑️ Big Five test result cleared');
+      await prefs.remove(_getUserKey(_resultKey, userId));
+      debugPrint('🗑️ Big Five test result cleared for user: $userId');
     } catch (e) {
       debugPrint('❌ Error clearing Big Five result: $e');
       rethrow;
@@ -119,11 +122,11 @@ class BigFiveStorageService {
   }
 
   /// Clear all Big Five test data
-  Future<void> clearAll() async {
+  Future<void> clearAll(String userId) async {
     try {
-      await clearProgress();
-      await clearResult();
-      debugPrint('🗑️ All Big Five test data cleared');
+      await clearProgress(userId);
+      await clearResult(userId);
+      debugPrint('🗑️ All Big Five test data cleared for user: $userId');
     } catch (e) {
       debugPrint('❌ Error clearing all Big Five data: $e');
       rethrow;

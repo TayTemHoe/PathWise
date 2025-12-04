@@ -4,9 +4,18 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:path_wise/repository/ai_match_repository.dart';
 import 'package:path_wise/services/shared_preference_services.dart';
+import 'package:path_wise/view/ai_match_screen.dart';
+import 'package:path_wise/view/big_five_test_screen.dart';
 import 'package:path_wise/view/comparison_screen.dart';
+import 'package:path_wise/view/dashboard.dart';
+import 'package:path_wise/view/mbti_test_screen.dart';
+import 'package:path_wise/view/riasec_test_screen.dart';
 import 'package:path_wise/viewModel/ai_match_view_model.dart';
+import 'package:path_wise/viewModel/big_five_test_view_model.dart';
 import 'package:path_wise/viewModel/comparison_view_model.dart';
+import 'package:path_wise/viewModel/dashboard_view_model.dart';
+import 'package:path_wise/viewModel/mbti_test_view_model.dart';
+import 'package:path_wise/viewModel/riasec_test_view_model.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:path_wise/services/app_initialization_service.dart';
 import 'package:path_wise/utils/shared_preferences_helper.dart';
@@ -49,7 +58,7 @@ Future<void> main() async {
     await Firebase.initializeApp(
       options: DefaultFirebaseOptions.currentPlatform,
     );
-    debugPrint('âœ… Firebase initialized');
+    debugPrint('Firebase initialized');
 
     // Initialize Supabase
     await Supabase.initialize(
@@ -106,6 +115,7 @@ Future<void> main() async {
         ChangeNotifierProvider(create: (_) => ProgramDetailViewModel()),
         ChangeNotifierProvider(create: (_) => ComparisonViewModel()),
         ChangeNotifierProvider(create: (_) => AIMatchViewModel()),
+        ChangeNotifierProvider(create: (_) => DashboardViewModel()),
       ],
       child: const PathWiseApp(),
     ),
@@ -195,8 +205,18 @@ class _PathWiseAppState extends State<PathWiseApp> with WidgetsBindingObserver {
       home: const AuthWrapper(),
       routes: {
         '/login': (context) => const AuthScreen(),
-        '/home': (context) => const UniversityListScreen(),
-        '/programs': (context) => const ProgramListScreen(),
+        '/home': (context) => const DashboardScreen(),
+
+        // Education Features
+        '/university_list': (context) => const UniversityListScreen(),
+        '/program_list': (context) => const ProgramListScreen(),
+        '/ai_match': (context) => const AIMatchScreen(),
+        '/compare': (context) => const ComparisonScreen(initialItems: []),
+
+        // Personality Tests
+        '/mbti': (context) => const MBTITestScreen(),
+        '/riasec': (context) => const RiasecTestScreen(),
+        '/big_five': (context) => const BigFiveTestScreen(),
       },
       debugShowCheckedModeBanner: false,
     );
@@ -215,15 +235,60 @@ class _AuthWrapperState extends State<AuthWrapper> {
   String _initStatus = 'Initializing PathWise...';
   double _progress = 0.0;
 
+  // 1. ADD THIS VARIABLE to track previous state
+  bool _wasLoggedIn = false;
+
   @override
   void initState() {
     super.initState();
-    _initializeApp();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _initializeApp();
+    });
   }
 
   Future<void> _initializeApp() async {
     try {
       final authViewModel = Provider.of<AuthViewModel>(context, listen: false);
+
+      // 2. INITIALIZE tracking variable
+      _wasLoggedIn = authViewModel.isUserLoggedIn();
+
+      // 3. UPDATE the listener logic
+      authViewModel.addListener(() {
+        final bool isLoggedIn = authViewModel.isUserLoggedIn();
+
+        // Only run cleanup if we TRANSITION from Logged In -> Logged Out
+        if (_wasLoggedIn && !isLoggedIn) {
+          debugPrint('🚪 User logged out - CLEARING ALL VIEW MODELS');
+
+          if (mounted) {
+            // 1. Clear AI Match
+            try { context.read<AIMatchViewModel>().reset(); } catch (_) {}
+
+            // 2. Clear Comparison
+            try { context.read<ComparisonViewModel>().clearForLogout(); } catch (_) {}
+
+            // 3. Clear Personality Tests
+            try { context.read<MBTITestViewModel>().reset(); } catch (_) {}
+            try { context.read<RiasecTestViewModel>().reset(); } catch (_) {}
+            try { context.read<BigFiveTestViewModel>().reset(); } catch (_) {}
+
+            // 4. Clear Notifications
+            try { context.read<NotificationViewModel>().clearData(); } catch (_) {}
+
+            // 5. Clear User-Specific List Data
+            try { context.read<UniversityListViewModel>().resetUserSpecificData(); } catch (_) {}
+            try { context.read<ProgramListViewModel>().resetUserSpecificData(); } catch (_) {}
+
+            // 6. Clear Dashboard
+            try { context.read<DashboardViewModel>().reset(); } catch (_) {}
+          }
+        }
+
+        // Update state for next time
+        _wasLoggedIn = isLoggedIn;
+      });
+
       final notificationViewModel = Provider.of<NotificationViewModel>(
         context,
         listen: false,
@@ -311,7 +376,7 @@ class _AuthWrapperState extends State<AuthWrapper> {
     return Consumer<AuthViewModel>(
       builder: (context, authViewModel, child) {
         if (authViewModel.isUserLoggedIn()) {
-          return const UniversityListScreen();
+          return const DashboardScreen();
         } else {
           return const AuthScreen();
         }

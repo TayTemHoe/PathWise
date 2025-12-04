@@ -114,6 +114,7 @@ class _EnglishTestDialogState extends State<EnglishTestDialog> {
 
                       const SizedBox(height: 20),
                       CustomTextField(
+                        key: ValueKey(_selectedTestType),
                         label: 'Score / Band / Grade',
                         controller: _resultController,
                         hint: _getScoreHint(),

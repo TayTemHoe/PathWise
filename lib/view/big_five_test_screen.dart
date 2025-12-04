@@ -23,19 +23,22 @@ class _BigFiveTestScreenState extends State<BigFiveTestScreen> {
   @override
   void initState() {
     super.initState();
-    _viewModel = BigFiveTestViewModel();
+    _viewModel = BigFiveTestViewModel(); // or MBTITestViewModel / RiasecTestViewModel
 
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       await _viewModel.initialize();
+      
+      if (mounted) {
+        // Schedule this for the NEXT frame to ensure PageView is built and attached
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted && _viewModel.currentQuestionIndex > 0 && _pageController.hasClients) {
+            _pageController.jumpToPage(_viewModel.currentQuestionIndex);
+          }
+        });
 
-      // Navigate to saved question
-      if (_viewModel.currentQuestionIndex > 0 && mounted) {
-        _pageController.jumpToPage(_viewModel.currentQuestionIndex);
-      }
-
-      // Show result if test completed
-      if (_viewModel.result != null && mounted) {
-        _navigateToResult();
+        if (_viewModel.result != null) {
+          _navigateToResult();
+        }
       }
     });
   }

@@ -6,6 +6,7 @@ class UserModel {
   final String email;
   final String dob;
   final String address;
+  final String userRole;
 
   const UserModel({
     required this.userId,
@@ -15,6 +16,7 @@ class UserModel {
     required this.email,
     required this.dob,
     required this.address,
+    this.userRole = 'education',
   });
 
   factory UserModel.fromMap(Map<String, dynamic> map, {String? userId}) {
@@ -26,6 +28,7 @@ class UserModel {
       email: map['email'] ?? '',
       dob: map['dob'] ?? '',
       address: map['address'] ?? '',
+      userRole: map['user_role'] ?? 'education',
     );
   }
 
@@ -38,6 +41,7 @@ class UserModel {
       'email': email,
       'dob': dob,
       'address': address,
+      'user_role': userRole,
     };
   }
 
@@ -49,6 +53,7 @@ class UserModel {
     String? email,
     String? dob,
     String? address,
+    String? userRole,
   }) {
     return UserModel(
       userId: userId ?? this.userId,
@@ -58,12 +63,13 @@ class UserModel {
       email: email ?? this.email,
       dob: dob ?? this.dob,
       address: address ?? this.address,
+      userRole: userRole ?? this.userRole,
     );
   }
 
   @override
   String toString() {
-    return 'UserModel(userId: $userId, firstName: $firstName, lastName: $lastName, phone: $phone, email: $email, dob: $dob, address: $address)';
+    return 'UserModel(userId: $userId, firstName: $firstName, lastName: $lastName, phone: $phone, email: $email, dob: $dob, address: $address, user Role: $userRole)';
   }
 
   @override

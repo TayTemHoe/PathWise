@@ -28,14 +28,18 @@ class _RiasecTestScreenState extends State<RiasecTestScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       await _viewModel.initialize();
 
-      // Navigate to saved question
-      if (_viewModel.currentQuestionIndex > 0 && mounted) {
-        _pageController.jumpToPage(_viewModel.currentQuestionIndex);
-      }
+      if (mounted) {
+        // Schedule this for the NEXT frame to ensure PageView is built and attached
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted && _viewModel.currentQuestionIndex > 0 && _pageController.hasClients) {
+            _pageController.jumpToPage(_viewModel.currentQuestionIndex);
+          }
+        });
 
-      // Show result if test completed
-      if (_viewModel.result != null && mounted) {
-        _navigateToResult();
+        // Navigate to result if ready (this doesn't need PageController)
+        if (_viewModel.result != null) {
+          _navigateToResult();
+        }
       }
     });
   }

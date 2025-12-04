@@ -313,7 +313,6 @@ class Formatters {
   static List<TextInputFormatter> cambridgeFormatter() {
     return [
       FilteringTextInputFormatter.digitsOnly,
-      _NumericRangeFormatter(min: 80, max: 230),
     ];
   }
 

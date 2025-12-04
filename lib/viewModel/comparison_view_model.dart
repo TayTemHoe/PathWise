@@ -57,10 +57,21 @@ class ComparisonViewModel extends ChangeNotifier {
       final user = FirebaseAuth.instance.currentUser;
       if (user == null) {
         debugPrint('⚠️ No user logged in');
+        _comparisonItems.clear(); // ✅ ADD THIS
+        notifyListeners(); // ✅ ADD THIS
         return;
       }
 
       _userId = user.uid;
+
+      if (_comparisonItems.isNotEmpty) {
+        final oldUserId = _comparisonItems.first.id; // Infer from cached data
+        if (!oldUserId.contains(_userId!)) { // Simple check
+          _comparisonItems.clear();
+          _repository.clearCache();
+          notifyListeners();
+        }
+      }
 
       // DEBUG: Check what's in SQLite FIRST
       await _repository.debugPrintSQLiteState(_userId!);
@@ -814,5 +825,12 @@ class ComparisonViewModel extends ChangeNotifier {
     _comparisonItems.clear();
     _repository.clearCache();
     super.dispose();
+  }
+
+  void clearForLogout() {
+    _comparisonItems.clear();
+    _repository.clearCache();
+    notifyListeners();
+    debugPrint('🧹 Comparison data cleared for logout');
   }
 }

@@ -12,13 +12,16 @@ class RiasecStorageService {
   static const String _progressKey = 'riasec_test_progress';
   static const String _resultKey = 'riasec_test_result';
 
+  // Helper to generate user-specific keys
+  String _getUserKey(String key, String userId) => '${key}_$userId';
+
   /// Save test progress (auto-save)
-  Future<void> saveProgress(RiasecTestProgress progress) async {
+  Future<void> saveProgress(String userId, RiasecTestProgress progress) async {
     try {
       final prefs = await SharedPreferences.getInstance();
       final jsonString = jsonEncode(progress.toJson());
-      await prefs.setString(_progressKey, jsonString);
-      debugPrint('✅ RIASEC test progress saved (${progress.answers.length} answers)');
+      await prefs.setString(_getUserKey(_progressKey, userId), jsonString);
+      debugPrint('✅ RIASEC test progress saved (${progress.answers.length} answers) for user: $userId');
     } catch (e) {
       debugPrint('❌ Error saving RIASEC progress: $e');
       rethrow;
@@ -26,13 +29,13 @@ class RiasecStorageService {
   }
 
   /// Load saved test progress
-  Future<RiasecTestProgress?> loadProgress() async {
+  Future<RiasecTestProgress?> loadProgress(String userId) async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      final jsonString = prefs.getString(_progressKey);
+      final jsonString = prefs.getString(_getUserKey(_progressKey, userId));
 
       if (jsonString == null) {
-        debugPrint('ℹ️ No saved RIASEC test progress found');
+        debugPrint('ℹ️ No saved RIASEC test progress found for user: $userId');
         return null;
       }
 
@@ -48,10 +51,10 @@ class RiasecStorageService {
   }
 
   /// Check if there's saved progress
-  Future<bool> hasProgress() async {
+  Future<bool> hasProgress(String userId) async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      return prefs.containsKey(_progressKey);
+      return prefs.containsKey(_getUserKey(_progressKey, userId));
     } catch (e) {
       debugPrint('❌ Error checking RIASEC progress: $e');
       return false;
@@ -59,11 +62,11 @@ class RiasecStorageService {
   }
 
   /// Clear test progress
-  Future<void> clearProgress() async {
+  Future<void> clearProgress(String userId) async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      await prefs.remove(_progressKey);
-      debugPrint('🗑️ RIASEC test progress cleared');
+      await prefs.remove(_getUserKey(_progressKey, userId));
+      debugPrint('🗑️ RIASEC test progress cleared for user: $userId');
     } catch (e) {
       debugPrint('❌ Error clearing RIASEC progress: $e');
       rethrow;
@@ -71,12 +74,12 @@ class RiasecStorageService {
   }
 
   /// Save test result
-  Future<void> saveResult(RiasecResult result) async {
+  Future<void> saveResult(String userId, RiasecResult result) async {
     try {
       final prefs = await SharedPreferences.getInstance();
       final jsonString = jsonEncode(result.toJson());
-      await prefs.setString(_resultKey, jsonString);
-      debugPrint('✅ RIASEC test result saved');
+      await prefs.setString(_getUserKey(_resultKey, userId), jsonString);
+      debugPrint('✅ RIASEC test result saved for user: $userId');
     } catch (e) {
       debugPrint('❌ Error saving RIASEC result: $e');
       rethrow;
@@ -84,13 +87,13 @@ class RiasecStorageService {
   }
 
   /// Load saved test result
-  Future<RiasecResult?> loadResult() async {
+  Future<RiasecResult?> loadResult(String userId) async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      final jsonString = prefs.getString(_resultKey);
+      final jsonString = prefs.getString(_getUserKey(_resultKey, userId));
 
       if (jsonString == null) {
-        debugPrint('ℹ️ No saved RIASEC test result found');
+        debugPrint('ℹ️ No saved RIASEC test result found for user: $userId');
         return null;
       }
 
@@ -106,11 +109,11 @@ class RiasecStorageService {
   }
 
   /// Clear test result
-  Future<void> clearResult() async {
+  Future<void> clearResult(String userId) async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      await prefs.remove(_resultKey);
-      debugPrint('🗑️ RIASEC test result cleared');
+      await prefs.remove(_getUserKey(_resultKey, userId));
+      debugPrint('🗑️ RIASEC test result cleared for user: $userId');
     } catch (e) {
       debugPrint('❌ Error clearing RIASEC result: $e');
       rethrow;
@@ -118,11 +121,11 @@ class RiasecStorageService {
   }
 
   /// Clear all RIASEC test data
-  Future<void> clearAll() async {
+  Future<void> clearAll(String userId) async {
     try {
-      await clearProgress();
-      await clearResult();
-      debugPrint('🗑️ All RIASEC test data cleared');
+      await clearProgress(userId);
+      await clearResult(userId);
+      debugPrint('🗑️ All RIASEC test data cleared for user: $userId');
     } catch (e) {
       debugPrint('❌ Error clearing all RIASEC data: $e');
       rethrow;
