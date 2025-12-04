@@ -1,4 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:path_wise/view/career/career_view.dart';
+import 'package:path_wise/view/career/job_view.dart';
+import 'package:path_wise/view/interview/interview_home_view.dart';
+import 'package:path_wise/view/profile/profile_overview_view.dart';
+import 'package:path_wise/view/resume/resume_home_view.dart';
+import 'package:path_wise/view/roadmap/careerroadmap_list_view.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart'; // Ensure intl is in pubspec.yaml, widely used in Flutter
 import '../utils/app_color.dart';
@@ -65,12 +71,22 @@ class _DashboardScreenState extends State<DashboardScreen> {
             MaterialPageRoute(builder: (_) => const BigFiveTestScreen()));
         break;
       case '/job_list':
+        Navigator.push(context,MaterialPageRoute(builder: (_) => const JobView()));
+        break;
       case '/ai_job_match':
+        Navigator.push(context,MaterialPageRoute(builder: (_) => const CareerDiscoveryView()));
+        break;
       case '/resume':
+        Navigator.push(context,MaterialPageRoute(builder: (_) => const ResumeListPage()));
+        break;
       case '/interview':
+        Navigator.push(context,MaterialPageRoute(builder: (_) => const InterviewHomePage()));
+        break;
       case '/roadmap':
+        Navigator.push(context,MaterialPageRoute(builder: (_) => const RoadmapListView()));
+        break;
       case '/profile':
-        _showComingSoon(route.replaceAll('/', '').replaceAll('_', ' ').toUpperCase());
+        Navigator.push(context,MaterialPageRoute(builder: (_) => const ProfileOverviewScreen()));
         break;
     }
   }

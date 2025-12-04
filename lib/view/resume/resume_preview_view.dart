@@ -8,6 +8,8 @@ import 'package:path_wise/model/resume_model.dart';
 import 'package:path_wise/model/user_profile.dart';
 import 'package:intl/intl.dart';
 
+import '../../utils/app_color.dart';
+
 // Defining KYYAP Design Colors locally
 class _DesignColors {
   static const Color primary = Color(0xFF6C63FF);
@@ -34,7 +36,8 @@ class PreviewResumePage extends StatelessWidget {
         elevation: 0,
         centerTitle: true,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: _DesignColors.textPrimary),
+          icon: const Icon(
+              Icons.arrow_back_ios, color: AppColors.textPrimary, size: 20),
           onPressed: () => Navigator.pop(context),
         ),
         title: Column(

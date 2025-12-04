@@ -5,6 +5,8 @@ import 'package:path_wise/viewModel/interview_view_model.dart';
 import 'package:path_wise/viewModel/profile_view_model.dart';
 import 'dart:async';
 
+import '../../utils/app_color.dart';
+
 // Defining KYYAP Design Colors locally
 class _DesignColors {
   static const Color primary = Color(0xFF6C63FF);
@@ -190,7 +192,8 @@ class _InterviewSessionPageState extends State<InterviewSessionPage> {
           Row(
             children: [
               IconButton(
-                icon: const Icon(Icons.arrow_back, color: Colors.white),
+                icon: const Icon(
+                    Icons.arrow_back_ios, color: Colors.white, size: 20),
                 padding: EdgeInsets.zero,
                 constraints: const BoxConstraints(),
                 onPressed: () async {

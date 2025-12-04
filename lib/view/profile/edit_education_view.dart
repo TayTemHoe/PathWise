@@ -4,6 +4,8 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:path_wise/viewModel/profile_view_model.dart';
 import 'package:path_wise/model/user_profile.dart';
 
+import '../../utils/app_color.dart';
+
 class EditEducationScreen extends StatelessWidget {
   const EditEducationScreen({super.key});
 
@@ -25,7 +27,8 @@ class EditEducationScreen extends StatelessWidget {
             backgroundColor: _backgroundColor,
             centerTitle: true,
             leading: IconButton(
-              icon: const Icon(Icons.arrow_back_ios, color: Colors.black, size: 20),
+              icon: const Icon(
+                  Icons.arrow_back_ios, color: AppColors.textPrimary, size: 20),
               onPressed: () => Navigator.pop(context),
             ),
             title: Text(

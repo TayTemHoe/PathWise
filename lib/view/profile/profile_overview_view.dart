@@ -11,6 +11,8 @@ import 'package:path_wise/view/profile/edit_skills_view.dart';
 import 'package:path_wise/view/profile/edit_preferences_view.dart';
 import 'package:path_wise/view/profile/edit_personality_view.dart';
 
+import '../../utils/app_color.dart';
+
 // Defining KYYAP Design Colors locally
 class _DesignColors {
   static const Color primary = Color(0xFF6C63FF);
@@ -57,6 +59,11 @@ class _ProfileOverviewScreenState extends State<ProfileOverviewScreen> {
         backgroundColor: _DesignColors.background,
         elevation: 0,
         centerTitle: true,
+        leading: IconButton(
+          icon: const Icon(
+              Icons.arrow_back_ios, color: AppColors.textPrimary, size: 20),
+          onPressed: () => Navigator.pop(context),
+        ),
         automaticallyImplyLeading: false,
         actions: [
           IconButton(

@@ -7,6 +7,8 @@ import 'package:provider/provider.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:path_wise/viewModel/profile_view_model.dart';
 
+import '../../utils/app_color.dart';
+
 class EditPersonalInfoScreen extends StatefulWidget {
   const EditPersonalInfoScreen({super.key});
 
@@ -136,7 +138,8 @@ class _EditPersonalInfoScreenState extends State<EditPersonalInfoScreen> {
             backgroundColor: Colors.white,
             centerTitle: true,
             leading: IconButton(
-              icon: const Icon(Icons.arrow_back_ios, color: Colors.black, size: 20),
+              icon: const Icon(
+                  Icons.arrow_back_ios, color: AppColors.textPrimary, size: 20),
               onPressed: () => Navigator.pop(context),
             ),
             title: Text(

@@ -3,6 +3,8 @@ import 'package:provider/provider.dart';
 import 'package:path_wise/model/user_profile.dart';
 import 'package:path_wise/viewModel/profile_view_model.dart';
 
+import '../../utils/app_color.dart';
+
 class EditPreferencesScreen extends StatelessWidget {
   const EditPreferencesScreen({super.key});
 
@@ -39,8 +41,9 @@ class EditPreferencesScreen extends StatelessWidget {
         backgroundColor: _backgroundColor,
         centerTitle: true,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios, color: Colors.black, size: 20),
-          onPressed: () => Navigator.maybePop(context),
+          icon: const Icon(
+              Icons.arrow_back_ios, color: AppColors.textPrimary, size: 20),
+          onPressed: () => Navigator.pop(context),
         ),
         title: Text(
           'Career Preferences',

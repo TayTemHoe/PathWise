@@ -3,18 +3,31 @@ import 'dart:async';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:path_wise/repository/ai_match_repository.dart';
+import 'package:path_wise/routes.dart';
 import 'package:path_wise/services/shared_preference_services.dart';
 import 'package:path_wise/view/ai_match_screen.dart';
 import 'package:path_wise/view/big_five_test_screen.dart';
 import 'package:path_wise/view/comparison_screen.dart';
 import 'package:path_wise/view/dashboard.dart';
 import 'package:path_wise/view/mbti_test_screen.dart';
+import 'package:path_wise/view/profile/edit_education_view.dart';
+import 'package:path_wise/view/profile/edit_experience_view.dart';
+import 'package:path_wise/view/profile/edit_personal_view.dart';
+import 'package:path_wise/view/profile/edit_personality_view.dart';
+import 'package:path_wise/view/profile/edit_preferences_view.dart';
+import 'package:path_wise/view/profile/edit_skills_view.dart';
 import 'package:path_wise/view/riasec_test_screen.dart';
 import 'package:path_wise/viewModel/ai_match_view_model.dart';
 import 'package:path_wise/viewModel/big_five_test_view_model.dart';
+import 'package:path_wise/viewModel/career_view_model.dart';
+import 'package:path_wise/viewModel/careerroadmap_view_model.dart';
 import 'package:path_wise/viewModel/comparison_view_model.dart';
 import 'package:path_wise/viewModel/dashboard_view_model.dart';
+import 'package:path_wise/viewModel/interview_view_model.dart';
+import 'package:path_wise/viewModel/job_view_model.dart';
 import 'package:path_wise/viewModel/mbti_test_view_model.dart';
+import 'package:path_wise/viewModel/profile_view_model.dart';
+import 'package:path_wise/viewModel/resume_view_model.dart';
 import 'package:path_wise/viewModel/riasec_test_view_model.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:path_wise/services/app_initialization_service.dart';
@@ -59,6 +72,11 @@ Future<void> main() async {
       options: DefaultFirebaseOptions.currentPlatform,
     );
     debugPrint('Firebase initialized');
+
+    await Supabase.initialize(
+      url: 'https://ajdaciskaffuvaanizlw.supabase.co',
+      anonKey: 'sb_publishable_Vs82x42CVKx28QIzgQEYNw_zvzJ7yEg',
+    );
 
     // Initialize Supabase
     await Supabase.initialize(
@@ -116,6 +134,13 @@ Future<void> main() async {
         ChangeNotifierProvider(create: (_) => ComparisonViewModel()),
         ChangeNotifierProvider(create: (_) => AIMatchViewModel()),
         ChangeNotifierProvider(create: (_) => DashboardViewModel()),
+
+        ChangeNotifierProvider(create: (_) {final vm = ProfileViewModel();vm.loadAll(); return vm;}),
+        ChangeNotifierProvider(create: (_) => CareerViewModel()),
+        ChangeNotifierProvider(create: (_) => JobViewModel()),
+        ChangeNotifierProvider(create: (_) => InterviewViewModel()),
+        ChangeNotifierProvider(create: (_) => CareerRoadmapViewModel()),
+        ChangeNotifierProvider(create: (_) => ResumeViewModel()),
       ],
       child: const PathWiseApp(),
     ),
@@ -217,6 +242,20 @@ class _PathWiseAppState extends State<PathWiseApp> with WidgetsBindingObserver {
         '/mbti': (context) => const MBTITestScreen(),
         '/riasec': (context) => const RiasecTestScreen(),
         '/big_five': (context) => const BigFiveTestScreen(),
+
+        AppRoutes.editPersonal:     (_) => const EditPersonalInfoScreen(),
+        AppRoutes.editSkills:       (_) => const EditSkillsScreen(),
+        AppRoutes.editEducation:    (_) => const EditEducationScreen(),
+        AppRoutes.editExperience:   (_) => const EditExperienceScreen(),
+        AppRoutes.editPreferences:  (_) => const EditPreferencesScreen(),
+        AppRoutes.editPersonality:  (_) => const EditPersonalityScreen(),
+        '/interview-home': (context) => const InterviewHomePage(),
+        '/interview-setup': (context) => const InterviewSetupPage(),
+        '/interview-session': (context) => const InterviewSessionPage(),
+        '/interview-results': (context) => const InterviewResultsPage(),
+        '/interview-history': (context) => const InterviewHistoryPage(),
+        '/resume/template-selection': (context) => TemplateSelectionPage(),
+        '/resume/edit':(context) => CustomizeResumePage(),
       },
       debugShowCheckedModeBanner: false,
     );

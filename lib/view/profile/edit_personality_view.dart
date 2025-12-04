@@ -3,6 +3,8 @@ import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:path_wise/viewModel/profile_view_model.dart';
 
+import '../../utils/app_color.dart';
+
 class EditPersonalityScreen extends StatefulWidget {
   const EditPersonalityScreen({super.key});
 
@@ -49,6 +51,11 @@ class EditPersonalityScreenState extends State<EditPersonalityScreen> {
               end: Alignment.bottomRight,
             ),
           ),
+        ),
+        leading: IconButton(
+          icon: const Icon(
+              Icons.arrow_back_ios, color: AppColors.textPrimary, size: 20),
+          onPressed: () => Navigator.pop(context),
         ),
         title: const Text(
           'Personality Tests',

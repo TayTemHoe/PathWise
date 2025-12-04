@@ -6,6 +6,8 @@ import 'package:path_wise/viewModel/career_view_model.dart';
 import 'package:path_wise/viewModel/profile_view_model.dart';
 import 'package:path_wise/view/roadmap/roadmap_detail_view.dart';
 
+import '../../utils/app_color.dart';
+
 // Defining KYYAP Design Colors locally
 class _DesignColors {
   static const Color primary = Color(0xFF6C63FF);
@@ -68,7 +70,8 @@ class _CreateRoadmapViewState extends State<CreateRoadmapView> {
         elevation: 0,
         centerTitle: true,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: _DesignColors.textPrimary),
+          icon: const Icon(
+              Icons.arrow_back_ios, color: AppColors.textPrimary, size: 20),
           onPressed: () => Navigator.pop(context),
         ),
         title: const Text(

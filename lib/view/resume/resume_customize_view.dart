@@ -6,6 +6,8 @@ import 'package:path_wise/viewModel/profile_view_model.dart';
 import 'package:path_wise/model/resume_model.dart';
 import 'package:path_wise/view/resume/resume_preview_view.dart';
 
+import '../../utils/app_color.dart';
+
 // Defining KYYAP Design Colors locally
 class _DesignColors {
   static const Color primary = Color(0xFF6C63FF);
@@ -170,7 +172,8 @@ class _CustomizeResumePageState extends State<CustomizeResumePage>
           elevation: 0,
           centerTitle: true,
           leading: IconButton(
-            icon: const Icon(Icons.arrow_back, color: _DesignColors.textPrimary),
+            icon: const Icon(
+                Icons.arrow_back_ios, color: AppColors.textPrimary, size: 20),
             onPressed: () async {
               if (await _onWillPop()) {
                 if (mounted) Navigator.pop(context);

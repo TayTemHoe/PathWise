@@ -6,6 +6,8 @@ import 'package:path_wise/viewModel/profile_view_model.dart';
 import 'package:path_wise/view/career/job_view.dart';
 import 'package:path_wise/model/career_suggestion.dart';
 
+import '../../utils/app_color.dart';
+
 // Defining KYYAP Design Colors locally
 class _DesignColors {
   static const Color primary = Color(0xFF6C63FF);
@@ -71,6 +73,11 @@ class _CareerDiscoveryViewState extends State<CareerDiscoveryView> {
         elevation: 0,
         centerTitle: true,
         automaticallyImplyLeading: false,
+        leading: IconButton(
+          icon: const Icon(
+              Icons.arrow_back_ios, color: AppColors.textPrimary, size: 20),
+          onPressed: () => Navigator.pop(context),
+        ),
         actions: [
           IconButton(
             icon: const Icon(Icons.refresh, color: _DesignColors.primary),

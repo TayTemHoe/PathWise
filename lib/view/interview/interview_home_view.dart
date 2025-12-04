@@ -5,6 +5,8 @@ import 'package:provider/provider.dart';
 import 'package:path_wise/viewModel/interview_view_model.dart';
 import 'package:path_wise/viewModel/career_view_model.dart';
 
+import '../../utils/app_color.dart';
+
 // Defining KYYAP Design Colors locally
 class _DesignColors {
   static const Color primary = Color(0xFF6C63FF);
@@ -60,6 +62,11 @@ class _InterviewHomePageState extends State<InterviewHomePage> {
             fontWeight: FontWeight.bold,
             color: _DesignColors.textPrimary,
           ),
+        ),
+        leading: IconButton(
+          icon: const Icon(
+              Icons.arrow_back_ios, color: AppColors.textPrimary, size: 20),
+          onPressed: () => Navigator.pop(context),
         ),
         actions: [
           IconButton(

@@ -3,6 +3,8 @@ import 'package:provider/provider.dart';
 import 'package:path_wise/viewModel/profile_view_model.dart';
 import 'package:path_wise/model/user_profile.dart';
 
+import '../../utils/app_color.dart';
+
 class EditSkillsScreen extends StatefulWidget {
   const EditSkillsScreen({super.key});
 
@@ -61,7 +63,8 @@ class _EditSkillsScreenState extends State<EditSkillsScreen> {
               backgroundColor: _backgroundColor,
               centerTitle: true,
               leading: IconButton(
-                icon: const Icon(Icons.arrow_back_ios, color: Colors.black, size: 20),
+                icon: const Icon(
+                    Icons.arrow_back_ios, color: AppColors.textPrimary, size: 20),
                 onPressed: () => Navigator.pop(context),
               ),
               title: Text(
