@@ -5,6 +5,20 @@ import 'package:provider/provider.dart';
 import 'package:path_wise/viewModel/interview_view_model.dart';
 import 'package:path_wise/viewModel/career_view_model.dart';
 
+// Defining KYYAP Design Colors locally
+class _DesignColors {
+  static const Color primary = Color(0xFF6C63FF);
+  static const Color background = Color(0xFFF5F7FA);
+  static const Color textPrimary = Color(0xFF2D3436);
+  static const Color textSecondary = Color(0xFF636E72);
+  static const Color cardBackground = Colors.white;
+  static const Color success = Color(0xFF00B894);
+  static const Color info = Color(0xFF74B9FF);
+  static const Color warning = Color(0xFFFDCB6E);
+  static const Color error = Color(0xFFD63031);
+  static Color shadow = Colors.black.withOpacity(0.08);
+}
+
 class InterviewHomePage extends StatefulWidget {
   const InterviewHomePage({Key? key}) : super(key: key);
 
@@ -34,92 +48,68 @@ class _InterviewHomePageState extends State<InterviewHomePage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: Container(
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [Color(0xFF8B5CF6), Color(0xFF3B82F6)],
+      backgroundColor: _DesignColors.background,
+      appBar: AppBar(
+        backgroundColor: _DesignColors.background,
+        elevation: 0,
+        centerTitle: true,
+        title: const Text(
+          'Interview Simulator',
+          style: TextStyle(
+            fontSize: 20,
+            fontWeight: FontWeight.bold,
+            color: _DesignColors.textPrimary,
           ),
         ),
-        child: SafeArea(
-          child: Column(
-            children: [
-              _buildHeader(),
-              Expanded(
-                child: Container(
-                  decoration: const BoxDecoration(
-                    color: Color(0xFFF5F5F5),
-                    borderRadius: BorderRadius.only(
-                      topLeft: Radius.circular(30),
-                      topRight: Radius.circular(30),
-                    ),
-                  ),
-                  child: Consumer<InterviewViewModel>(
-                    builder: (context, interviewVM, child) {
-                      if (interviewVM.isLoading) {
-                        return const Center(child: CircularProgressIndicator());
-                      }
-
-                      final stats = interviewVM.getStatistics();
-
-                      return RefreshIndicator(
-                        onRefresh: _loadData,
-                        child: SingleChildScrollView(
-                          physics: const AlwaysScrollableScrollPhysics(),
-                          child: Column(
-                            children: [
-                              const SizedBox(height: 20), // Add top padding
-                              // Statistics Cards
-                              _buildStatisticsCards(stats),
-
-                              // Action Cards
-                              _buildActionCards(context),
-
-                              // Recent Performance
-                              _buildRecentPerformance(interviewVM),
-
-                              const SizedBox(height: 24),
-                            ],
-                          ),
-                        ),
-                      );
-                    },
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildHeader() {
-    return Padding(
-      padding: const EdgeInsets.all(20),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          const SizedBox(width: 40), // Balance the space
-          const Expanded(
-            child: Text(
-              'Interview Simulator',
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                fontSize: 28,
-                fontWeight: FontWeight.bold,
-                color: Colors.white,
-              ),
-            ),
-          ),
+        actions: [
           IconButton(
-            icon: const Icon(Icons.help_outline, color: Colors.white),
-            onPressed: () {
-              _showHelpDialog(context);
-            },
+            icon: const Icon(Icons.help_outline, color: _DesignColors.textSecondary),
+            onPressed: () => _showHelpDialog(context),
           ),
         ],
+      ),
+      body: SafeArea(
+        child: Consumer<InterviewViewModel>(
+          builder: (context, interviewVM, child) {
+            if (interviewVM.isLoading) {
+              return const Center(
+                child: CircularProgressIndicator(
+                  valueColor: AlwaysStoppedAnimation<Color>(_DesignColors.primary),
+                ),
+              );
+            }
+
+            final stats = interviewVM.getStatistics();
+
+            return RefreshIndicator(
+              onRefresh: _loadData,
+              color: _DesignColors.primary,
+              child: SingleChildScrollView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Statistics Section
+                    _buildStatisticsCards(stats),
+
+                    const SizedBox(height: 24),
+
+                    // Action Cards
+                    _buildActionCards(context),
+
+                    const SizedBox(height: 24),
+
+                    // Recent Performance
+                    _buildRecentPerformance(interviewVM),
+
+                    const SizedBox(height: 40),
+                  ],
+                ),
+              ),
+            );
+          },
+        ),
       ),
     );
   }
@@ -129,31 +119,26 @@ class _InterviewHomePageState extends State<InterviewHomePage> {
     final avgScore = hasData ? stats['averageScore'] ?? 0 : 0;
     final totalSessions = stats['totalSessions'] ?? 0;
 
-    return Padding(
-      padding: const EdgeInsets.all(16),
-      child: Row(
-        children: [
-          Expanded(
-            child: _buildStatCard(
-              icon: Icons.emoji_events,
-              iconColor: Colors.orange,
-              value: '$avgScore%',
-              label: 'Average\nScore',
-              backgroundColor: Colors.white,
-            ),
+    return Row(
+      children: [
+        Expanded(
+          child: _buildStatCard(
+            icon: Icons.emoji_events_outlined,
+            iconColor: _DesignColors.warning,
+            value: '$avgScore%',
+            label: 'Average Score',
           ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: _buildStatCard(
-              icon: Icons.adjust,
-              iconColor: Colors.green,
-              value: '$totalSessions',
-              label: 'Total\nSessions',
-              backgroundColor: Colors.white,
-            ),
+        ),
+        const SizedBox(width: 16),
+        Expanded(
+          child: _buildStatCard(
+            icon: Icons.check_circle_outline,
+            iconColor: _DesignColors.success,
+            value: '$totalSessions',
+            label: 'Total Sessions',
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 
@@ -162,16 +147,15 @@ class _InterviewHomePageState extends State<InterviewHomePage> {
     required Color iconColor,
     required String value,
     required String label,
-    required Color backgroundColor,
   }) {
     return Container(
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: backgroundColor,
+        color: _DesignColors.cardBackground,
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
+            color: _DesignColors.shadow,
             blurRadius: 10,
             offset: const Offset(0, 4),
           ),
@@ -179,24 +163,31 @@ class _InterviewHomePageState extends State<InterviewHomePage> {
       ),
       child: Column(
         children: [
-          Icon(icon, color: iconColor, size: 32),
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: iconColor.withOpacity(0.1),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(icon, color: iconColor, size: 24),
+          ),
           const SizedBox(height: 12),
           Text(
             value,
             style: const TextStyle(
-              fontSize: 24,
+              fontSize: 22,
               fontWeight: FontWeight.bold,
-              color: Colors.black87,
+              color: _DesignColors.textPrimary,
             ),
           ),
           const SizedBox(height: 4),
           Text(
             label,
             textAlign: TextAlign.center,
-            style: TextStyle(
+            style: const TextStyle(
               fontSize: 12,
-              color: Colors.grey[600],
-              height: 1.3,
+              color: _DesignColors.textSecondary,
+              fontWeight: FontWeight.w500,
             ),
           ),
         ],
@@ -205,27 +196,24 @@ class _InterviewHomePageState extends State<InterviewHomePage> {
   }
 
   Widget _buildActionCards(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      child: Column(
-        children: [
-          _buildActionCard(
-            icon: Icons.play_circle_outline,
-            iconColor: const Color(0xFF8B5CF6),
-            title: 'Start New Interview',
-            subtitle: 'Practice with customizable\ninterview settings',
-            onTap: () => _startNewInterview(context),
-          ),
-          const SizedBox(height: 12),
-          _buildActionCard(
-            icon: Icons.history,
-            iconColor: const Color(0xFF3B82F6),
-            title: 'View History',
-            subtitle: 'Track your progress and review\npast sessions',
-            onTap: () => _viewHistory(context),
-          ),
-        ],
-      ),
+    return Column(
+      children: [
+        _buildActionCard(
+          icon: Icons.play_arrow_rounded,
+          iconColor: _DesignColors.primary,
+          title: 'Start New Interview',
+          subtitle: 'Practice with customizable interview settings',
+          onTap: () => _startNewInterview(context),
+        ),
+        const SizedBox(height: 16),
+        _buildActionCard(
+          icon: Icons.history_rounded,
+          iconColor: _DesignColors.info,
+          title: 'View History',
+          subtitle: 'Track your progress and review past sessions',
+          onTap: () => _viewHistory(context),
+        ),
+      ],
     );
   }
 
@@ -236,51 +224,69 @@ class _InterviewHomePageState extends State<InterviewHomePage> {
     required String subtitle,
     required VoidCallback onTap,
   }) {
-    return Card(
-      elevation: 2,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      child: InkWell(
-        onTap: onTap,
+    return Container(
+      decoration: BoxDecoration(
+        color: _DesignColors.cardBackground,
         borderRadius: BorderRadius.circular(16),
-        child: Padding(
-          padding: const EdgeInsets.all(20),
-          child: Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: iconColor.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: _DesignColors.shadow,
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Material(
+        color: Colors.transparent,
+        borderRadius: BorderRadius.circular(16),
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(16),
+          child: Padding(
+            padding: const EdgeInsets.all(20),
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: iconColor.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Icon(icon, color: iconColor, size: 28),
                 ),
-                child: Icon(icon, color: iconColor, size: 28),
-              ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      title,
-                      style: const TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.black87,
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        title,
+                        style: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          color: _DesignColors.textPrimary,
+                        ),
                       ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      subtitle,
-                      style: TextStyle(
-                        fontSize: 13,
-                        color: Colors.grey[600],
-                        height: 1.3,
+                      const SizedBox(height: 4),
+                      Text(
+                        subtitle,
+                        style: const TextStyle(
+                          fontSize: 13,
+                          color: _DesignColors.textSecondary,
+                          height: 1.3,
+                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
-              ),
-              Icon(Icons.arrow_forward_ios, color: Colors.grey[400], size: 18),
-            ],
+                const SizedBox(width: 8),
+                const Icon(
+                  Icons.arrow_forward_ios_rounded,
+                  color: _DesignColors.textSecondary,
+                  size: 16,
+                ),
+              ],
+            ),
           ),
         ),
       ),
@@ -291,102 +297,122 @@ class _InterviewHomePageState extends State<InterviewHomePage> {
     final recentSessions = interviewVM.recentSessions;
 
     if (recentSessions.isEmpty) {
-      return Padding(
-        padding: const EdgeInsets.all(16),
-        child: Card(
-          child: Padding(
-            padding: const EdgeInsets.all(32),
-            child: Column(
-              children: [
-                Icon(Icons.history, size: 48, color: Colors.grey[400]),
-                const SizedBox(height: 16),
-                Text(
-                  'No interview sessions yet',
-                  style: TextStyle(
-                    fontSize: 16,
-                    color: Colors.grey[600],
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  'Start your first interview to see your performance',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontSize: 13,
-                    color: Colors.grey[500],
-                  ),
-                ),
-              ],
+      return Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(32),
+        decoration: BoxDecoration(
+          color: _DesignColors.cardBackground,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: Colors.grey.withOpacity(0.1)),
+        ),
+        child: Column(
+          children: [
+            Icon(Icons.history_toggle_off, size: 48, color: Colors.grey[300]),
+            const SizedBox(height: 16),
+            const Text(
+              'No interview sessions yet',
+              style: TextStyle(
+                fontSize: 16,
+                color: _DesignColors.textPrimary,
+                fontWeight: FontWeight.w600,
+              ),
             ),
-          ),
+            const SizedBox(height: 8),
+            const Text(
+              'Start your first interview to see performance metrics',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 13,
+                color: _DesignColors.textSecondary,
+              ),
+            ),
+          ],
         ),
       );
     }
 
-    return Padding(
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Padding(
+          padding: EdgeInsets.only(left: 4, bottom: 12),
+          child: Text(
             'Recent Performance',
             style: TextStyle(
               fontSize: 18,
               fontWeight: FontWeight.bold,
-              color: Colors.black87,
+              color: _DesignColors.textPrimary,
             ),
           ),
-          const SizedBox(height: 8),
-          Text(
-            'Your last ${recentSessions.length} interview sessions',
-            style: TextStyle(
-              fontSize: 13,
-              color: Colors.grey[600],
-            ),
-          ),
-          const SizedBox(height: 16),
-          Card(
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                children: [
-                  _buildPerformanceHeader(),
-                  const SizedBox(height: 16),
-                  ...recentSessions.asMap().entries.map((entry) {
-                    final index = entry.key;
-                    final session = entry.value;
-                    return _buildPerformanceRow(
-                      sessionNumber: recentSessions.length - index,
-                      session: session,
-                      isLast: index == recentSessions.length - 1,
-                    );
-                  }).toList(),
-                ],
+        ),
+        Container(
+          decoration: BoxDecoration(
+            color: _DesignColors.cardBackground,
+            borderRadius: BorderRadius.circular(16),
+            boxShadow: [
+              BoxShadow(
+                color: _DesignColors.shadow,
+                blurRadius: 10,
+                offset: const Offset(0, 4),
               ),
+            ],
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              children: [
+                _buildPerformanceHeader(),
+                const Divider(height: 24),
+                ...recentSessions.asMap().entries.map((entry) {
+                  final index = entry.key;
+                  final session = entry.value;
+                  return _buildPerformanceRow(
+                    sessionNumber: recentSessions.length - index,
+                    session: session,
+                    isLast: index == recentSessions.length - 1,
+                  );
+                }).toList(),
+              ],
             ),
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 
   Widget _buildPerformanceHeader() {
-    return Row(
+    return const Row(
       children: [
-        const SizedBox(width: 60),
+        SizedBox(
+          width: 50,
+          child: Text(
+            'Session',
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.bold,
+              color: _DesignColors.textSecondary,
+            ),
+          ),
+        ),
+        SizedBox(width: 12),
         Expanded(
           child: Text(
             'Job Title',
             style: TextStyle(
               fontSize: 12,
-              fontWeight: FontWeight.w600,
-              color: Colors.grey[700],
+              fontWeight: FontWeight.bold,
+              color: _DesignColors.textSecondary,
             ),
           ),
         ),
-        const SizedBox(width: 60),
-        const SizedBox(width: 40),
+        SizedBox(width: 50, child: Center(child: Text(
+          'Score',
+          style: TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.bold,
+            color: _DesignColors.textSecondary,
+          ),
+        ))),
       ],
     );
   }
@@ -399,131 +425,147 @@ class _InterviewHomePageState extends State<InterviewHomePage> {
     final score = session.totalScore ?? 0;
     final scoreColor = _getScoreColor(score);
 
-    return Column(
-      children: [
-        const SizedBox(height: 12),
-        Row(
-          children: [
-            SizedBox(
-              width: 60,
-              child: Text(
-                'Session\n$sessionNumber',
-                textAlign: TextAlign.center,
-                style: const TextStyle(
-                  fontSize: 12,
-                  color: Colors.black87,
-                  height: 1.2,
-                ),
+    return Padding(
+      padding: EdgeInsets.only(bottom: isLast ? 0 : 16),
+      child: Row(
+        children: [
+          SizedBox(
+            width: 50,
+            child: Text(
+              '#$sessionNumber',
+              style: const TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+                color: _DesignColors.textPrimary,
               ),
             ),
-            Expanded(
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                decoration: BoxDecoration(
-                  color: _getDifficultyColor(session.difficultyLevel),
-                  borderRadius: BorderRadius.circular(6),
-                ),
-                child: Text(
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
                   session.jobTitle,
                   style: const TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w500,
-                    color: Colors.white,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: _DesignColors.textPrimary,
                   ),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),
-              ),
-            ),
-            const SizedBox(width: 8),
-            Container(
-              width: 60,
-              height: 6,
-              decoration: BoxDecoration(
-                color: Colors.grey[200],
-                borderRadius: BorderRadius.circular(3),
-              ),
-              child: FractionallySizedBox(
-                alignment: Alignment.centerLeft,
-                widthFactor: score / 100,
-                child: Container(
+                const SizedBox(height: 4),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                   decoration: BoxDecoration(
-                    color: scoreColor,
-                    borderRadius: BorderRadius.circular(3),
+                    color: _getDifficultyColor(session.difficultyLevel).withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: Text(
+                    session.difficultyLevel,
+                    style: TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.bold,
+                      color: _getDifficultyColor(session.difficultyLevel),
+                    ),
                   ),
                 ),
-              ),
+              ],
             ),
-            const SizedBox(width: 8),
-            SizedBox(
-              width: 40,
-              child: Text(
-                '$score%',
-                textAlign: TextAlign.right,
-                style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.bold,
-                  color: scoreColor,
+          ),
+          SizedBox(
+            width: 50,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                Text(
+                  '$score%',
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.bold,
+                    color: scoreColor,
+                  ),
                 ),
-              ),
+                const SizedBox(height: 4),
+                // Mini progress bar
+                Container(
+                  height: 4,
+                  width: 40,
+                  decoration: BoxDecoration(
+                    color: Colors.grey[200],
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                  child: FractionallySizedBox(
+                    alignment: Alignment.centerLeft,
+                    widthFactor: score / 100,
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: scoreColor,
+                        borderRadius: BorderRadius.circular(2),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
             ),
-          ],
-        ),
-        if (!isLast) const SizedBox(height: 12),
-      ],
+          ),
+        ],
+      ),
     );
   }
 
   Color _getScoreColor(int score) {
-    if (score >= 80) return Colors.green;
-    if (score >= 60) return Colors.orange;
-    return Colors.red;
+    if (score >= 80) return _DesignColors.success;
+    if (score >= 60) return _DesignColors.warning;
+    return _DesignColors.error;
   }
 
   Color _getDifficultyColor(String difficulty) {
     switch (difficulty.toLowerCase()) {
       case 'beginner':
-        return Colors.green;
+        return _DesignColors.success;
       case 'intermediate':
-        return Colors.orange;
+        return _DesignColors.warning;
       case 'advanced':
-        return Colors.red;
+        return _DesignColors.error;
       default:
-        return Colors.blue;
+        return _DesignColors.info;
     }
   }
 
   void _startNewInterview(BuildContext context) async {
-    final user = 'U0001';
-    if (user == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please login first')),
-      );
-      return;
-    }
-
-    // Check if user has career suggestions (A1)
+    // Check if user has career suggestions
     final careerVM = Provider.of<CareerViewModel>(context, listen: false);
-    if (!careerVM.hasLatestSuggestion) {
+
+    // In a real scenario, check logic here. For UI demo:
+    bool hasSuggestions = careerVM.hasLatestSuggestion;
+
+    if (!hasSuggestions) {
       showDialog(
         context: context,
         builder: (context) => AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
           title: const Text('Career Analysis Required'),
           content: const Text(
-            'Please complete your career analysis first to get personalised interview questions.',
+            'Complete your career analysis to generate personalized interview questions.',
+            style: TextStyle(color: _DesignColors.textSecondary),
           ),
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(context),
-              child: const Text('Cancel'),
+              child: const Text('Cancel', style: TextStyle(color: _DesignColors.textSecondary)),
             ),
             ElevatedButton(
               onPressed: () {
                 Navigator.pop(context);
-                // Navigate to career prediction
-                // Navigator.pushNamed(context, '/career-prediction');
+                // Navigate to career logic
               },
-              child: const Text('Go to Career Analysis'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: _DesignColors.primary,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              ),
+              child: const Text('Go to Career', style: TextStyle(color: Colors.white)),
             ),
           ],
         ),
@@ -531,7 +573,6 @@ class _InterviewHomePageState extends State<InterviewHomePage> {
       return;
     }
 
-    // Navigate to interview setup
     Navigator.pushNamed(context, '/interview-setup');
   }
 
@@ -546,9 +587,9 @@ class _InterviewHomePageState extends State<InterviewHomePage> {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: const Row(
           children: [
-            Icon(Icons.help_outline, color: Color(0xFF8B5CF6)),
+            Icon(Icons.help_outline, color: _DesignColors.primary),
             SizedBox(width: 12),
-            Text('How to use Interview Simulator', style: TextStyle(fontSize: 17)),
+            Text('Interview Simulator', style: TextStyle(color: _DesignColors.textPrimary)),
           ],
         ),
         content: SingleChildScrollView(
@@ -556,18 +597,17 @@ class _InterviewHomePageState extends State<InterviewHomePage> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              _buildHelpStep('1', 'Complete your career analysis to get personalized questions'),
-              _buildHelpStep('2', 'Click "Start New Interview" to configure settings'),
-              _buildHelpStep('3', 'Practice with AI-powered interview questions'),
-              _buildHelpStep('4', 'Review your performance and feedback'),
-              _buildHelpStep('5', 'Track your progress over multiple sessions'),
+              _buildHelpStep('1', 'Complete career analysis first.'),
+              _buildHelpStep('2', 'Start a new interview session.'),
+              _buildHelpStep('3', 'Answer AI-generated questions.'),
+              _buildHelpStep('4', 'Receive detailed feedback.'),
             ],
           ),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('Got it!'),
+            child: const Text('Got it', style: TextStyle(color: _DesignColors.primary, fontWeight: FontWeight.bold)),
           ),
         ],
       ),
@@ -584,7 +624,7 @@ class _InterviewHomePageState extends State<InterviewHomePage> {
             width: 24,
             height: 24,
             decoration: const BoxDecoration(
-              color: Color(0xFF8B5CF6),
+              color: _DesignColors.primary,
               shape: BoxShape.circle,
             ),
             child: Center(
@@ -602,7 +642,7 @@ class _InterviewHomePageState extends State<InterviewHomePage> {
           Expanded(
             child: Text(
               text,
-              style: const TextStyle(fontSize: 13, height: 1.4),
+              style: const TextStyle(fontSize: 14, color: _DesignColors.textSecondary, height: 1.4),
             ),
           ),
         ],

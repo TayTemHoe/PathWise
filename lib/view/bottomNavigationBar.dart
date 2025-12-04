@@ -1,9 +1,18 @@
+// lib/view/bottomNavigationBar.dart
 import 'package:flutter/material.dart';
 import 'package:path_wise/view/profile/profile_overview_view.dart';
 import 'package:path_wise/view/career/career_view.dart';
+import 'package:path_wise/view/career/job_view.dart'; // Added JobView import
 import 'package:path_wise/view/roadmap/careerroadmap_list_view.dart';
 import 'package:path_wise/view/resume/resume_home_view.dart';
 import 'package:path_wise/view/interview/interview_home_view.dart';
+
+// Defining KYYAP Design Colors locally
+class _DesignColors {
+  static const Color primary = Color(0xFF6C63FF);
+  static const Color textSecondary = Color(0xFF636E72);
+  static const Color background = Color(0xFFFFFFFF);
+}
 
 class BottomNavScreen extends StatefulWidget {
   const BottomNavScreen({Key? key}) : super(key: key);
@@ -15,9 +24,10 @@ class BottomNavScreen extends StatefulWidget {
 class _BottomNavScreenState extends State<BottomNavScreen> {
   int _currentIndex = 0;
 
-  // List of screens for each tab
+  // List of screens including the new JobView
   final List<Widget> _screens = [
     const CareerDiscoveryView(),
+    const JobView(),
     const RoadmapListView(),
     const ResumeListPage(),
     const InterviewHomePage(),
@@ -26,154 +36,122 @@ class _BottomNavScreenState extends State<BottomNavScreen> {
 
   void _onTabTapped(int index) {
     setState(() {
-      _currentIndex = index; // Update the selected tab
+      _currentIndex = index;
     });
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      // Set up a body with the selected screen
-      body: _screens[_currentIndex],
+      backgroundColor: _DesignColors.background,
+      body: IndexedStack(
+        index: _currentIndex,
+        children: _screens,
+      ),
+      bottomNavigationBar: Container(
+        decoration: BoxDecoration(
+          color: Colors.white,
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.05),
+              blurRadius: 10,
+              offset: const Offset(0, -2),
+            ),
+          ],
+        ),
+        child: BottomNavigationBar(
+          currentIndex: _currentIndex,
+          onTap: _onTabTapped,
+          backgroundColor: Colors.white,
+          type: BottomNavigationBarType.fixed, // Required for >3 items
+          selectedItemColor: _DesignColors.primary,
+          unselectedItemColor: _DesignColors.textSecondary,
+          selectedFontSize: 0, // Hiding default labels as we use custom icon builder
+          unselectedFontSize: 0,
+          elevation: 0,
+          items: [
+            BottomNavigationBarItem(
+              icon: _buildIcon(Icons.explore_outlined, Icons.explore, 0),
+              label: 'Career',
+            ),
+            BottomNavigationBarItem(
+              icon: _buildIcon(Icons.work_outline, Icons.work, 1),
+              label: 'Jobs',
+            ),
+            BottomNavigationBarItem(
+              icon: _buildIcon(Icons.map_outlined, Icons.map, 2),
+              label: 'Roadmap',
+            ),
+            BottomNavigationBarItem(
+              icon: _buildIcon(Icons.description_outlined, Icons.description, 3),
+              label: 'Resume',
+            ),
+            BottomNavigationBarItem(
+              icon: _buildIcon(Icons.chat_bubble_outline, Icons.chat_bubble, 4),
+              label: 'Interview',
+            ),
+            BottomNavigationBarItem(
+              icon: _buildIcon(Icons.person_outline, Icons.person, 5),
+              label: 'Profile',
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 
-      // Bottom Navigation Bar with 5 tabs
-      bottomNavigationBar: BottomNavigationBar(
-        currentIndex: _currentIndex, // Current selected tab
-        onTap: _onTabTapped, // Handle tab selection
-        selectedItemColor: Colors.blue, // Color for selected item label
-        unselectedItemColor: Colors.grey, // Color for unselected item labels
-        items: [
-          BottomNavigationBarItem(
-            icon: _buildIcon(Icons.work, 0), // Career
-            label: '',
+  // Custom Icon Builder with Animation and Label
+  Widget _buildIcon(IconData unselectedIcon, IconData selectedIcon, int index) {
+    final isSelected = _currentIndex == index;
+
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          AnimatedContainer(
+            duration: const Duration(milliseconds: 200),
+            padding: EdgeInsets.all(isSelected ? 0 : 2),
+            child: Icon(
+              isSelected ? selectedIcon : unselectedIcon,
+              size: 24,
+              color: isSelected ? _DesignColors.primary : _DesignColors.textSecondary,
+            ),
           ),
-          BottomNavigationBarItem(
-            icon: _buildIcon(Icons.map, 1), // Roadmap
-            label: '',
+          const SizedBox(height: 4),
+          Text(
+            _getLabel(index),
+            style: TextStyle(
+              fontSize: 10,
+              fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+              color: isSelected ? _DesignColors.primary : _DesignColors.textSecondary,
+            ),
           ),
-          BottomNavigationBarItem(
-            icon: _buildIcon(Icons.article, 2), // Resume
-            label: '',
-          ),
-          BottomNavigationBarItem(
-            icon: _buildIcon(Icons.comment, 3), // Interview
-            label: '',
-          ),
-          BottomNavigationBarItem(
-            icon: _buildIcon(Icons.person, 4), // Profile
-            label: '',
+          const SizedBox(height: 4),
+          // Active Indicator Dot/Line
+          AnimatedContainer(
+            duration: const Duration(milliseconds: 200),
+            height: 4,
+            width: isSelected ? 4 : 0,
+            decoration: BoxDecoration(
+              color: _DesignColors.primary,
+              shape: BoxShape.circle,
+            ),
           ),
         ],
       ),
     );
   }
 
-  // Build custom icon with a blue circle under the selected tab and label below
-  Widget _buildIcon(IconData icon, int index) {
-    return Stack(
-      clipBehavior: Clip.none,
-      children: [
-        Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(icon, size: 30, color: _currentIndex == index ? Colors.blue : Colors.grey),
-            Text(
-              _getLabel(index),
-              style: TextStyle(
-                fontSize: 12,
-                color: _currentIndex == index ? Colors.blue : Colors.grey, // Label color
-              ),
-            ),
-          ],
-        ),
-        if (_currentIndex == index)
-          Positioned(
-            bottom: -8,
-            child: Container(
-              width: 50,
-              height: 3,
-              decoration: BoxDecoration(
-                shape: BoxShape.rectangle,
-                color: Colors.blue,
-                borderRadius: BorderRadius.circular(5),
-              ),
-            ),
-          ),
-      ],
-    );
-  }
-
-  // Get the label based on the selected index
   String _getLabel(int index) {
     switch (index) {
-      case 0:
-        return 'Career';
-      case 1:
-        return 'Roadmap';
-      case 2:
-        return 'Resume';
-      case 3:
-        return 'Interview';
-      case 4:
-        return 'Profile';
-      default:
-        return '';
+      case 0: return 'Career';
+      case 1: return 'Jobs';
+      case 2: return 'Roadmap';
+      case 3: return 'Resume';
+      case 4: return 'Interview';
+      case 5: return 'Profile';
+      default: return '';
     }
-  }
-}
-
-// Sample screens for each tab
-class CareerScreen extends StatelessWidget {
-  const CareerScreen({Key? key}) : super(key: key);
-
-  @override
-  Widget build(BuildContext context) {
-    return const Center(
-      child: Text('Career Screen'),
-    );
-  }
-}
-
-class RoadmapScreen extends StatelessWidget {
-  const RoadmapScreen({Key? key}) : super(key: key);
-
-  @override
-  Widget build(BuildContext context) {
-    return const Center(
-      child: Text('Roadmap Screen'),
-    );
-  }
-}
-
-class ResumeScreen extends StatelessWidget {
-  const ResumeScreen({Key? key}) : super(key: key);
-
-  @override
-  Widget build(BuildContext context) {
-    return const Center(
-      child: Text('Resume Screen'),
-    );
-  }
-}
-
-class InterviewScreen extends StatelessWidget {
-  const InterviewScreen({Key? key}) : super(key: key);
-
-  @override
-  Widget build(BuildContext context) {
-    return const Center(
-      child: Text('Interview Screen'),
-    );
-  }
-}
-
-class ProfileScreen extends StatelessWidget {
-  const ProfileScreen({Key? key}) : super(key: key);
-
-  @override
-  Widget build(BuildContext context) {
-    return const Center(
-      child: Text('Profile Screen'),
-    );
   }
 }

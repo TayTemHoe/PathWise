@@ -66,8 +66,8 @@ class ResumeViewModel extends ChangeNotifier {
   String? get error => _error;
   String? get successMessage => _successMessage;
 
-  String get uid => _auth.currentUser?.uid ?? 'U0001';
-
+  //String get uid => _auth.currentUser?.uid ?? 'U0001';
+  String get uid => 'U0001';
   // =============================
   // State Setters
   // =============================
@@ -343,7 +343,7 @@ class ResumeViewModel extends ChangeNotifier {
     }
   }
 
-  
+
 
   /// Share resume as PDF
   Future<bool> shareResume(ResumeDoc resume) async {

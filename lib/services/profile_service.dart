@@ -2,6 +2,7 @@ import 'dart:io';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:flutter/foundation.dart';
 import 'package:path_wise/model/user_profile.dart';
 
 class ProfileService {
@@ -62,41 +63,79 @@ class ProfileService {
 
   Future<UserProfile?> getUser(String uid) async {
     try {
+      debugPrint('🔍 ProfileService: Getting user document for uid=$uid');
       final doc = await _userDoc(uid).get();
-      if (!doc.exists) return null;
+      if (!doc.exists) {
+        debugPrint('⚠️ ProfileService: User document does not exist');
+        return null;
+      }
+      debugPrint('✅ ProfileService: User document found');
       return UserProfile.fromFirestore(doc as DocumentSnapshot<Map<String, dynamic>>);
     } catch (e, st) {
-      print('[services] getUser error: $e\n$st');
+      debugPrint('❌ ProfileService: getUser error: $e');
+      debugPrint('Stack trace: $st');
       rethrow;
     }
   }
 
   Future<UserProfile?> getUserWithSubcollections(String uid) async {
     try {
-      final doc = await _userDoc(uid).get();
-      if (!doc.exists) return null;
+      debugPrint('🔍 ProfileService: Getting user with subcollections for uid=$uid');
 
+      final doc = await _userDoc(uid).get();
+      if (!doc.exists) {
+        debugPrint('⚠️ ProfileService: User document does not exist');
+        return null;
+      }
+
+      debugPrint('✅ ProfileService: User document found, loading subcollections...');
       final root = UserProfile.fromFirestore(doc as DocumentSnapshot<Map<String, dynamic>>);
 
+      // Load subcollections with better error handling
       final results = await Future.wait<List<dynamic>>([
-        listSkills(uid: uid),
-        listEducation(uid: uid),
-        listExperience(uid: uid),
+        listSkills(uid: uid).catchError((e) {
+          debugPrint('❌ Error loading skills: $e');
+          return <Skill>[];
+        }),
+        listEducation(uid: uid).catchError((e) {
+          debugPrint('❌ Error loading education: $e');
+          return <Education>[];
+        }),
+        listExperience(uid: uid).catchError((e) {
+          debugPrint('❌ Error loading experience: $e');
+          return <Experience>[];
+        }),
       ]);
 
+      final skills = results[0].cast<Skill>();
+      final education = results[1].cast<Education>();
+      final experience = results[2].cast<Experience>();
+
+      debugPrint('📊 ProfileService: Loaded Skills=${skills.length}, Education=${education.length}, Experience=${experience.length}');
+
+      if (skills.isNotEmpty) {
+        for (var skill in skills) {
+          debugPrint('  📌 Skill: ${skill.name}, Category: "${skill.category}", Level: ${skill.level}');
+        }
+      } else {
+        debugPrint('  ⚠️ No skills found in subcollection');
+      }
+
       return root.copyWith(
-        skills: results[0].cast<Skill>(),
-        education: results[1].cast<Education>(),
-        experience: results[2].cast<Experience>(),
+        skills: skills,
+        education: education,
+        experience: experience,
       );
     } catch (e, st) {
-      print('[services] getUserWithSubcollections error: $e\n$st');
+      debugPrint('❌ ProfileService: getUserWithSubcollections error: $e');
+      debugPrint('Stack trace: $st');
       rethrow;
     }
   }
 
   Future<void> createOrMergeUser(String uid, UserProfile profile) async {
     try {
+      debugPrint('🔧 ProfileService: Creating/merging user uid=$uid');
       final exists = (await _userDoc(uid).get()).exists;
       final nowDate = _dateOnly();
       final data = profile.toMap();
@@ -107,8 +146,10 @@ class ProfileService {
       data['lastUpdated'] = nowDate;
 
       await _userDoc(uid).set(data, SetOptions(merge: true));
+      debugPrint('✅ ProfileService: User created/merged successfully');
     } catch (e, st) {
-      print('[services] createOrMergeUser error: $e\n$st');
+      debugPrint('❌ ProfileService: createOrMergeUser error: $e');
+      debugPrint('Stack trace: $st');
       rethrow;
     }
   }
@@ -127,7 +168,8 @@ class ProfileService {
         rethrow;
       }
     } catch (e, st) {
-      print('[services] patchRoot error: $e\n$st');
+      debugPrint('❌ ProfileService: patchRoot error: $e');
+      debugPrint('Stack trace: $st');
       rethrow;
     }
   }
@@ -196,8 +238,6 @@ class ProfileService {
       final fileName = 'profile_$uid.${DateTime.now().millisecondsSinceEpoch}.$ext';
       final path = '$uid/$fileName';
 
-      // 1. Upload to Supabase Storage
-      // Make sure you created a bucket named 'profiles' in Supabase Dashboard
       await Supabase.instance.client.storage
           .from('profiles')
           .upload(
@@ -206,87 +246,341 @@ class ProfileService {
         fileOptions: const FileOptions(upsert: true),
       );
 
-      // 2. Get Public URL
       final url = Supabase.instance.client.storage
           .from('profiles')
           .getPublicUrl(path);
 
-      // 3. Save URL to Firestore (Your existing logic)
       await updatePersonalInfo(uid: uid, profilePictureUrl: url);
 
       return url;
     } catch (e, st) {
-      print('[services] uploadProfilePicture error: $e\n$st');
-      // Rethrow to let viewModel handle the UI error message
+      debugPrint('❌ ProfileService: uploadProfilePicture error: $e');
+      debugPrint('Stack trace: $st');
       throw Exception('Supabase Upload Failed: $e');
     }
   }
 
   // =============================
-  // Skills, Education, Experience...
-  // (Left unchanged as they were correct)
+  // Skills CRUD
   // =============================
 
   Future<List<Skill>> listSkills({required String uid, int limit = 100}) async {
-    final snap = await _skillsCol(uid).orderBy('order', descending: false).limit(limit).get();
-    return snap.docs.map((d) => Skill.fromFirestore(d as DocumentSnapshot<Map<String, dynamic>>)).toList();
+    try {
+      debugPrint('🔍 ProfileService: Listing skills for uid=$uid');
+
+      // ✅ FIXED: Get ALL documents without ordering first
+      // Then sort in-memory to avoid Firestore index issues
+      final snap = await _skillsCol(uid).limit(limit).get();
+
+      debugPrint('📊 ProfileService: Found ${snap.docs.length} skill documents');
+
+      if (snap.docs.isEmpty) {
+        debugPrint('⚠️ ProfileService: No skills found. Check Firestore path: users/$uid/skills/');
+        return [];
+      }
+
+      final skills = <Skill>[];
+      for (var doc in snap.docs) {
+        try {
+          debugPrint('  🔍 Processing doc: ${doc.id}');
+          debugPrint('  📄 Doc data: ${doc.data()}');
+
+          final skill = Skill.fromFirestore(doc as DocumentSnapshot<Map<String, dynamic>>);
+          debugPrint('  ✅ Parsed skill: ${skill.name}, Category: "${skill.category}", Order: ${skill.order}');
+          skills.add(skill);
+        } catch (e) {
+          debugPrint('  ❌ Error parsing skill doc ${doc.id}: $e');
+        }
+      }
+
+      // ✅ Sort in-memory by order (handle nulls)
+      skills.sort((a, b) {
+        final orderA = a.order ?? 9999;
+        final orderB = b.order ?? 9999;
+        return orderA.compareTo(orderB);
+      });
+
+      debugPrint('✅ ProfileService: Returning ${skills.length} skills (sorted)');
+      return skills;
+    } catch (e, st) {
+      debugPrint('❌ ProfileService: listSkills error: $e');
+      debugPrint('Stack trace: $st');
+      rethrow;
+    }
   }
 
   Future<Skill> createSkill({required String uid, required Skill skill}) async {
-    final id = await _nextId(_skillsCol(uid), 'SK');
-    final data = skill.copyWith(id: id, updatedAt: _dateOnly()).toMap();
-    await _skillsCol(uid).doc(id).set(data, SetOptions(merge: true));
-    final doc = await _skillsCol(uid).doc(id).get();
-    return Skill.fromFirestore(doc as DocumentSnapshot<Map<String, dynamic>>);
+    try {
+      debugPrint('➕ ProfileService: Creating skill: ${skill.name}, Category: "${skill.category}"');
+
+      final id = await _nextId(_skillsCol(uid), 'SK');
+      debugPrint('  Generated ID: $id');
+
+      // ✅ CRITICAL: Ensure order is set for new skills
+      final orderValue = skill.order ?? await _getNextSkillOrder(uid);
+      debugPrint('  Order value: $orderValue');
+
+      final data = skill.copyWith(
+        id: id,
+        updatedAt: _dateOnly(),
+        order: orderValue,  // ✅ Ensure order is always set
+      ).toMap();
+
+      debugPrint('  Skill data to save: $data');
+
+      await _skillsCol(uid).doc(id).set(data, SetOptions(merge: true));
+
+      final doc = await _skillsCol(uid).doc(id).get();
+      final created = Skill.fromFirestore(doc as DocumentSnapshot<Map<String, dynamic>>);
+
+      debugPrint('✅ ProfileService: Skill created successfully with ID: ${created.id}, Order: ${created.order}');
+      return created;
+    } catch (e, st) {
+      debugPrint('❌ ProfileService: createSkill error: $e');
+      debugPrint('Stack trace: $st');
+      rethrow;
+    }
+  }
+
+  // ✅ NEW: Helper to get next order value
+  Future<int> _getNextSkillOrder(String uid) async {
+    try {
+      final snap = await _skillsCol(uid).get();
+      int maxOrder = 0;
+      for (var doc in snap.docs) {
+        final data = doc.data();
+        final order = data['order'] as int?;
+        if (order != null && order > maxOrder) {
+          maxOrder = order;
+        }
+      }
+      return maxOrder + 1;
+    } catch (e) {
+      debugPrint('⚠️ Error getting next order: $e, defaulting to 1');
+      return 1;
+    }
   }
 
   Future<void> updateSkill({required String uid, required Skill skill}) async {
-    await _skillsCol(uid).doc(skill.id).set(skill.copyWith(updatedAt: _dateOnly()).toMap(), SetOptions(merge: true));
+    try {
+      debugPrint('💾 ProfileService: Updating skill: ${skill.name}, ID: ${skill.id}');
+
+      // ✅ Ensure order exists when updating
+      final orderValue = skill.order ?? await _getNextSkillOrder(uid);
+
+      final data = skill.copyWith(
+        updatedAt: _dateOnly(),
+        order: orderValue,  // ✅ Preserve or set order
+      ).toMap();
+
+      await _skillsCol(uid).doc(skill.id).set(data, SetOptions(merge: true));
+
+      debugPrint('✅ ProfileService: Skill updated successfully');
+    } catch (e, st) {
+      debugPrint('❌ ProfileService: updateSkill error: $e');
+      debugPrint('Stack trace: $st');
+      rethrow;
+    }
   }
 
   Future<void> deleteSkill({required String uid, required String skillId}) async {
-    await _skillsCol(uid).doc(skillId).delete();
+    try {
+      debugPrint('🗑️ ProfileService: Deleting skill ID: $skillId');
+      await _skillsCol(uid).doc(skillId).delete();
+      debugPrint('✅ ProfileService: Skill deleted successfully');
+    } catch (e, st) {
+      debugPrint('❌ ProfileService: deleteSkill error: $e');
+      debugPrint('Stack trace: $st');
+      rethrow;
+    }
   }
 
+  // =============================
+  // Education CRUD
+  // =============================
+
   Future<List<Education>> listEducation({required String uid, int limit = 100}) async {
-    final snap = await _educationCol(uid).orderBy('order', descending: false).limit(limit).get();
-    return snap.docs.map((d) => Education.fromFirestore(d as DocumentSnapshot<Map<String, dynamic>>)).toList();
+    try {
+      debugPrint('🔍 ProfileService: Listing education for uid=$uid');
+
+      // ✅ FIXED: Same approach - get all, sort in-memory
+      final snap = await _educationCol(uid).limit(limit).get();
+      debugPrint('📊 ProfileService: Found ${snap.docs.length} education documents');
+
+      final education = snap.docs
+          .map((d) => Education.fromFirestore(d as DocumentSnapshot<Map<String, dynamic>>))
+          .toList();
+
+      // Sort in-memory
+      education.sort((a, b) {
+        final orderA = a.order ?? 9999;
+        final orderB = b.order ?? 9999;
+        return orderA.compareTo(orderB);
+      });
+
+      return education;
+    } catch (e, st) {
+      debugPrint('❌ ProfileService: listEducation error: $e');
+      debugPrint('Stack trace: $st');
+      rethrow;
+    }
   }
 
   Future<Education> createEducation({required String uid, required Education education}) async {
-    final id = await _nextId(_educationCol(uid), 'ED');
-    final data = education.copyWith(id: id, updatedAt: _dateOnly()).toMap();
-    await _educationCol(uid).doc(id).set(data, SetOptions(merge: true));
-    final doc = await _educationCol(uid).doc(id).get();
-    return Education.fromFirestore(doc as DocumentSnapshot<Map<String, dynamic>>);
+    try {
+      debugPrint('➕ ProfileService: Creating education: ${education.institution}');
+      final id = await _nextId(_educationCol(uid), 'ED');
+
+      // ✅ Ensure order is set
+      final orderValue = education.order ?? await _getNextEducationOrder(uid);
+
+      final data = education.copyWith(
+        id: id,
+        updatedAt: _dateOnly(),
+        order: orderValue,
+      ).toMap();
+
+      await _educationCol(uid).doc(id).set(data, SetOptions(merge: true));
+      final doc = await _educationCol(uid).doc(id).get();
+      debugPrint('✅ ProfileService: Education created with ID: $id');
+      return Education.fromFirestore(doc as DocumentSnapshot<Map<String, dynamic>>);
+    } catch (e, st) {
+      debugPrint('❌ ProfileService: createEducation error: $e');
+      debugPrint('Stack trace: $st');
+      rethrow;
+    }
+  }
+
+  Future<int> _getNextEducationOrder(String uid) async {
+    try {
+      final snap = await _educationCol(uid).get();
+      int maxOrder = 0;
+      for (var doc in snap.docs) {
+        final order = doc.data()['order'] as int?;
+        if (order != null && order > maxOrder) maxOrder = order;
+      }
+      return maxOrder + 1;
+    } catch (e) {
+      return 1;
+    }
   }
 
   Future<void> updateEducation({required String uid, required Education education}) async {
-    await _educationCol(uid).doc(education.id).set(education.copyWith(updatedAt: _dateOnly()).toMap(), SetOptions(merge: true));
+    try {
+      debugPrint('💾 ProfileService: Updating education: ${education.institution}, ID: ${education.id}');
+      final orderValue = education.order ?? await _getNextEducationOrder(uid);
+      final data = education.copyWith(updatedAt: _dateOnly(), order: orderValue).toMap();
+      await _educationCol(uid).doc(education.id).set(data, SetOptions(merge: true));
+      debugPrint('✅ ProfileService: Education updated successfully');
+    } catch (e, st) {
+      debugPrint('❌ ProfileService: updateEducation error: $e');
+      debugPrint('Stack trace: $st');
+      rethrow;
+    }
   }
 
   Future<void> deleteEducation({required String uid, required String eduId}) async {
-    await _educationCol(uid).doc(eduId).delete();
+    try {
+      debugPrint('🗑️ ProfileService: Deleting education ID: $eduId');
+      await _educationCol(uid).doc(eduId).delete();
+      debugPrint('✅ ProfileService: Education deleted successfully');
+    } catch (e, st) {
+      debugPrint('❌ ProfileService: deleteEducation error: $e');
+      debugPrint('Stack trace: $st');
+      rethrow;
+    }
   }
 
+  // =============================
+  // Experience CRUD
+  // =============================
+
   Future<List<Experience>> listExperience({required String uid, int limit = 100}) async {
-    final snap = await _experienceCol(uid).orderBy('order', descending: false).limit(limit).get();
-    return snap.docs.map((d) => Experience.fromFirestore(d as DocumentSnapshot<Map<String, dynamic>>)).toList();
+    try {
+      debugPrint('🔍 ProfileService: Listing experience for uid=$uid');
+
+      final snap = await _experienceCol(uid).limit(limit).get();
+      debugPrint('📊 ProfileService: Found ${snap.docs.length} experience documents');
+
+      final experience = snap.docs
+          .map((d) => Experience.fromFirestore(d as DocumentSnapshot<Map<String, dynamic>>))
+          .toList();
+
+      experience.sort((a, b) {
+        final orderA = a.order ?? 9999;
+        final orderB = b.order ?? 9999;
+        return orderA.compareTo(orderB);
+      });
+
+      return experience;
+    } catch (e, st) {
+      debugPrint('❌ ProfileService: listExperience error: $e');
+      debugPrint('Stack trace: $st');
+      rethrow;
+    }
   }
 
   Future<Experience> createExperience({required String uid, required Experience experience}) async {
-    final id = await _nextId(_experienceCol(uid), 'EX');
-    final data = experience.copyWith(id: id, updatedAt: _dateOnly()).toMap();
-    await _experienceCol(uid).doc(id).set(data, SetOptions(merge: true));
-    final doc = await _experienceCol(uid).doc(id).get();
-    return Experience.fromFirestore(doc as DocumentSnapshot<Map<String, dynamic>>);
+    try {
+      debugPrint('➕ ProfileService: Creating experience: ${experience.company}');
+      final id = await _nextId(_experienceCol(uid), 'EX');
+
+      final orderValue = experience.order ?? await _getNextExperienceOrder(uid);
+
+      final data = experience.copyWith(
+        id: id,
+        updatedAt: _dateOnly(),
+        order: orderValue,
+      ).toMap();
+
+      await _experienceCol(uid).doc(id).set(data, SetOptions(merge: true));
+      final doc = await _experienceCol(uid).doc(id).get();
+      debugPrint('✅ ProfileService: Experience created with ID: $id');
+      return Experience.fromFirestore(doc as DocumentSnapshot<Map<String, dynamic>>);
+    } catch (e, st) {
+      debugPrint('❌ ProfileService: createExperience error: $e');
+      debugPrint('Stack trace: $st');
+      rethrow;
+    }
+  }
+
+  Future<int> _getNextExperienceOrder(String uid) async {
+    try {
+      final snap = await _experienceCol(uid).get();
+      int maxOrder = 0;
+      for (var doc in snap.docs) {
+        final order = doc.data()['order'] as int?;
+        if (order != null && order > maxOrder) maxOrder = order;
+      }
+      return maxOrder + 1;
+    } catch (e) {
+      return 1;
+    }
   }
 
   Future<void> updateExperience({required String uid, required Experience experience}) async {
-    await _experienceCol(uid).doc(experience.id).set(experience.copyWith(updatedAt: _dateOnly()).toMap(), SetOptions(merge: true));
+    try {
+      debugPrint('💾 ProfileService: Updating experience: ${experience.company}, ID: ${experience.id}');
+      final orderValue = experience.order ?? await _getNextExperienceOrder(uid);
+      final data = experience.copyWith(updatedAt: _dateOnly(), order: orderValue).toMap();
+      await _experienceCol(uid).doc(experience.id).set(data, SetOptions(merge: true));
+      debugPrint('✅ ProfileService: Experience updated successfully');
+    } catch (e, st) {
+      debugPrint('❌ ProfileService: updateExperience error: $e');
+      debugPrint('Stack trace: $st');
+      rethrow;
+    }
   }
 
   Future<void> deleteExperience({required String uid, required String expId}) async {
-    await _experienceCol(uid).doc(expId).delete();
+    try {
+      debugPrint('🗑️ ProfileService: Deleting experience ID: $expId');
+      await _experienceCol(uid).doc(expId).delete();
+      debugPrint('✅ ProfileService: Experience deleted successfully');
+    } catch (e, st) {
+      debugPrint('❌ ProfileService: deleteExperience error: $e');
+      debugPrint('Stack trace: $st');
+      rethrow;
+    }
   }
 }

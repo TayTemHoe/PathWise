@@ -7,6 +7,11 @@ import 'package:path_wise/model/user_profile.dart';
 class EditEducationScreen extends StatelessWidget {
   const EditEducationScreen({super.key});
 
+  // KYYAP Style Constants
+  final Color _primaryColor = const Color(0xFF6C63FF);
+  final Color _textColor = const Color(0xFF1A1A1A);
+  final Color _backgroundColor = Colors.white;
+
   @override
   Widget build(BuildContext context) {
     return Consumer<ProfileViewModel>(
@@ -14,105 +19,148 @@ class EditEducationScreen extends StatelessWidget {
         final eduCount = vm.education.length;
 
         return Scaffold(
-          backgroundColor: const Color(0xFFF7F8FC),
+          backgroundColor: _backgroundColor,
           appBar: AppBar(
             elevation: 0,
-            backgroundColor: Colors.transparent,
-            flexibleSpace: Container(
-              decoration: const BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [Color(0xFF7C4DFF), Color(0xFF6EA8FF)],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                ),
-              ),
+            backgroundColor: _backgroundColor,
+            centerTitle: true,
+            leading: IconButton(
+              icon: const Icon(Icons.arrow_back_ios, color: Colors.black, size: 20),
+              onPressed: () => Navigator.pop(context),
             ),
-            title: const Text(
+            title: Text(
               'Education Background',
-              style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700),
+              style: TextStyle(
+                color: _textColor,
+                fontWeight: FontWeight.bold,
+                fontSize: 20,
+              ),
             ),
           ),
           body: ListView(
-            padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
+            padding: const EdgeInsets.all(24),
             children: [
-              // Stats pill (Education entries)
+              // Stats Card
               Container(
-                padding: const EdgeInsets.all(14),
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
                 decoration: BoxDecoration(
-                  color: const Color(0xFFFFFFFF).withOpacity(0.15),
-                  borderRadius: BorderRadius.circular(12),
+                  color: const Color(0xFFF9FAFB),
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: const Color(0xFFE5E7EB)),
                 ),
                 child: Row(
                   children: [
-                    _StatPill(
-                      title: 'Education Entry',
-                      value: '$eduCount',
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          '$eduCount',
+                          style: TextStyle(
+                            fontSize: 24,
+                            fontWeight: FontWeight.w900,
+                            color: _primaryColor,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          'Education Entries',
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: Colors.grey[600],
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ],
                     ),
                     const Spacer(),
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: _primaryColor.withOpacity(0.1),
+                        shape: BoxShape.circle,
+                      ),
+                      child: Icon(Icons.school, color: _primaryColor, size: 24),
+                    ),
                   ],
                 ),
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: 32),
 
-              // Section header + Add button
+              // Section Header
               Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  const Icon(Icons.school_outlined, size: 18),
-                  const SizedBox(width: 8),
-                  const Text('Education',
-                      style:
-                      TextStyle(fontSize: 16, fontWeight: FontWeight.w800)),
-                  const Spacer(),
-                  ElevatedButton.icon(
+                  Text(
+                    'Your Education',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: _textColor,
+                    ),
+                  ),
+                  TextButton.icon(
                     onPressed: () => _showAddOrEditSheet(context, vm),
-                    icon: const Icon(Icons.add, size: 18),
-                    label: const Text('Add Education'),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFFEEF2FF),
-                      foregroundColor: const Color(0xFF4338CA),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(10),
+                    icon: Icon(Icons.add_circle_outline, color: _primaryColor, size: 20),
+                    label: Text(
+                      'Add New',
+                      style: TextStyle(
+                        color: _primaryColor,
+                        fontWeight: FontWeight.w600,
                       ),
+                    ),
+                    style: TextButton.styleFrom(
+                      padding: EdgeInsets.zero,
+                      minimumSize: const Size(0, 0),
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                     ),
                   )
                 ],
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: 16),
 
               if (vm.education.isEmpty)
                 Container(
-                  padding: const EdgeInsets.all(14),
+                  padding: const EdgeInsets.all(24),
+                  alignment: Alignment.center,
                   decoration: BoxDecoration(
-                    color: const Color(0xFFF3F4F6),
+                    color: const Color(0xFFF9FAFB),
                     borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: const Color(0xFFE5E7EB), style: BorderStyle.solid),
                   ),
-                  child: const Text(
-                    'No education added yet. Tap "Add Education" to create one.',
-                    style: TextStyle(color: Color(0xFF6B7280)),
+                  child: Column(
+                    children: [
+                      Icon(Icons.school_outlined, size: 48, color: Colors.grey[400]),
+                      const SizedBox(height: 12),
+                      Text(
+                        'No education history yet',
+                        style: TextStyle(color: Colors.grey[600], fontWeight: FontWeight.w500),
+                      ),
+                    ],
                   ),
                 )
               else
-                ...vm.education
-                    .map((e) => _EducationCard(
+                ...vm.education.map((e) => _EducationCard(
                   edu: e,
+                  primaryColor: _primaryColor,
                   onEdit: () => _showAddOrEditSheet(context, vm, existing: e),
                   onDelete: () async {
-                    final ok = await _confirmDelete(
-                        context, e.institution ?? 'this entry');
+                    final ok = await _confirmDelete(context, e.institution ?? 'this entry', _primaryColor);
                     if (!ok) return;
                     await vm.deleteEducation(e.id);
                     if (!context.mounted) return;
                     ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Education deleted')),
+                      const SnackBar(
+                        content: Text('Education entry deleted'),
+                        backgroundColor: Color(0xFFD63031),
+                      ),
                     );
                   },
-                ))
-                    .toList(),
+                )),
 
-              const SizedBox(height: 20),
+              const SizedBox(height: 32),
 
-              // Tips (no certification section per your request)
-              EducationTipsCard(),
+              // Tips Section
+              _EducationTipsCard(primaryColor: _primaryColor),
             ],
           ),
         );
@@ -128,313 +176,400 @@ class EditEducationScreen extends StatelessWidget {
       }) async {
     final formKey = GlobalKey<FormState>();
 
-    final institutionCtrl =
-    TextEditingController(text: existing?.institution ?? '');
+    // Controllers
+    final institutionCtrl = TextEditingController(text: existing?.institution ?? '');
     final fieldCtrl = TextEditingController(text: existing?.fieldOfStudy ?? '');
     final gpaCtrl = TextEditingController(text: existing?.gpa ?? '');
     final locationCtrl = TextEditingController(
       text: _joinCityCountry(existing?.city, existing?.country),
     );
 
+    // Initial State Values for dirty checking
+    final initialInstitution = existing?.institution ?? '';
+    final initialField = existing?.fieldOfStudy ?? '';
+    final initialGpa = existing?.gpa ?? '';
+    final initialLocation = _joinCityCountry(existing?.city, existing?.country);
+    final initialDegree = existing?.degreeLevel;
+    final initialStartDate = existing?.startDate;
+    final initialEndDate = existing?.endDate;
+    final initialIsCurrent = existing?.isCurrent ?? false;
+
     String? degreeLevel = existing?.degreeLevel;
     Timestamp? startDate = existing?.startDate;
     Timestamp? endDate = existing?.endDate;
     bool isCurrent = existing?.isCurrent ?? false;
+
+    // Helper to check for unsaved changes
+    bool hasUnsavedChanges() {
+      if (institutionCtrl.text.trim() != initialInstitution) return true;
+      if (fieldCtrl.text.trim() != initialField) return true;
+      if (gpaCtrl.text.trim() != initialGpa) return true;
+      if (locationCtrl.text.trim() != initialLocation) return true;
+      if (degreeLevel != initialDegree) return true;
+      if (startDate != initialStartDate) return true;
+      if (endDate != initialEndDate) return true;
+      if (isCurrent != initialIsCurrent) return true;
+      return false;
+    }
+
+    // ✅ FIXED: Added flag to prevent duplicate saves
+    bool isSaving = false;
+
+    // Save Function logic
+    Future<bool> handleSave() async {
+      // ✅ Prevent duplicate saves
+      if (isSaving) return false;
+
+      if (!formKey.currentState!.validate()) return false;
+
+      // ✅ Validate Start Date
+      if (startDate == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Start Date is required'))
+        );
+        return false;
+      }
+
+      // ✅ Validate End Date if not current
+      if (!isCurrent && endDate == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('End Date is required (or mark as current)'))
+        );
+        return false;
+      }
+
+      // ✅ Validate Date Logic
+      if (!isCurrent && endDate != null && startDate != null) {
+        if (endDate!.toDate().isBefore(startDate!.toDate())) {
+          ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('End Date must be after Start Date'))
+          );
+          return false;
+        }
+      }
+
+      isSaving = true; // Set flag
+
+      final (city, country) = _splitCityCountry(locationCtrl.text.trim());
+
+      final draft = Education(
+        id: existing?.id ?? 'TEMP',
+        institution: institutionCtrl.text.trim(),
+        degreeLevel: degreeLevel,
+        fieldOfStudy: fieldCtrl.text.trim(),
+        startDate: startDate,
+        endDate: isCurrent ? null : endDate,
+        isCurrent: isCurrent,
+        gpa: gpaCtrl.text.trim().isEmpty ? null : gpaCtrl.text.trim(),
+        city: city,
+        country: country,
+        order: existing?.order ?? (vm.education.length + 1),
+      );
+
+      bool ok;
+      if (existing == null) {
+        ok = await vm.addEducation(draft);
+      } else {
+        ok = await vm.saveEducation(draft);
+      }
+
+      isSaving = false; // Reset flag
+
+      if (ok) {
+        return true;
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(vm.error ?? 'Failed to save education')),
+        );
+        return false;
+      }
+    }
+
+    // Unsaved Changes Dialog
+    Future<void> showUnsavedDialog() async {
+      await showDialog(
+        context: context,
+        barrierDismissible: false, // Prevent dismiss by tapping outside
+        builder: (dialogContext) => AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title: const Text('Unsaved Changes', style: TextStyle(fontWeight: FontWeight.bold)),
+          content: const Text(
+            'You have unsaved changes. Do you want to save them before leaving?',
+            style: TextStyle(color: Color(0xFF6B7280)),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.pop(dialogContext); // Close dialog
+                Navigator.pop(context); // Close sheet
+              },
+              child: const Text('Discard', style: TextStyle(color: Colors.grey)),
+            ),
+            ElevatedButton(
+              onPressed: () async {
+                Navigator.pop(dialogContext); // Close dialog first
+                final success = await handleSave();
+                if (success && context.mounted) {
+                  Navigator.pop(context); // Close sheet on success
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(existing == null ? 'Education added successfully' : 'Education updated successfully'),
+                      backgroundColor: const Color(0xFF00B894),
+                    ),
+                  );
+                }
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF6C63FF),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              ),
+              child: const Text('Save', style: TextStyle(color: Colors.white)),
+            ),
+          ],
+        ),
+      );
+    }
 
     await showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       useSafeArea: true,
       backgroundColor: Colors.transparent,
+      isDismissible: false, // Prevent dismiss by tapping outside
+      enableDrag: false, // Disable drag to force using close button
       builder: (context) {
-        final viewInsets = MediaQuery.of(context).viewInsets.bottom;
-        return Padding(
-          padding: EdgeInsets.only(bottom: viewInsets),
-          child: Container(
-            decoration: const BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.vertical(top: Radius.circular(18)),
-            ),
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
-              child: StatefulBuilder(
-                builder: (context, setState) {
-                  return Form(
-                    key: formKey,
-                    child: SingleChildScrollView(
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              Text(
-                                existing == null
-                                    ? 'Add Education'
-                                    : 'Edit Education',
-                                style: const TextStyle(
-                                    fontSize: 18, fontWeight: FontWeight.w800),
-                              ),
-                              const Spacer(),
-                              IconButton(
-                                onPressed: () => Navigator.pop(context),
-                                icon: const Icon(Icons.close),
-                              )
-                            ],
-                          ),
-                          const SizedBox(height: 8),
-
-                          // Institution
-                          const _FieldLabel('Institution Name *'),
-                          const SizedBox(height: 6),
-                          TextFormField(
-                            controller: institutionCtrl,
-                            validator: (v) =>
-                            (v == null || v.trim().isEmpty)
-                                ? 'Required'
-                                : null,
-                            decoration: _inputDecoration(
-                              hint: 'e.g., University of Malaya',
-                            ),
-                          ),
-                          const SizedBox(height: 14),
-
-                          // Degree Level
-                          const _FieldLabel('Degree Level *'),
-                          const SizedBox(height: 6),
-                          _Dropdown<String>(
-                            value: degreeLevel,
-                            hint: 'Select degree level',
-                            items: const [
-                              'HighSchool',
-                              'Diploma',
-                              'Bachelor',
-                              'Master',
-                              'PhD',
-                              'Other',
-                            ],
-                            onChanged: (v) => setState(() => degreeLevel = v),
-                            validator: (v) => (v == null || v.isEmpty)
-                                ? 'Required'
-                                : null,
-                          ),
-                          const SizedBox(height: 14),
-
-                          // Field of Study
-                          const _FieldLabel('Field of Study *'),
-                          const SizedBox(height: 6),
-                          _Dropdown<String>(
-                            // show current value in fieldCtrl if exists
-                            value: _fieldOptions.contains(fieldCtrl.text)
-                                ? fieldCtrl.text
-                                : null,
-                            hint: 'Select field of study',
-                            items: _fieldOptions,
-                            onChanged: (v) {
-                              fieldCtrl.text = v ?? '';
-                              setState(() {});
-                            },
-                            validator: (_) => (fieldCtrl.text.trim().isEmpty)
-                                ? 'Required'
-                                : null,
-                          ),
-                          const SizedBox(height: 14),
-
-                          // Dates
-                          Row(
-                            children: [
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    const _FieldLabel('Start Date *'),
-                                    const SizedBox(height: 6),
-                                    _DateButton(
-                                      date: startDate,
-                                      onPick: (ts) =>
-                                          setState(() => startDate = ts),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                              const SizedBox(width: 12),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    const _FieldLabel('End Date *'),
-                                    const SizedBox(height: 6),
-                                    _DateButton(
-                                      date: endDate,
-                                      onPick: (ts) =>
-                                          setState(() => endDate = ts),
-                                      enabled: !isCurrent,
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 8),
-                          // Current toggle
-                          Row(
-                            children: [
-                              Switch(
-                                value: isCurrent,
-                                onChanged: (v) {
-                                  setState(() {
-                                    isCurrent = v;
-                                    if (isCurrent) endDate = null;
-                                  });
-                                },
-                              ),
-                              const SizedBox(width: 8),
-                              const Text('Currently studying here'),
-                            ],
-                          ),
-                          const SizedBox(height: 8),
-
-                          // GPA
-                          const _FieldLabel('Grade/CGPA (Optional)'),
-                          const SizedBox(height: 6),
-                          TextFormField(
-                            controller: gpaCtrl,
-                            keyboardType:
-                            const TextInputType.numberWithOptions(
-                                decimal: true),
-                            decoration: _inputDecoration(
-                              hint: 'e.g., 3.8',
-                            ),
-                          ),
-                          const SizedBox(height: 14),
-
-                          // Location
-                          const _FieldLabel('Location *'),
-                          const SizedBox(height: 6),
-                          TextFormField(
-                            controller: locationCtrl,
-                            validator: (v) =>
-                            (v == null || v.trim().isEmpty)
-                                ? 'Required'
-                                : null,
-                            decoration: _inputDecoration(
-                              hint: 'e.g., Kuala Lumpur, Malaysia',
-                            ),
-                          ),
-                          const SizedBox(height: 18),
-
-                          Row(
-                            children: [
-                              Expanded(
-                                child: ElevatedButton(
-                                  onPressed: vm.savingEducation
-                                      ? null
-                                      : () async {
-                                    if (!formKey.currentState!
-                                        .validate()) return;
-                                    if (startDate == null) {
-                                      ScaffoldMessenger.of(context)
-                                          .showSnackBar(const SnackBar(
-                                          content: Text(
-                                              'Start Date is required')));
-                                      return;
-                                    }
-                                    if (!isCurrent && endDate == null) {
-                                      ScaffoldMessenger.of(context)
-                                          .showSnackBar(const SnackBar(
-                                          content: Text(
-                                              'End Date is required (or mark as current)')));
-                                      return;
-                                    }
-
-                                    final (city, country) =
-                                    _splitCityCountry(
-                                        locationCtrl.text.trim());
-
-                                    final draft = Education(
-                                      id: existing?.id ?? 'TEMP',
-                                      institution:
-                                      institutionCtrl.text.trim(),
-                                      degreeLevel: degreeLevel,
-                                      fieldOfStudy: fieldCtrl.text.trim(),
-                                      startDate: startDate,
-                                      endDate: isCurrent ? null : endDate,
-                                      isCurrent: isCurrent,
-                                      gpa: gpaCtrl.text.trim().isEmpty
-                                          ? null
-                                          : gpaCtrl.text.trim(),
-                                      city: city,
-                                      country: country,
-                                      // order: keep existing order, else append to tail
-                                      order: existing?.order ??
-                                          (vm.education.length + 1),
-                                    );
-
-                                    bool ok;
-                                    if (existing == null) {
-                                      ok = await vm.addEducation(draft);
-                                    } else {
-                                      ok = await vm.saveEducation(draft);
-                                    }
-
-                                    if (!context.mounted) return;
-                                    if (ok) {
-                                      Navigator.pop(context);
-                                      ScaffoldMessenger.of(context)
-                                          .showSnackBar(SnackBar(
-                                          content: Text(existing ==
-                                              null
-                                              ? 'Education added'
-                                              : 'Education updated')));
-                                    } else {
-                                      ScaffoldMessenger.of(context)
-                                          .showSnackBar(SnackBar(
-                                          content: Text(vm.error ??
-                                              'Failed to save education')));
-                                    }
-                                  },
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor: const Color(0xFF7C4DFF),
-                                    foregroundColor: Colors.white,
-                                    padding: const EdgeInsets.symmetric(
-                                        vertical: 14),
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(12),
-                                    ),
-                                  ),
-                                  child: vm.savingEducation
-                                      ? const SizedBox(
-                                    width: 18,
-                                    height: 18,
-                                    child: CircularProgressIndicator(
-                                      strokeWidth: 2,
-                                      color: Colors.white,
-                                    ),
-                                  )
-                                      : const Text('Add Education'),
-                                ),
-                              ),
-                              const SizedBox(width: 12),
-                              Expanded(
-                                child: OutlinedButton(
-                                  onPressed: () => Navigator.pop(context),
-                                  style: OutlinedButton.styleFrom(
-                                    padding: const EdgeInsets.symmetric(
-                                        vertical: 14),
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(12),
-                                    ),
-                                  ),
-                                  child: const Text('Cancel'),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ],
+        return PopScope(
+          canPop: false, // Disable default pop
+          onPopInvokedWithResult: (didPop, result) async {
+            if (didPop) return;
+            if (hasUnsavedChanges()) {
+              await showUnsavedDialog();
+            } else {
+              Navigator.pop(context);
+            }
+          },
+          child: Padding(
+            padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
+            child: Container(
+              decoration: const BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // Handle Bar
+                  Center(
+                    child: Container(
+                      margin: const EdgeInsets.only(top: 12),
+                      width: 40,
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: Colors.grey[300],
+                        borderRadius: BorderRadius.circular(2),
                       ),
                     ),
-                  );
-                },
+                  ),
+
+                  // Content
+                  Flexible(
+                    child: SingleChildScrollView(
+                      padding: const EdgeInsets.fromLTRB(24, 16, 24, 24),
+                      child: StatefulBuilder(
+                        builder: (context, setState) {
+                          return Form(
+                            key: formKey,
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    Text(
+                                      existing == null ? 'Add Education' : 'Edit Education',
+                                      style: const TextStyle(
+                                          fontSize: 20,
+                                          fontWeight: FontWeight.bold,
+                                          color: Color(0xFF1A1A1A)
+                                      ),
+                                    ),
+                                    IconButton(
+                                      onPressed: () async {
+                                        if (hasUnsavedChanges()) {
+                                          await showUnsavedDialog();
+                                        } else {
+                                          Navigator.pop(context);
+                                        }
+                                      },
+                                      icon: const Icon(Icons.close, color: Colors.grey),
+                                    )
+                                  ],
+                                ),
+                                const SizedBox(height: 24),
+
+                                // Institution
+                                _StyledField(
+                                  label: 'Institution Name *',
+                                  controller: institutionCtrl,
+                                  hint: 'e.g., University of Malaya',
+                                  validator: (v) => (v == null || v.trim().isEmpty) ? 'Institution name is required' : null,
+                                ),
+                                const SizedBox(height: 20),
+
+                                // Degree Level
+                                _StyledDropdown<String>(
+                                  label: 'Degree Level *',
+                                  value: degreeLevel,
+                                  hint: 'Select degree level',
+                                  items: const ['HighSchool', 'Diploma', 'Bachelor', 'Master', 'PhD', 'Other'],
+                                  onChanged: (v) => setState(() => degreeLevel = v),
+                                  validator: (v) => (v == null || v.isEmpty) ? 'Degree level is required' : null,
+                                ),
+                                const SizedBox(height: 20),
+
+                                // Field of Study
+                                _StyledDropdown<String>(
+                                  label: 'Field of Study *',
+                                  value: _fieldOptions.contains(fieldCtrl.text) ? fieldCtrl.text : null,
+                                  hint: 'Select field of study',
+                                  items: _fieldOptions,
+                                  onChanged: (v) {
+                                    fieldCtrl.text = v ?? '';
+                                    setState(() {});
+                                  },
+                                  validator: (_) => (fieldCtrl.text.trim().isEmpty) ? 'Field of study is required' : null,
+                                ),
+                                const SizedBox(height: 20),
+
+                                // Dates
+                                Row(
+                                  children: [
+                                    Expanded(
+                                      child: _StyledDateField(
+                                        label: 'Start Date *',
+                                        date: startDate,
+                                        onPick: (ts) => setState(() => startDate = ts),
+                                      ),
+                                    ),
+                                    const SizedBox(width: 16),
+                                    Expanded(
+                                      child: _StyledDateField(
+                                        label: 'End Date *',
+                                        date: endDate,
+                                        enabled: !isCurrent,
+                                        onPick: (ts) => setState(() => endDate = ts),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 12),
+
+                                // Current Switch
+                                SwitchListTile(
+                                  contentPadding: EdgeInsets.zero,
+                                  title: const Text(
+                                    'Currently studying here',
+                                    style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
+                                  ),
+                                  activeColor: const Color(0xFF6C63FF),
+                                  value: isCurrent,
+                                  onChanged: (v) {
+                                    setState(() {
+                                      isCurrent = v;
+                                      if (isCurrent) endDate = null;
+                                    });
+                                  },
+                                ),
+
+                                const SizedBox(height: 12),
+
+                                // GPA
+                                _StyledField(
+                                  label: 'Grade/CGPA (Optional)',
+                                  controller: gpaCtrl,
+                                  hint: 'e.g., 3.8',
+                                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                                ),
+                                const SizedBox(height: 20),
+
+                                // Location
+                                _StyledField(
+                                  label: 'Location *',
+                                  controller: locationCtrl,
+                                  hint: 'e.g., Kuala Lumpur, Malaysia',
+                                  validator: (v) => (v == null || v.trim().isEmpty) ? 'Location is required' : null,
+                                  prefixIcon: const Icon(Icons.location_on_outlined, color: Colors.grey),
+                                ),
+                                const SizedBox(height: 32),
+
+                                // Action Buttons
+                                SizedBox(
+                                  width: double.infinity,
+                                  height: 54,
+                                  child: ElevatedButton(
+                                    onPressed: (vm.savingEducation || isSaving)
+                                        ? null
+                                        : () async {
+                                      final success = await handleSave();
+                                      if (success && context.mounted) {
+                                        Navigator.pop(context);
+                                        ScaffoldMessenger.of(context).showSnackBar(
+                                          SnackBar(
+                                            content: Text(existing == null ? 'Education added successfully' : 'Education updated successfully'),
+                                            backgroundColor: const Color(0xFF00B894),
+                                          ),
+                                        );
+                                      }
+                                    },
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: const Color(0xFF6C63FF),
+                                      foregroundColor: Colors.white,
+                                      elevation: 0,
+                                      disabledBackgroundColor: Colors.grey[300],
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(12),
+                                      ),
+                                    ),
+                                    child: (vm.savingEducation || isSaving)
+                                        ? const SizedBox(
+                                      width: 24, height: 24,
+                                      child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+                                    )
+                                        : const Text(
+                                      'Save Education',
+                                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(height: 16),
+                                SizedBox(
+                                  width: double.infinity,
+                                  height: 54,
+                                  child: OutlinedButton(
+                                    onPressed: (vm.savingEducation || isSaving) ? null : () async {
+                                      if (hasUnsavedChanges()) {
+                                        await showUnsavedDialog();
+                                      } else {
+                                        Navigator.pop(context);
+                                      }
+                                    },
+                                    style: OutlinedButton.styleFrom(
+                                      side: BorderSide(color: Colors.grey[300]!),
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(12),
+                                      ),
+                                    ),
+                                    child: const Text('Cancel', style: TextStyle(color: Color(0xFF1A1A1A))),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
           ),
@@ -443,143 +578,48 @@ class EditEducationScreen extends StatelessWidget {
     );
   }
 
-  static Future<bool> _confirmDelete(BuildContext c, String title) async {
+  static Future<bool> _confirmDelete(BuildContext c, String title, Color primary) async {
     return await showDialog<bool>(
       context: c,
+      barrierDismissible: false,
       builder: (c) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: const Text('Delete Education?'),
-        content: Text('Remove "$title" from your profile?'),
+        content: Text('Remove "$title" from your profile? This action cannot be undone.'),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('Cancel')),
-          FilledButton(onPressed: () => Navigator.pop(c, true), child: const Text('Delete')),
-        ],
-      ),
-    ) ??
-        false;
-  }
-}
-
-class EducationTipsCard extends StatelessWidget {
-  const EducationTipsCard({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      margin: const EdgeInsets.only(top: 8),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: const Color(0xFFEFF6FF), // light blue
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFFBFDBFE)), // blue-200
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: const [
-          // Header
-          Row(
-            children: [
-              Icon(Icons.tips_and_updates_outlined,
-                  color: Color(0xFF2563EB)), // blue-600
-              SizedBox(width: 8),
-              Text(
-                'Education Tips',
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w800,
-                  color: Color(0xFF1E3A8A), // blue-900
-                ),
-              ),
-            ],
+          TextButton(
+            onPressed: () => Navigator.pop(c, false),
+            child: const Text('Cancel', style: TextStyle(color: Colors.grey)),
           ),
-          SizedBox(height: 12),
-
-          // Tips
-          _TipRow('Include all relevant educational qualifications'),
-          _TipRow('Add certifications to showcase additional skills'),
-          _TipRow('Keep your information current and accurate'),
-          _TipRow('Include grades/honors when they strengthen your profile'),
-          _TipRow('Professional certifications can be as valuable as degrees'),
-        ],
-      ),
-    );
-  }
-}
-
-class _TipRow extends StatelessWidget {
-  const _TipRow(this.text);
-
-  final String text;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            '•',
-            style: TextStyle(
-              fontSize: 16,
-              height: 1.35,
-              color: Color(0xFF1E40AF), // blue-800
+          ElevatedButton(
+            onPressed: () => Navigator.pop(c, true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFFD63031),
+              elevation: 0,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
             ),
-          ),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Text(
-              text,
-              style: const TextStyle(
-                color: Color(0xFF1F2937), // gray-800
-                height: 1.35,
-              ),
-            ),
+            child: const Text('Delete', style: TextStyle(color: Colors.white)),
           ),
         ],
       ),
-    );
+    ) ?? false;
   }
 }
 
-
-// ======= Widgets & helpers =======
-
-class _StatPill extends StatelessWidget {
-  const _StatPill({required this.title, required this.value});
-  final String title;
-  final String value;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-      decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.95),
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Column(
-        children: [
-          Text(value,
-              style:
-              const TextStyle(fontSize: 18, fontWeight: FontWeight.w900)),
-          const SizedBox(height: 2),
-          Text(title, style: const TextStyle(color: Color(0xFF6B7280))),
-        ],
-      ),
-    );
-  }
-}
+// ======= KYYAP Styled Components =======
 
 class _EducationCard extends StatelessWidget {
   const _EducationCard({
     required this.edu,
     required this.onEdit,
     required this.onDelete,
+    required this.primaryColor,
   });
 
   final Education edu;
   final VoidCallback onEdit;
   final VoidCallback onDelete;
+  final Color primaryColor;
 
   @override
   Widget build(BuildContext context) {
@@ -589,61 +629,102 @@ class _EducationCard extends StatelessWidget {
       edu.isCurrent == true ? 'Present' : _fmtDate(edu.endDate),
     ].where((e) => e != null && e.isNotEmpty).join(' – ');
 
-    return Card(
-      margin: const EdgeInsets.only(bottom: 12),
-      elevation: 0,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+    return Container(
+      margin: const EdgeInsets.only(bottom: 16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFE5E7EB)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
       child: Padding(
-        padding: const EdgeInsets.fromLTRB(14, 14, 14, 14),
+        padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // title + actions
             Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Expanded(
-                  child: Text(
-                    '${edu.degreeLevel ?? ''}${(edu.degreeLevel != null && (edu.fieldOfStudy ?? '').isNotEmpty) ? " in " : ""}${edu.fieldOfStudy ?? ''}',
-                    style: const TextStyle(
-                        fontSize: 16, fontWeight: FontWeight.w800),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        '${edu.degreeLevel ?? ''}${(edu.degreeLevel != null && (edu.fieldOfStudy ?? '').isNotEmpty) ? " in " : ""}${edu.fieldOfStudy ?? ''}',
+                        style: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w700,
+                          color: Color(0xFF1A1A1A),
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        edu.institution ?? '',
+                        style: const TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w500,
+                          color: Color(0xFF6C63FF),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
-                IconButton(
-                  visualDensity: VisualDensity.compact,
-                  onPressed: onEdit,
-                  icon: const Icon(Icons.edit_outlined),
-                  tooltip: 'Edit',
-                ),
-                IconButton(
-                  visualDensity: VisualDensity.compact,
-                  onPressed: onDelete,
-                  icon: const Icon(Icons.delete_outline, color: Colors.redAccent),
-                  tooltip: 'Delete',
+                PopupMenuButton<String>(
+                  icon: const Icon(Icons.more_vert, color: Colors.grey),
+                  onSelected: (v) {
+                    if (v == 'edit') onEdit();
+                    if (v == 'delete') onDelete();
+                  },
+                  itemBuilder: (context) => [
+                    const PopupMenuItem(
+                      value: 'edit',
+                      child: Row(
+                        children: [
+                          Icon(Icons.edit, size: 18, color: Color(0xFF6B7280)),
+                          SizedBox(width: 12),
+                          Text('Edit'),
+                        ],
+                      ),
+                    ),
+                    const PopupMenuItem(
+                      value: 'delete',
+                      child: Row(
+                        children: [
+                          Icon(Icons.delete, size: 18, color: Color(0xFFD63031)),
+                          SizedBox(width: 12),
+                          Text('Delete', style: TextStyle(color: Color(0xFFD63031))),
+                        ],
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),
-            Text(
-              edu.institution ?? '',
-              style: const TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w700,
-                  color: Color(0xFF374151)),
-            ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 12),
+            Divider(color: Colors.grey[100]),
+            const SizedBox(height: 12),
             Row(
               children: [
-                const Icon(Icons.lock_clock, size: 16, color: Color(0xFF9CA3AF)),
+                Icon(Icons.calendar_today, size: 14, color: Colors.grey[500]),
                 const SizedBox(width: 6),
-                Text(dateText, style: const TextStyle(color: Color(0xFF6B7280))),
-                const SizedBox(width: 16),
-                const Icon(Icons.location_on_outlined,
-                    size: 16, color: Color(0xFF9CA3AF)),
-                const SizedBox(width: 4),
+                Text(dateText, style: TextStyle(fontSize: 13, color: Colors.grey[600])),
+              ],
+            ),
+            const SizedBox(height: 6),
+            Row(
+              children: [
+                Icon(Icons.location_on, size: 14, color: Colors.grey[500]),
+                const SizedBox(width: 6),
                 Expanded(
                   child: Text(
                     loc,
-                    style: const TextStyle(color: Color(0xFF6B7280)),
+                    style: TextStyle(fontSize: 13, color: Colors.grey[600]),
                     overflow: TextOverflow.ellipsis,
                   ),
                 ),
@@ -651,8 +732,13 @@ class _EducationCard extends StatelessWidget {
             ),
             if ((edu.gpa ?? '').isNotEmpty) ...[
               const SizedBox(height: 6),
-              Text('Grade: ${edu.gpa}',
-                  style: const TextStyle(color: Color(0xFF6B7280))),
+              Row(
+                children: [
+                  Icon(Icons.grade, size: 14, color: Colors.grey[500]),
+                  const SizedBox(width: 6),
+                  Text('CGPA: ${edu.gpa}', style: TextStyle(fontSize: 13, color: Colors.grey[600])),
+                ],
+              ),
             ],
           ],
         ),
@@ -661,16 +747,9 @@ class _EducationCard extends StatelessWidget {
   }
 }
 
-class _FieldLabel extends StatelessWidget {
-  const _FieldLabel(this.text);
-  final String text;
-  @override
-  Widget build(BuildContext context) =>
-      Text(text, style: const TextStyle(fontWeight: FontWeight.w600));
-}
-
-class _Dropdown<T> extends StatelessWidget {
-  const _Dropdown({
+class _StyledDropdown<T> extends StatelessWidget {
+  const _StyledDropdown({
+    required this.label,
     required this.value,
     required this.hint,
     required this.items,
@@ -678,6 +757,7 @@ class _Dropdown<T> extends StatelessWidget {
     this.validator,
   });
 
+  final String label;
   final T? value;
   final String hint;
   final List<T> items;
@@ -686,86 +766,243 @@ class _Dropdown<T> extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return DropdownButtonFormField<T>(
-      value: value,
-      decoration: _inputDecoration(hint: hint),
-      items: items
-          .map((e) => DropdownMenuItem<T>(
-        value: e,
-        child: Text(e.toString()),
-      ))
-          .toList(),
-      onChanged: onChanged,
-      validator: validator,
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: const TextStyle(fontSize: 14,
+              fontWeight: FontWeight.w500,
+              color: Color(0xFF1A1A1A)),
+        ),
+        const SizedBox(height: 8),
+        DropdownButtonFormField<T>(
+          value: value,
+          isExpanded: true,
+          icon: const Icon(Icons.keyboard_arrow_down, color: Colors.grey),
+          decoration: _inputDecoration(hint: hint),
+          items: items.map((e) =>
+              DropdownMenuItem<T>(
+                value: e,
+                child: Text(e.toString(), style: const TextStyle(
+                    fontSize: 16, color: Color(0xFF1A1A1A))),
+              )).toList(),
+          onChanged: onChanged,
+          validator: validator,
+        ),
+      ],
     );
   }
 }
 
-class _DateButton extends StatelessWidget {
-  const _DateButton({
+class _StyledField extends StatelessWidget {
+  const _StyledField({
+    required this.label,
+    required this.controller,
+    this.hint,
+    this.keyboardType,
+    this.validator,
+    this.prefixIcon,
+  });
+
+  final String label;
+  final TextEditingController controller;
+  final String? hint;
+  final TextInputType? keyboardType;
+  final String? Function(String?)? validator;
+  final Widget? prefixIcon;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500, color: Color(0xFF1A1A1A)),
+        ),
+        const SizedBox(height: 8),
+        TextFormField(
+          controller: controller,
+          validator: validator,
+          keyboardType: keyboardType,
+          style: const TextStyle(fontSize: 16, color: Color(0xFF1A1A1A)),
+          decoration: _inputDecoration(hint: hint, prefixIcon: prefixIcon),
+        ),
+      ],
+    );
+  }
+}
+
+class _StyledDateField extends StatelessWidget {
+  const _StyledDateField({
+    required this.label,
     required this.date,
     required this.onPick,
     this.enabled = true,
   });
 
+  final String label;
   final Timestamp? date;
   final ValueChanged<Timestamp?> onPick;
   final bool enabled;
 
   @override
   Widget build(BuildContext context) {
-    return InkWell(
-      onTap: !enabled
-          ? null
-          : () async {
-        final now = DateTime.now();
-        final initial = date?.toDate() ?? DateTime(now.year, now.month, now.day);
-        final picked = await showDatePicker(
-          context: context,
-          firstDate: DateTime(1960),
-          lastDate: DateTime(now.year + 6),
-          initialDate: initial,
-        );
-        if (picked != null) {
-          final ts = Timestamp.fromDate(DateTime(picked.year, picked.month, picked.day));
-          onPick(ts);
-        }
-      },
-      child: Container(
-        height: 48,
-        alignment: Alignment.centerLeft,
-        padding: const EdgeInsets.symmetric(horizontal: 12),
-        decoration: BoxDecoration(
-          color: const Color(0xFFF9FAFB),
-          borderRadius: BorderRadius.circular(10),
-          border: Border.all(color: const Color(0xFFE5E7EB)),
-        ),
-        child: Text(
-          date == null ? 'dd/mm/yyyy' : _fmtDate(date),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
           style: TextStyle(
-            color: enabled ? const Color(0xFF111827) : const Color(0xFF9CA3AF),
+            fontSize: 14,
+            fontWeight: FontWeight.w500,
+            color: enabled ? const Color(0xFF1A1A1A) : Colors.grey[400],
           ),
         ),
+        const SizedBox(height: 8),
+        InkWell(
+          onTap: !enabled
+              ? null
+              : () async {
+            final now = DateTime.now();
+            final initial = date?.toDate() ?? DateTime(now.year, now.month, now.day);
+            final picked = await showDatePicker(
+              context: context,
+              firstDate: DateTime(1960),
+              lastDate: DateTime(now.year + 6),
+              initialDate: initial,
+              builder: (context, child) {
+                return Theme(
+                  data: Theme.of(context).copyWith(
+                    colorScheme: const ColorScheme.light(primary: Color(0xFF6C63FF)),
+                  ),
+                  child: child!,
+                );
+              },
+            );
+            if (picked != null) {
+              final ts = Timestamp.fromDate(DateTime(picked.year, picked.month, picked.day));
+              onPick(ts);
+            }
+          },
+          borderRadius: BorderRadius.circular(12),
+          child: IgnorePointer(
+            child: TextFormField(
+              controller: TextEditingController(text: _fmtDate(date)),
+              style: TextStyle(
+                  fontSize: 16,
+                  color: enabled ? const Color(0xFF1A1A1A) : Colors.grey[400]
+              ),
+              decoration: _inputDecoration(
+                hint: 'DD/MM/YYYY',
+                prefixIcon: Icon(Icons.calendar_today, color: enabled ? Colors.grey : Colors.grey[300]),
+              ).copyWith(
+                filled: true,
+                fillColor: enabled ? const Color(0xFFF9FAFB) : Colors.grey[100],
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _EducationTipsCard extends StatelessWidget {
+  const _EducationTipsCard({required this.primaryColor});
+  final Color primaryColor;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF3F4F6),
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.lightbulb_outline, color: primaryColor, size: 22),
+              const SizedBox(width: 8),
+              Text(
+                'Pro Tips',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  color: primaryColor,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          const _TipRow('List your most recent degree first.'),
+          const _TipRow('Include relevant coursework if you are a fresh graduate.'),
+          const _TipRow('Keep your information accurate and up-to-date.'),
+        ],
       ),
     );
   }
 }
 
-InputDecoration _inputDecoration({String? hint}) => const InputDecoration(
-  filled: true,
-  fillColor: Color(0xFFF9FAFB),
-  border: OutlineInputBorder(
-    borderSide: BorderSide(color: Color(0xFFE5E7EB)),
-    borderRadius: BorderRadius.all(Radius.circular(10)),
-  ),
-  enabledBorder: OutlineInputBorder(
-    borderSide: BorderSide(color: Color(0xFFE5E7EB)),
-    borderRadius: BorderRadius.all(Radius.circular(10)),
-  ),
-  contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-).copyWith(hintText: hint);
+class _TipRow extends StatelessWidget {
+  const _TipRow(this.text);
+  final String text;
 
-// Format dd/MM/yyyy
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text('•', style: TextStyle(fontSize: 16, color: Colors.grey, height: 1.4)),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(text, style: const TextStyle(color: Color(0xFF4B5563), height: 1.4)),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// Helpers
+
+InputDecoration _inputDecoration({String? hint, Widget? prefixIcon}) {
+  return InputDecoration(
+    hintText: hint,
+    hintStyle: TextStyle(fontSize: 16, color: Colors.grey[500]),
+    prefixIcon: prefixIcon,
+    filled: true,
+    fillColor: const Color(0xFFF9FAFB),
+    contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+    border: OutlineInputBorder(
+      borderRadius: BorderRadius.circular(12),
+      borderSide: const BorderSide(color: Color(0xFFE5E7EB)),
+    ),
+    enabledBorder: OutlineInputBorder(
+      borderRadius: BorderRadius.circular(12),
+      borderSide: const BorderSide(color: Color(0xFFE5E7EB)),
+    ),
+    focusedBorder: OutlineInputBorder(
+      borderRadius: BorderRadius.circular(12),
+      borderSide: const BorderSide(color: Color(0xFF6C63FF), width: 2),
+    ),
+    errorBorder: OutlineInputBorder(
+      borderRadius: BorderRadius.circular(12),
+      borderSide: const BorderSide(color: Colors.red, width: 1),
+    ),
+    focusedErrorBorder: OutlineInputBorder(
+      borderRadius: BorderRadius.circular(12),
+      borderSide: const BorderSide(color: Colors.red, width: 2),
+    ),
+  );
+}
+
 String _fmtDate(Timestamp? ts) {
   if (ts == null) return '';
   final d = ts.toDate();
@@ -793,61 +1030,12 @@ String _joinCityCountry(String? city, String? country) {
   return '$a, $b';
 }
 
-/// Common field-of-study options (extended)
+// Data Options
 const List<String> _fieldOptions = [
-  // Computing & Tech
-  'Computer Science',
-  'Information Technology',
-  'Software Engineering',
-  'Data Science',
-  'Artificial Intelligence',
-  'Cybersecurity',
-  'Information Systems',
-  'Computer Engineering',
-  'Network Engineering',
-  'Human-Computer Interaction',
-  'Game Development',
-  'Cloud Computing',
-  'Business Analytics',
-  'Machine Learning',
-  // Engineering
-  'Electrical Engineering',
-  'Mechanical Engineering',
-  'Civil Engineering',
-  'Chemical Engineering',
-  'Industrial Engineering',
-  'Mechatronics',
-  'Biomedical Engineering',
-  // Business & Management
-  'Business Administration',
-  'Finance',
-  'Accounting',
-  'Marketing',
-  'Economics',
-  'Entrepreneurship',
-  'Supply Chain Management',
-  'Human Resource Management',
-  'International Business',
-  // Sciences
-  'Mathematics',
-  'Statistics',
-  'Physics',
-  'Chemistry',
-  'Biology',
-  'Biotechnology',
-  'Environmental Science',
-  // Arts & Social Sciences
-  'Psychology',
-  'Communications',
-  'Design',
-  'Architecture',
-  'Education',
-  'Sociology',
-  'Political Science',
-  'Linguistics',
-  'Media Studies',
-  'Law',
-  'Medicine',
-  'Pharmacy',
-  'Nursing',
+  'Computer Science', 'Information Technology', 'Software Engineering',
+  'Data Science', 'Artificial Intelligence', 'Cybersecurity',
+  'Business Administration', 'Finance', 'Accounting', 'Marketing',
+  'Electrical Engineering', 'Mechanical Engineering', 'Civil Engineering',
+  'Mathematics', 'Physics', 'Chemistry', 'Biology',
+  'Psychology', 'Design', 'Law', 'Medicine', 'Nursing',
 ];

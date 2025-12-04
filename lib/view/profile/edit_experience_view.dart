@@ -7,6 +7,11 @@ import 'package:path_wise/viewModel/profile_view_model.dart';
 class EditExperienceScreen extends StatelessWidget {
   const EditExperienceScreen({super.key});
 
+  // KYYAP Style Constants
+  final Color _primaryColor = const Color(0xFF6C63FF);
+  final Color _textColor = const Color(0xFF1A1A1A);
+  final Color _backgroundColor = Colors.white;
+
   @override
   Widget build(BuildContext context) {
     return Consumer<ProfileViewModel>(
@@ -14,100 +19,147 @@ class EditExperienceScreen extends StatelessWidget {
         final total = vm.experience.length;
 
         return Scaffold(
-          backgroundColor: const Color(0xFFF7F8FC),
+          backgroundColor: _backgroundColor,
           appBar: AppBar(
             elevation: 0,
-            backgroundColor: Colors.transparent,
-            flexibleSpace: Container(
-              decoration: const BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [Color(0xFF7C4DFF), Color(0xFF6EA8FF)],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                ),
-              ),
+            backgroundColor: _backgroundColor,
+            centerTitle: true,
+            leading: IconButton(
+              icon: const Icon(Icons.arrow_back_ios, color: Colors.black, size: 20),
+              onPressed: () => Navigator.pop(context),
             ),
-            title: const Text(
+            title: Text(
               'Work Experience',
-              style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700),
+              style: TextStyle(
+                color: _textColor,
+                fontWeight: FontWeight.bold,
+                fontSize: 20,
+              ),
             ),
           ),
           body: ListView(
-            padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
+            padding: const EdgeInsets.all(24),
             children: [
-              // little summary pill
+              // Stats Card
               Container(
-                padding: const EdgeInsets.all(14),
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
                 decoration: BoxDecoration(
-                  color: const Color(0xFFFFFFFF).withOpacity(0.15),
-                  borderRadius: BorderRadius.circular(12),
+                  color: const Color(0xFFF9FAFB),
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: const Color(0xFFE5E7EB)),
                 ),
                 child: Row(
                   children: [
-                    _StatPill(title: 'Work Experience', value: '$total'),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          '$total',
+                          style: TextStyle(
+                            fontSize: 24,
+                            fontWeight: FontWeight.w900,
+                            color: _primaryColor,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          'Experiences Listed',
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: Colors.grey[600],
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ],
+                    ),
                     const Spacer(),
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: _primaryColor.withOpacity(0.1),
+                        shape: BoxShape.circle,
+                      ),
+                      child: Icon(Icons.work, color: _primaryColor, size: 24),
+                    ),
                   ],
                 ),
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: 32),
 
-              // header + add
+              // Section Header
               Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  const Flexible(
-                    child: Text(
-                      'Professional Experience',
-                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800),
-                      overflow: TextOverflow.ellipsis,
+                  Text(
+                    'Professional History',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: _textColor,
                     ),
                   ),
-                  const SizedBox(width: 8),
-                  ElevatedButton.icon(
+                  TextButton.icon(
                     onPressed: () => _showAddOrEditSheet(context, vm),
-                    icon: const Icon(Icons.add, size: 18),
-                    label: const Text('Add Experience'),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFFEEF2FF),
-                      foregroundColor: const Color(0xFF4338CA),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(10),
+                    icon: Icon(Icons.add_circle_outline, color: _primaryColor, size: 20),
+                    label: Text(
+                      'Add New',
+                      style: TextStyle(
+                        color: _primaryColor,
+                        fontWeight: FontWeight.w600,
                       ),
+                    ),
+                    style: TextButton.styleFrom(
+                      padding: EdgeInsets.zero,
+                      minimumSize: const Size(0, 0),
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                     ),
                   )
                 ],
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: 16),
 
               if (vm.experience.isEmpty)
                 Container(
-                  padding: const EdgeInsets.all(14),
+                  padding: const EdgeInsets.all(24),
+                  alignment: Alignment.center,
                   decoration: BoxDecoration(
-                    color: const Color(0xFFF3F4F6),
+                    color: const Color(0xFFF9FAFB),
                     borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: const Color(0xFFE5E7EB)),
                   ),
-                  child: const Text(
-                    'No work experience yet. Tap "Add Experience" to create one.',
-                    style: TextStyle(color: Color(0xFF6B7280)),
+                  child: Column(
+                    children: [
+                      Icon(Icons.work_outline, size: 48, color: Colors.grey[400]),
+                      const SizedBox(height: 12),
+                      Text(
+                        'No work experience added yet',
+                        style: TextStyle(color: Colors.grey[600], fontWeight: FontWeight.w500),
+                      ),
+                    ],
                   ),
                 )
               else
                 ...vm.experience.map((exp) => _ExperienceCard(
                   exp: exp,
+                  primaryColor: _primaryColor,
                   onEdit: () => _showAddOrEditSheet(context, vm, existing: exp),
                   onDelete: () async {
                     final ok = await _confirmDelete(
-                        context, exp.jobTitle ?? 'this entry');
+                        context, exp.jobTitle ?? 'this entry', _primaryColor);
                     if (!ok) return;
                     await vm.deleteExperience(exp.id);
                     if (!context.mounted) return;
                     ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Experience deleted')),
+                      const SnackBar(
+                        content: Text('Experience deleted'),
+                        backgroundColor: Color(0xFFD63031),
+                      ),
                     );
                   },
                 )),
 
-              const SizedBox(height: 20),
-              const _ExperienceTipsCard(),
+              const SizedBox(height: 32),
+              _ExperienceTipsCard(primaryColor: _primaryColor),
             ],
           ),
         );
@@ -123,442 +175,483 @@ class EditExperienceScreen extends StatelessWidget {
       }) async {
     final formKey = GlobalKey<FormState>();
 
+    // Controllers
     final jobCtrl = TextEditingController(text: existing?.jobTitle ?? '');
     final companyCtrl = TextEditingController(text: existing?.company ?? '');
     final descCtrl = TextEditingController(text: existing?.description ?? '');
-    final locationCtrl =
-    TextEditingController(text: _joinCityCountry(existing?.city, existing?.country));
+    final locationCtrl = TextEditingController(text: _joinCityCountry(existing?.city, existing?.country));
 
-    String? employmentType = _sanitizeDropdownValue(
-      existing?.employmentType,
-      _employmentTypes,
-    );
-    String? industry = _sanitizeDropdownValue(
-      _normalizeIndustry(existing?.industry),
-      _industries,
-    );
-
-    Timestamp? startDate = existing?.startDate;
-    Timestamp? endDate = existing?.endDate;
-    bool isCurrent = existing?.isCurrent ?? false;
-
-    // Achievements: 3-box input -> combined into single string "title | metric | impact"
+    // Achievement Logic
     final achTitleCtrl = TextEditingController();
     final achMetricCtrl = TextEditingController();
     final achImpactCtrl = TextEditingController();
-    // if existing has one combined description, try to split to prefill first field only
+    // Parse existing achievements description
     if ((existing?.achievements?.description ?? '').isNotEmpty) {
       final parts = existing!.achievements!.description!.split('|').map((e) => e.trim()).toList();
       if (parts.isNotEmpty) achTitleCtrl.text = parts[0];
       if (parts.length > 1) achMetricCtrl.text = parts[1];
       if (parts.length > 2) achImpactCtrl.text = parts[2];
     }
+
     final List<String> skillsUsed = [...(existing?.achievements?.skillsUsed ?? [])];
     final skillInputCtrl = TextEditingController();
+
+    // Dropdowns
+    String? employmentType = _sanitizeDropdownValue(existing?.employmentType, _employmentTypes);
+    String? industry = _sanitizeDropdownValue(_normalizeIndustry(existing?.industry), _industries);
+
+    // Dates
+    Timestamp? startDate = existing?.startDate;
+    Timestamp? endDate = existing?.endDate;
+    bool isCurrent = existing?.isCurrent ?? false;
+
+    // --- Dirty Checking Logic ---
+    final initialJob = existing?.jobTitle ?? '';
+    final initialCompany = existing?.company ?? '';
+    final initialDesc = existing?.description ?? '';
+    final initialLoc = _joinCityCountry(existing?.city, existing?.country);
+    final initialType = existing?.employmentType;
+    final initialIndustry = _normalizeIndustry(existing?.industry);
+    final initialStart = existing?.startDate;
+    final initialEnd = existing?.endDate;
+    final initialIsCurrent = existing?.isCurrent ?? false;
+    // Achievements initial state
+    final initialAchTitle = achTitleCtrl.text;
+    final initialAchMetric = achMetricCtrl.text;
+    final initialAchImpact = achImpactCtrl.text;
+    final initialSkillsLength = skillsUsed.length;
+
+    bool hasUnsavedChanges() {
+      if (jobCtrl.text != initialJob) return true;
+      if (companyCtrl.text != initialCompany) return true;
+      if (descCtrl.text != initialDesc) return true;
+      if (locationCtrl.text != initialLoc) return true;
+      if (employmentType != initialType) return true;
+      if (industry != initialIndustry) return true;
+      if (startDate != initialStart) return true;
+      if (endDate != initialEnd) return true;
+      if (isCurrent != initialIsCurrent) return true;
+      if (achTitleCtrl.text != initialAchTitle) return true;
+      if (achMetricCtrl.text != initialAchMetric) return true;
+      if (achImpactCtrl.text != initialAchImpact) return true;
+      if (skillsUsed.length != initialSkillsLength) return true;
+      return false;
+    }
+
+    // Save Logic
+    Future<bool> handleSave() async {
+      if (!formKey.currentState!.validate()) return false;
+      if (startDate == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Start Date is required')),
+        );
+        return false;
+      }
+
+      final (city, country) = _splitCityCountry(locationCtrl.text.trim());
+
+      final achParts = [
+        achTitleCtrl.text.trim(),
+        achMetricCtrl.text.trim(),
+        achImpactCtrl.text.trim(),
+      ].where((e) => e.isNotEmpty).toList();
+      final combinedAch = achParts.isEmpty ? null : achParts.join(' | ');
+
+      final draft = Experience(
+        id: existing?.id ?? 'TEMP',
+        jobTitle: jobCtrl.text.trim(),
+        company: companyCtrl.text.trim(),
+        employmentType: employmentType,
+        industry: industry,
+        startDate: startDate,
+        endDate: isCurrent ? null : endDate,
+        isCurrent: isCurrent,
+        city: city,
+        country: country,
+        description: descCtrl.text.trim(),
+        achievements: (combinedAch == null && skillsUsed.isEmpty)
+            ? null
+            : ExpAchievements(
+          description: combinedAch,
+          skillsUsed: skillsUsed.isEmpty ? null : skillsUsed,
+        ),
+        order: existing?.order ?? (vm.experience.length + 1),
+      );
+
+      bool ok;
+      if (existing == null) {
+        ok = await vm.addExperience(draft);
+      } else {
+        ok = await vm.saveExperience(draft);
+      }
+
+      if (!ok) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(vm.error ?? 'Failed to save experience')),
+        );
+      }
+      return ok;
+    }
+
+    // Unsaved Changes Dialog
+    Future<void> showUnsavedDialog() async {
+      await showDialog(
+        context: context,
+        builder: (dialogContext) => AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title: const Text('Unsaved Changes', style: TextStyle(fontWeight: FontWeight.bold)),
+          content: const Text(
+            'You have unsaved changes. Do you want to save them before leaving?',
+            style: TextStyle(color: Color(0xFF6B7280)),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.pop(dialogContext); // Close dialog
+                Navigator.pop(context); // Close sheet (discard)
+              },
+              child: const Text('Continue', style: TextStyle(color: Colors.grey)),
+            ),
+            ElevatedButton(
+              onPressed: () async {
+                Navigator.pop(dialogContext); // Close dialog
+                final success = await handleSave();
+                if (success && context.mounted) {
+                  Navigator.pop(context); // Close sheet (saved)
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(existing == null ? 'Experience added' : 'Experience updated'),
+                      backgroundColor: const Color(0xFF00B894),
+                    ),
+                  );
+                }
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF6C63FF),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              ),
+              child: const Text('Save', style: TextStyle(color: Colors.white)),
+            ),
+          ],
+        ),
+      );
+    }
 
     await showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       useSafeArea: true,
       backgroundColor: Colors.transparent,
+      enableDrag: false,
       builder: (context) {
-        final viewInsets = MediaQuery.of(context).viewInsets.bottom;
-        return Padding(
-          padding: EdgeInsets.only(bottom: viewInsets),
-          child: Container(
-            decoration: const BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.vertical(top: Radius.circular(18)),
-            ),
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
-              child: StatefulBuilder(
-                builder: (context, setState) {
-                  return Form(
-                    key: formKey,
+        return PopScope(
+          canPop: false,
+          onPopInvoked: (didPop) async {
+            if (didPop) return;
+            if (hasUnsavedChanges()) {
+              await showUnsavedDialog();
+            } else {
+              Navigator.pop(context);
+            }
+          },
+          child: Padding(
+            padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
+            child: Container(
+              decoration: const BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // Handle Bar
+                  Center(
+                    child: Container(
+                      margin: const EdgeInsets.only(top: 12),
+                      width: 40,
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: Colors.grey[300],
+                        borderRadius: BorderRadius.circular(2),
+                      ),
+                    ),
+                  ),
+
+                  Flexible(
                     child: SingleChildScrollView(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Row(
-                            children: [
-                              Flexible(
-                                child: Text(
-                                  existing == null
-                                      ? 'Add Work Experience'
-                                      : 'Edit Work Experience',
-                                  style: const TextStyle(
-                                      fontSize: 18, fontWeight: FontWeight.w800),
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                              ),
-                              IconButton(
-                                onPressed: () => Navigator.pop(context),
-                                icon: const Icon(Icons.close),
-                              )
-                            ],
-                          ),
-                          const SizedBox(height: 8),
-
-                          // Job Title
-                          const _FieldLabel('Job Title *'),
-                          const SizedBox(height: 6),
-                          TextFormField(
-                            controller: jobCtrl,
-                            validator: (v) =>
-                            (v == null || v.trim().isEmpty) ? 'Required' : null,
-                            decoration: _inputDecoration(hint: 'e.g., Frontend Developer'),
-                          ),
-                          const SizedBox(height: 14),
-
-                          // Company
-                          const _FieldLabel('Company Name *'),
-                          const SizedBox(height: 6),
-                          TextFormField(
-                            controller: companyCtrl,
-                            validator: (v) =>
-                            (v == null || v.trim().isEmpty) ? 'Required' : null,
-                            decoration:
-                            _inputDecoration(hint: 'e.g., Tech Solutions Sdn Bhd'),
-                          ),
-                          const SizedBox(height: 14),
-
-                          // Emp Type + Industry (sanitized values)
-                          Row(
-                            children: [
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
+                      padding: const EdgeInsets.fromLTRB(24, 16, 24, 24),
+                      child: StatefulBuilder(
+                        builder: (context, setState) {
+                          return Form(
+                            key: formKey,
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                   children: [
-                                    const _FieldLabel('Employment Type *'),
-                                    const SizedBox(height: 6),
-                                    DropdownButtonFormField<String>(
-                                      value: _employmentTypes.contains(employmentType)
-                                          ? employmentType
-                                          : null,
-                                      items: _employmentTypes
-                                          .map((e) => DropdownMenuItem(
-                                        value: e,
-                                        child: Text(
-                                          e,
-                                          overflow: TextOverflow.ellipsis,
-                                          maxLines: 1,
+                                    Flexible(
+                                      child: Text(
+                                        existing == null ? 'Add Work Experience' : 'Edit Work Experience',
+                                        style: const TextStyle(
+                                            fontSize: 20,
+                                            fontWeight: FontWeight.bold,
+                                            color: Color(0xFF1A1A1A)
                                         ),
-                                      ))
-                                          .toList(),
-                                      onChanged: (v) => setState(() => employmentType = v),
-                                      validator: (v) =>
-                                      (v == null || v.isEmpty) ? 'Required' : null,
-                                      decoration: _inputDecoration(hint: 'Select type'),
-                                      isExpanded: true, // Add this line
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
                                     ),
+                                    IconButton(
+                                      onPressed: () async {
+                                        if (hasUnsavedChanges()) {
+                                          await showUnsavedDialog();
+                                        } else {
+                                          Navigator.pop(context);
+                                        }
+                                      },
+                                      icon: const Icon(Icons.close, color: Colors.grey),
+                                    )
                                   ],
                                 ),
-                              ),
-                              const SizedBox(width: 12),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                const SizedBox(height: 24),
+
+                                // Job Title
+                                _StyledField(
+                                  label: 'Job Title *',
+                                  controller: jobCtrl,
+                                  hint: 'e.g., Frontend Developer',
+                                  validator: (v) => (v == null || v.trim().isEmpty) ? 'Required' : null,
+                                ),
+                                const SizedBox(height: 20),
+
+                                // Company
+                                _StyledField(
+                                  label: 'Company Name *',
+                                  controller: companyCtrl,
+                                  hint: 'e.g., Tech Solutions Sdn Bhd',
+                                  validator: (v) => (v == null || v.trim().isEmpty) ? 'Required' : null,
+                                  prefixIcon: const Icon(Icons.business_outlined, color: Colors.grey),
+                                ),
+                                const SizedBox(height: 20),
+
+                                // Employment Type & Industry
+                                Row(
                                   children: [
-                                    const _FieldLabel('Industry *'),
-                                    const SizedBox(height: 6),
-                                    DropdownButtonFormField<String>(
-                                      value: _industries.contains(industry) ? industry : null,
-                                      items: _industries
-                                          .map((e) => DropdownMenuItem(
-                                        value: e,
-                                        child: Text(
-                                          e,
-                                          overflow: TextOverflow.ellipsis,
-                                          maxLines: 1,
-                                        ),
-                                      ))
-                                          .toList(),
-                                      onChanged: (v) => setState(() => industry = v),
-                                      validator: (v) =>
-                                      (v == null || v.isEmpty) ? 'Required' : null,
-                                      decoration: _inputDecoration(hint: 'Select industry'),
-                                      isExpanded: true, // Add this line
+                                    Expanded(
+                                      child: _StyledDropdown<String>(
+                                        label: 'Employment Type *',
+                                        value: _employmentTypes.contains(employmentType) ? employmentType : null,
+                                        hint: 'Select',
+                                        items: _employmentTypes,
+                                        onChanged: (v) => setState(() => employmentType = v),
+                                        validator: (v) => (v == null || v.isEmpty) ? 'Required' : null,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 16),
+                                    Expanded(
+                                      child: _StyledDropdown<String>(
+                                        label: 'Industry *',
+                                        value: _industries.contains(industry) ? industry : null,
+                                        hint: 'Select',
+                                        items: _industries,
+                                        onChanged: (v) => setState(() => industry = v),
+                                        validator: (v) => (v == null || v.isEmpty) ? 'Required' : null,
+                                      ),
                                     ),
                                   ],
                                 ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 14),
+                                const SizedBox(height: 20),
 
-                          // Dates
-                          Row(
-                            children: [
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                // Dates
+                                Row(
                                   children: [
-                                    const _FieldLabel('Start Date *'),
-                                    const SizedBox(height: 6),
-                                    _DateButton(
-                                      date: startDate,
-                                      onPick: (ts) => setState(() => startDate = ts),
+                                    Expanded(
+                                      child: _StyledDateField(
+                                        label: 'Start Date *',
+                                        date: startDate,
+                                        onPick: (ts) => setState(() => startDate = ts),
+                                      ),
+                                    ),
+                                    const SizedBox(width: 16),
+                                    Expanded(
+                                      child: _StyledDateField(
+                                        label: 'End Date',
+                                        date: endDate,
+                                        enabled: !isCurrent,
+                                        onPick: (ts) => setState(() => endDate = ts),
+                                      ),
                                     ),
                                   ],
                                 ),
-                              ),
-                              const SizedBox(width: 12),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    const _FieldLabel('End Date'),
-                                    const SizedBox(height: 6),
-                                    _DateButton(
-                                      date: endDate,
-                                      enabled: !isCurrent,
-                                      onPick: (ts) => setState(() => endDate = ts),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 8),
-                          Row(
-                            children: [
-                              Switch(
-                                value: isCurrent,
-                                onChanged: (v) {
-                                  setState(() {
-                                    isCurrent = v;
-                                    if (isCurrent) endDate = null;
-                                  });
-                                },
-                              ),
-                              const SizedBox(width: 8),
-                              const Flexible(
-                                child: Text(
-                                  'Currently working here',
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 8),
-
-                          // Location
-                          const _FieldLabel('Location *'),
-                          const SizedBox(height: 6),
-                          TextFormField(
-                            controller: locationCtrl,
-                            validator: (v) =>
-                            (v == null || v.trim().isEmpty) ? 'Required' : null,
-                            decoration:
-                            _inputDecoration(hint: 'e.g., Kuala Lumpur, Malaysia'),
-                          ),
-                          const SizedBox(height: 14),
-
-                          // Job Description -> experience.description
-                          const _FieldLabel('Job Description *'),
-                          const SizedBox(height: 6),
-                          TextFormField(
-                            controller: descCtrl,
-                            maxLines: 4,
-                            validator: (v) =>
-                            (v == null || v.trim().isEmpty) ? 'Required' : null,
-                            decoration: _inputDecoration(
-                                hint:
-                                'Describe your role, responsibilities, and impact...'),
-                          ),
-                          const SizedBox(height: 16),
-
-                          // Key Achievements (3 boxes -> combined with " | ")
-                          const _FieldLabel('Key Achievements (Optional)'),
-                          const SizedBox(height: 8),
-                          TextFormField(
-                            controller: achTitleCtrl,
-                            decoration: _inputDecoration(
-                                hint: 'Title/What (e.g., Improved app performance)'),
-                          ),
-                          const SizedBox(height: 8),
-                          TextFormField(
-                            controller: achMetricCtrl,
-                            decoration: _inputDecoration(
-                                hint: 'Metric (e.g., +40% faster load times)'),
-                          ),
-                          const SizedBox(height: 8),
-                          TextFormField(
-                            controller: achImpactCtrl,
-                            decoration: _inputDecoration(
-                                hint: 'Business impact (optional)'),
-                          ),
-                          const SizedBox(height: 12),
-
-                          // Skills used chips
-                          const Text('Skills Used/Developed',
-                              style: TextStyle(fontWeight: FontWeight.w600)),
-                          const SizedBox(height: 8),
-                          if (skillsUsed.isNotEmpty)
-                            Wrap(
-                              spacing: 6,
-                              runSpacing: -8,
-                              children: skillsUsed
-                                  .map((s) => Chip(
-                                label: Text(s),
-                                deleteIcon:
-                                const Icon(Icons.close, size: 18),
-                                onDeleted: () {
-                                  setState(() => skillsUsed.remove(s));
-                                },
-                              ))
-                                  .toList(),
-                            ),
-                          const SizedBox(height: 8),
-                          Row(
-                            children: [
-                              Expanded(
-                                child: TextField(
-                                  controller: skillInputCtrl,
-                                  decoration: _inputDecoration(
-                                    hint: 'Enter a skill (e.g., React)',
+                                const SizedBox(height: 12),
+                                SwitchListTile(
+                                  contentPadding: EdgeInsets.zero,
+                                  title: const Text(
+                                    'Currently working here',
+                                    style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
                                   ),
-                                  onSubmitted: (_) {
-                                    final v = skillInputCtrl.text.trim();
-                                    if (v.isEmpty) return;
+                                  activeColor: const Color(0xFF6C63FF),
+                                  value: isCurrent,
+                                  onChanged: (v) {
                                     setState(() {
-                                      skillsUsed.add(v);
-                                      skillInputCtrl.clear();
+                                      isCurrent = v;
+                                      if (isCurrent) endDate = null;
                                     });
                                   },
                                 ),
-                              ),
-                              const SizedBox(width: 8),
-                              ElevatedButton(
-                                onPressed: () {
-                                  final v = skillInputCtrl.text.trim();
-                                  if (v.isEmpty) return;
-                                  setState(() {
-                                    skillsUsed.add(v);
-                                    skillInputCtrl.clear();
-                                  });
-                                },
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: const Color(0xFF7C4DFF),
-                                  foregroundColor: Colors.white,
+                                const SizedBox(height: 12),
+
+                                // Location
+                                _StyledField(
+                                  label: 'Location *',
+                                  controller: locationCtrl,
+                                  hint: 'e.g., Kuala Lumpur, Malaysia',
+                                  validator: (v) => (v == null || v.trim().isEmpty) ? 'Required' : null,
+                                  prefixIcon: const Icon(Icons.location_on_outlined, color: Colors.grey),
                                 ),
-                                child: const Text('Add'),
-                              ),
-                            ],
-                          ),
+                                const SizedBox(height: 20),
 
-                          const SizedBox(height: 18),
-                          Row(
-                            children: [
-                              Expanded(
-                                child: ElevatedButton(
-                                  onPressed: () async {
-                                    if (!formKey.currentState!.validate()) return;
-                                    if (startDate == null) {
-                                      ScaffoldMessenger.of(context).showSnackBar(
-                                        const SnackBar(
-                                            content: Text('Start Date is required')),
-                                      );
-                                      return;
-                                    }
+                                // Job Description
+                                _StyledField(
+                                  label: 'Job Description *',
+                                  controller: descCtrl,
+                                  hint: 'Describe your role, responsibilities, and impact...',
+                                  maxLines: 4,
+                                  validator: (v) => (v == null || v.trim().isEmpty) ? 'Required' : null,
+                                ),
+                                const SizedBox(height: 24),
 
-                                    final (city, country) =
-                                    _splitCityCountry(locationCtrl.text.trim());
+                                // Key Achievements
+                                const Text(
+                                  'Key Achievements (Optional)',
+                                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFF1A1A1A)),
+                                ),
+                                const SizedBox(height: 12),
+                                _StyledField(
+                                  label: 'Title / What',
+                                  controller: achTitleCtrl,
+                                  hint: 'e.g., Improved app performance',
+                                ),
+                                const SizedBox(height: 12),
+                                _StyledField(
+                                  label: 'Metric',
+                                  controller: achMetricCtrl,
+                                  hint: 'e.g., +40% faster load times',
+                                ),
+                                const SizedBox(height: 12),
+                                _StyledField(
+                                  label: 'Business Impact',
+                                  controller: achImpactCtrl,
+                                  hint: 'e.g., Increased user retention',
+                                ),
 
-                                    // combine 3 achievement inputs → single description (optional)
-                                    final achParts = [
-                                      achTitleCtrl.text.trim(),
-                                      achMetricCtrl.text.trim(),
-                                      achImpactCtrl.text.trim(),
-                                    ].where((e) => e.isNotEmpty).toList();
-                                    final combinedAch =
-                                    achParts.isEmpty ? null : achParts.join(' | ');
+                                const SizedBox(height: 24),
 
-                                    final draft = Experience(
-                                      id: existing?.id ?? 'TEMP',
-                                      jobTitle: jobCtrl.text.trim(),
-                                      company: companyCtrl.text.trim(),
-                                      employmentType: employmentType,
-                                      industry: industry,
-                                      startDate: startDate,
-                                      endDate: isCurrent ? null : endDate,
-                                      isCurrent: isCurrent,
-                                      city: city,
-                                      country: country,
-                                      // IMPORTANT: job description -> experience.description
-                                      description: descCtrl.text.trim(),
-                                      achievements: (combinedAch == null &&
-                                          skillsUsed.isEmpty)
-                                          ? null
-                                          : ExpAchievements(
-                                        description: combinedAch,
-                                        skillsUsed:
-                                        skillsUsed.isEmpty ? null : skillsUsed,
+                                // Skills Used
+                                const Text('Skills Used/Developed', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
+                                const SizedBox(height: 8),
+                                if (skillsUsed.isNotEmpty)
+                                  Wrap(
+                                    spacing: 8,
+                                    runSpacing: 0,
+                                    children: skillsUsed.map((s) => Chip(
+                                      label: Text(s, style: const TextStyle(fontSize: 12)),
+                                      backgroundColor: const Color(0xFFEEF2FF),
+                                      deleteIcon: const Icon(Icons.close, size: 16, color: Color(0xFF6C63FF)),
+                                      onDeleted: () => setState(() => skillsUsed.remove(s)),
+                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                      side: BorderSide.none,
+                                    )).toList(),
+                                  ),
+                                const SizedBox(height: 8),
+                                Row(
+                                  children: [
+                                    Expanded(
+                                      child: _StyledField(
+                                        label: '',
+                                        controller: skillInputCtrl,
+                                        hint: 'Enter a skill (e.g., React)',
                                       ),
-                                      order: existing?.order ??
-                                          (vm.experience.length + 1),
-                                    );
+                                    ),
+                                    const SizedBox(width: 12),
+                                    ElevatedButton(
+                                      onPressed: () {
+                                        final v = skillInputCtrl.text.trim();
+                                        if (v.isEmpty) return;
+                                        setState(() {
+                                          skillsUsed.add(v);
+                                          skillInputCtrl.clear();
+                                        });
+                                      },
+                                      style: ElevatedButton.styleFrom(
+                                        backgroundColor: const Color(0xFF6C63FF),
+                                        foregroundColor: Colors.white,
+                                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                                      ),
+                                      child: const Text('Add'),
+                                    ),
+                                  ],
+                                ),
 
-                                    bool ok;
-                                    if (existing == null) {
-                                      ok = await vm.addExperience(draft);
-                                    } else {
-                                      ok = await vm.saveExperience(draft);
-                                    }
+                                const SizedBox(height: 32),
 
-                                    if (!context.mounted) return;
-                                    if (ok) {
-                                      Navigator.pop(context);
-                                      ScaffoldMessenger.of(context).showSnackBar(
-                                        SnackBar(
-                                            content: Text(existing == null
-                                                ? 'Experience added'
-                                                : 'Experience updated')),
-                                      );
-                                    } else {
-                                      ScaffoldMessenger.of(context).showSnackBar(
-                                        SnackBar(
-                                          content: Text(vm.error ??
-                                              'Failed to save experience'),
-                                        ),
-                                      );
-                                    }
-                                  },
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor: const Color(0xFF7C4DFF),
-                                    foregroundColor: Colors.white,
-                                    padding:
-                                    const EdgeInsets.symmetric(vertical: 14),
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(12),
+                                // Action Buttons
+                                SizedBox(
+                                  width: double.infinity,
+                                  height: 54,
+                                  child: ElevatedButton(
+                                    onPressed: () async {
+                                      final success = await handleSave();
+                                      if (success && context.mounted) {
+                                        Navigator.pop(context);
+                                        ScaffoldMessenger.of(context).showSnackBar(
+                                          SnackBar(
+                                            content: Text(existing == null ? 'Experience added' : 'Experience updated'),
+                                            backgroundColor: const Color(0xFF00B894),
+                                          ),
+                                        );
+                                      }
+                                    },
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: const Color(0xFF6C63FF),
+                                      foregroundColor: Colors.white,
+                                      elevation: 0,
+                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                    ),
+                                    child: const Text(
+                                      'Save Experience',
+                                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
                                     ),
                                   ),
-                                  child: const Text('Save Experience'),
                                 ),
-                              ),
-                              const SizedBox(width: 12),
-                              Expanded(
-                                child: OutlinedButton(
-                                  onPressed: () => Navigator.pop(context),
-                                  style: OutlinedButton.styleFrom(
-                                    padding: const EdgeInsets.symmetric(
-                                        vertical: 14),
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(12),
+                                const SizedBox(height: 16),
+                                SizedBox(
+                                  width: double.infinity,
+                                  height: 54,
+                                  child: OutlinedButton(
+                                    onPressed: () async {
+                                      if (hasUnsavedChanges()) {
+                                        await showUnsavedDialog();
+                                      } else {
+                                        Navigator.pop(context);
+                                      }
+                                    },
+                                    style: OutlinedButton.styleFrom(
+                                      side: BorderSide(color: Colors.grey[300]!),
+                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                                     ),
+                                    child: const Text('Cancel', style: TextStyle(color: Color(0xFF1A1A1A))),
                                   ),
-                                  child: const Text('Cancel'),
                                 ),
-                              ),
-                            ],
-                          ),
-                        ],
+                              ],
+                            ),
+                          );
+                        },
                       ),
                     ),
-                  );
-                },
+                  ),
+                ],
               ),
             ),
           ),
@@ -567,60 +660,47 @@ class EditExperienceScreen extends StatelessWidget {
     );
   }
 
-  static Future<bool> _confirmDelete(BuildContext c, String title) async {
+  static Future<bool> _confirmDelete(BuildContext c, String title, Color primary) async {
     return await showDialog<bool>(
       context: c,
       builder: (c) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: const Text('Delete Experience?'),
         content: Text('Remove "$title" from your profile?'),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('Cancel')),
-          FilledButton(onPressed: () => Navigator.pop(c, true), child: const Text('Delete')),
+          TextButton(
+            onPressed: () => Navigator.pop(c, false),
+            child: const Text('Cancel', style: TextStyle(color: Colors.grey)),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(c, true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFFD63031),
+              elevation: 0,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            ),
+            child: const Text('Delete', style: TextStyle(color: Colors.white)),
+          ),
         ],
       ),
-    ) ??
-        false;
+    ) ?? false;
   }
 }
 
-// ---------- Cards, helpers, constants ----------
-
-class _StatPill extends StatelessWidget {
-  const _StatPill({required this.title, required this.value});
-  final String title;
-  final String value;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-      decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.95),
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Column(
-        children: [
-          Text(value,
-              style:
-              const TextStyle(fontSize: 18, fontWeight: FontWeight.w900)),
-          const SizedBox(height: 2),
-          Text(title, style: const TextStyle(color: Color(0xFF6B7280))),
-        ],
-      ),
-    );
-  }
-}
+// ---------- WIDGETS ----------
 
 class _ExperienceCard extends StatelessWidget {
   const _ExperienceCard({
     required this.exp,
     required this.onEdit,
     required this.onDelete,
+    required this.primaryColor,
   });
 
   final Experience exp;
   final VoidCallback onEdit;
   final VoidCallback onDelete;
+  final Color primaryColor;
 
   @override
   Widget build(BuildContext context) {
@@ -630,119 +710,117 @@ class _ExperienceCard extends StatelessWidget {
       exp.isCurrent == true ? 'Present' : _fmtDate(exp.endDate),
     ].where((e) => e != null && e.isNotEmpty).join(' – ');
 
-    return Card(
-      margin: const EdgeInsets.only(bottom: 12),
-      elevation: 0,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+    return Container(
+      margin: const EdgeInsets.only(bottom: 16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFE5E7EB)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
       child: Padding(
-        padding: const EdgeInsets.fromLTRB(14, 14, 14, 14),
+        padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Title + actions
             Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Expanded(
-                  child: Wrap(
-                    spacing: 8,
-                    runSpacing: -6,
-                    crossAxisAlignment: WrapCrossAlignment.center,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
                         exp.jobTitle ?? '',
                         style: const TextStyle(
-                            fontWeight: FontWeight.w800, fontSize: 16),
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFF1A1A1A),
+                        ),
                       ),
-                      if (exp.isCurrent == true)
-                        _Badge(text: 'Current', bg: 0xFFE8FFF3, fg: 0xFF059669),
-                      if ((exp.employmentType ?? '').isNotEmpty)
-                        _Badge(text: exp.employmentType!, bg: 0xFFEFF6FF, fg: 0xFF2563EB),
+                      const SizedBox(height: 4),
+                      Text(
+                        exp.company ?? '',
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          color: primaryColor,
+                        ),
+                      ),
                     ],
                   ),
                 ),
-                IconButton(
-                  visualDensity: VisualDensity.compact,
-                  onPressed: onEdit,
-                  icon: const Icon(Icons.edit_outlined),
-                  tooltip: 'Edit',
-                ),
-                IconButton(
-                  visualDensity: VisualDensity.compact,
-                  onPressed: onDelete,
-                  icon: const Icon(Icons.delete_outline, color: Colors.redAccent),
-                  tooltip: 'Delete',
+                PopupMenuButton<String>(
+                  icon: const Icon(Icons.more_vert, color: Colors.grey),
+                  onSelected: (v) {
+                    if (v == 'edit') onEdit();
+                    if (v == 'delete') onDelete();
+                  },
+                  itemBuilder: (context) => [
+                    const PopupMenuItem(
+                      value: 'edit',
+                      child: Row(
+                        children: [
+                          Icon(Icons.edit, size: 18, color: Color(0xFF6B7280)),
+                          SizedBox(width: 12),
+                          Text('Edit'),
+                        ],
+                      ),
+                    ),
+                    const PopupMenuItem(
+                      value: 'delete',
+                      child: Row(
+                        children: [
+                          Icon(Icons.delete, size: 18, color: Color(0xFFD63031)),
+                          SizedBox(width: 12),
+                          Text('Delete', style: TextStyle(color: Color(0xFFD63031))),
+                        ],
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),
-            const SizedBox(height: 4),
-            Text(
-              exp.company ?? '',
-              style: const TextStyle(
-                fontWeight: FontWeight.w700,
-                color: Color(0xFF374151),
-              ),
-            ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 12),
+            Divider(color: Colors.grey[100]),
+            const SizedBox(height: 12),
+
+            // Metadata Row
             Wrap(
               spacing: 12,
-              runSpacing: 4,
-              crossAxisAlignment: WrapCrossAlignment.center,
+              runSpacing: 8,
               children: [
-                Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const Icon(Icons.lock_clock, size: 16, color: Color(0xFF9CA3AF)),
-                    const SizedBox(width: 6),
-                    Text(dateText, style: const TextStyle(color: Color(0xFF6B7280))),
-                  ],
-                ),
-                Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const Icon(Icons.location_on_outlined,
-                        size: 16, color: Color(0xFF9CA3AF)),
-                    const SizedBox(width: 4),
-                    Text(loc, style: const TextStyle(color: Color(0xFF6B7280))),
-                  ],
-                ),
-                if ((exp.industry ?? '').isNotEmpty)
-                  _Badge(text: _normalizeIndustry(exp.industry)!, bg: 0xFFF3E8FF, fg: 0xFF7C3AED),
+                _MetaRow(icon: Icons.calendar_today, text: dateText),
+                _MetaRow(icon: Icons.location_on_outlined, text: loc),
+                if ((exp.employmentType ?? '').isNotEmpty)
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFEEF2FF),
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    child: Text(
+                      exp.employmentType!,
+                      style: TextStyle(fontSize: 12, color: primaryColor, fontWeight: FontWeight.w600),
+                    ),
+                  ),
               ],
             ),
             if ((exp.description ?? '').isNotEmpty) ...[
-              const SizedBox(height: 10),
-              Text(exp.description!,
-                  style: const TextStyle(color: Color(0xFF374151), height: 1.35)),
-            ],
-            if (exp.achievements != null &&
-                ((exp.achievements!.description ?? '').isNotEmpty ||
-                    (exp.achievements!.skillsUsed?.isNotEmpty ?? false)))
-              Padding(
-                padding: const EdgeInsets.only(top: 12),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text('Key Achievements',
-                        style: TextStyle(
-                            fontWeight: FontWeight.w700, fontSize: 13)),
-                    if ((exp.achievements!.description ?? '').isNotEmpty) ...[
-                      const SizedBox(height: 6),
-                      Text(exp.achievements!.description!,
-                          style: const TextStyle(color: Color(0xFF111827))),
-                    ],
-                    if (exp.achievements!.skillsUsed?.isNotEmpty ?? false) ...[
-                      const SizedBox(height: 8),
-                      Wrap(
-                        spacing: 6,
-                        children: exp.achievements!.skillsUsed!
-                            .map((s) => Chip(label: Text(s)))
-                            .toList(),
-                      ),
-                    ],
-                  ],
-                ),
+              const SizedBox(height: 12),
+              Text(
+                exp.description!,
+                style: const TextStyle(color: Color(0xFF4B5563), height: 1.4),
+                maxLines: 3,
+                overflow: TextOverflow.ellipsis,
               ),
+            ],
           ],
         ),
       ),
@@ -750,94 +828,294 @@ class _ExperienceCard extends StatelessWidget {
   }
 }
 
-class _Badge extends StatelessWidget {
-  const _Badge({required this.text, required this.bg, required this.fg});
+class _MetaRow extends StatelessWidget {
+  const _MetaRow({required this.icon, required this.text});
+  final IconData icon;
   final String text;
-  final int bg;
-  final int fg;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-      decoration: BoxDecoration(
-        color: Color(bg),
-        borderRadius: BorderRadius.circular(999),
-      ),
-      child: Text(
-        text,
-        style: TextStyle(
-          color: Color(fg),
-          fontSize: 11,
-          fontWeight: FontWeight.w700,
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(icon, size: 14, color: Colors.grey[500]),
+        const SizedBox(width: 4),
+        Text(text, style: TextStyle(fontSize: 13, color: Colors.grey[600])),
+      ],
+    );
+  }
+}
+
+// Styled Input Components
+
+class _StyledField extends StatelessWidget {
+  const _StyledField({
+    required this.label,
+    required this.controller,
+    this.hint,
+    this.validator,
+    this.prefixIcon,
+    this.maxLines = 1,
+  });
+
+  final String label;
+  final TextEditingController controller;
+  final String? hint;
+  final String? Function(String?)? validator;
+  final Widget? prefixIcon;
+  final int maxLines;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (label.isNotEmpty) ...[
+          Text(
+            label,
+            style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500, color: Color(0xFF1A1A1A)),
+          ),
+          const SizedBox(height: 8),
+        ],
+        TextFormField(
+          controller: controller,
+          validator: validator,
+          maxLines: maxLines,
+          style: const TextStyle(fontSize: 16, color: Color(0xFF1A1A1A)),
+          decoration: InputDecoration(
+            hintText: hint,
+            hintStyle: TextStyle(fontSize: 16, color: Colors.grey[500]),
+            prefixIcon: prefixIcon,
+            filled: true,
+            fillColor: const Color(0xFFF9FAFB),
+            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: const BorderSide(color: Color(0xFFE5E7EB)),
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: const BorderSide(color: Color(0xFFE5E7EB)),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: const BorderSide(color: Color(0xFF6C63FF), width: 2),
+            ),
+            errorBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: const BorderSide(color: Colors.red, width: 1),
+            ),
+          ),
         ),
-      ),
+      ],
+    );
+  }
+}
+
+class _StyledDropdown<T> extends StatelessWidget {
+  const _StyledDropdown({
+    required this.label,
+    required this.value,
+    required this.hint,
+    required this.items,
+    required this.onChanged,
+    this.validator,
+  });
+
+  final String label;
+  final T? value;
+  final String hint;
+  final List<T> items;
+  final ValueChanged<T?> onChanged;
+  final String? Function(T?)? validator;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500, color: Color(0xFF1A1A1A)),
+        ),
+        const SizedBox(height: 8),
+        DropdownButtonFormField<T>(
+          value: value,
+          isExpanded: true,
+          icon: const Icon(Icons.keyboard_arrow_down, color: Colors.grey),
+          decoration: InputDecoration(
+            hintText: hint,
+            filled: true,
+            fillColor: const Color(0xFFF9FAFB),
+            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: const BorderSide(color: Color(0xFFE5E7EB)),
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: const BorderSide(color: Color(0xFFE5E7EB)),
+            ),
+          ),
+          items: items.map((e) => DropdownMenuItem<T>(
+            value: e,
+            child: Text(e.toString(), style: const TextStyle(fontSize: 16, color: Color(0xFF1A1A1A)), overflow: TextOverflow.ellipsis),
+          )).toList(),
+          onChanged: onChanged,
+          validator: validator,
+        ),
+      ],
+    );
+  }
+}
+
+class _StyledDateField extends StatelessWidget {
+  const _StyledDateField({
+    required this.label,
+    required this.date,
+    required this.onPick,
+    this.enabled = true,
+  });
+
+  final String label;
+  final Timestamp? date;
+  final ValueChanged<Timestamp?> onPick;
+  final bool enabled;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.w500,
+            color: enabled ? const Color(0xFF1A1A1A) : Colors.grey[400],
+          ),
+        ),
+        const SizedBox(height: 8),
+        InkWell(
+          onTap: !enabled
+              ? null
+              : () async {
+            final now = DateTime.now();
+            final initial = date?.toDate() ?? DateTime(now.year, now.month, now.day);
+            final picked = await showDatePicker(
+              context: context,
+              firstDate: DateTime(1960),
+              lastDate: DateTime(now.year + 6),
+              initialDate: initial,
+              builder: (context, child) {
+                return Theme(
+                  data: Theme.of(context).copyWith(
+                    colorScheme: const ColorScheme.light(primary: Color(0xFF6C63FF)),
+                  ),
+                  child: child!,
+                );
+              },
+            );
+            if (picked != null) {
+              final ts = Timestamp.fromDate(DateTime(picked.year, picked.month, picked.day));
+              onPick(ts);
+            }
+          },
+          borderRadius: BorderRadius.circular(12),
+          child: IgnorePointer(
+            child: TextFormField(
+              controller: TextEditingController(text: _fmtDate(date)),
+              style: TextStyle(
+                  fontSize: 16,
+                  color: enabled ? const Color(0xFF1A1A1A) : Colors.grey[400]
+              ),
+              decoration: InputDecoration(
+                hintText: 'DD/MM/YYYY',
+                prefixIcon: Icon(Icons.calendar_today, color: enabled ? Colors.grey : Colors.grey[300]),
+                filled: true,
+                fillColor: enabled ? const Color(0xFFF9FAFB) : Colors.grey[100],
+                contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: const BorderSide(color: Color(0xFFE5E7EB)),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: const BorderSide(color: Color(0xFFE5E7EB)),
+                ),
+                disabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide(color: Colors.grey[200]!),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ],
     );
   }
 }
 
 class _ExperienceTipsCard extends StatelessWidget {
-  const _ExperienceTipsCard();
+  const _ExperienceTipsCard({required this.primaryColor});
+  final Color primaryColor;
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(14),
+      padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: const Color(0xFFEFF6FF),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFFBFDBFE)),
+        color: const Color(0xFFF3F4F6),
+        borderRadius: BorderRadius.circular(16),
       ),
-      child: const Column(
+      child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('💼 Experience Tips',
-              style: TextStyle(
-                  fontWeight: FontWeight.w800, color: Color(0xFF1E3A8A))),
-          SizedBox(height: 8),
-          _Tip('• Include all relevant work experience, including internships'),
-          _Tip('• Focus on achievements rather than just responsibilities'),
-          _Tip('• Quantify your impact with numbers and metrics when possible'),
-          _Tip('• List skills that are relevant to your target roles'),
-          _Tip('• Keep descriptions concise but impactful'),
-          _Tip('• Order experiences by start date (most recent first)'),
+          Row(
+            children: [
+              Icon(Icons.lightbulb_outline, color: primaryColor, size: 22),
+              const SizedBox(width: 8),
+              Text(
+                'Pro Tips',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  color: primaryColor,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          const _TipRow('Include internships if you are a recent graduate.'),
+          const _TipRow('Focus on achievements (e.g., "Increased sales by 20%").'),
+          const _TipRow('Keep descriptions concise and impactful.'),
         ],
       ),
     );
   }
 }
 
-class _Tip extends StatelessWidget {
-  const _Tip(this.text);
+class _TipRow extends StatelessWidget {
+  const _TipRow(this.text);
   final String text;
-  @override
-  Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.only(bottom: 4),
-    child: Text(text, style: const TextStyle(color: Color(0xFF1F2937))),
-  );
-}
 
-class _FieldLabel extends StatelessWidget {
-  const _FieldLabel(this.text);
-  final String text;
   @override
-  Widget build(BuildContext context) =>
-      Text(text, style: const TextStyle(fontWeight: FontWeight.w600));
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text('•', style: TextStyle(fontSize: 16, color: Colors.grey, height: 1.4)),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(text, style: const TextStyle(color: Color(0xFF4B5563), height: 1.4)),
+          ),
+        ],
+      ),
+    );
+  }
 }
-
-InputDecoration _inputDecoration({String? hint}) => const InputDecoration(
-  filled: true,
-  fillColor: Color(0xFFF9FAFB),
-  border: OutlineInputBorder(
-    borderSide: BorderSide(color: Color(0xFFE5E7EB)),
-    borderRadius: BorderRadius.all(Radius.circular(10)),
-  ),
-  enabledBorder: OutlineInputBorder(
-    borderSide: BorderSide(color: Color(0xFFE5E7EB)),
-    borderRadius: BorderRadius.all(Radius.circular(10)),
-  ),
-  contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-).copyWith(hintText: hint);
 
 // --- constants & helpers ---
 
@@ -851,11 +1129,10 @@ const _employmentTypes = <String>[
   'Volunteer',
 ];
 
-/// include both "Information Technology" and short "IT" to avoid value mismatch
 const _industries = <String>[
   'Technology',
-  'Information Technology', // long form
-  'IT',                      // alias value that might exist in DB
+  'Information Technology',
+  'IT',
   'Finance',
   'Healthcare',
   'Education',
@@ -880,7 +1157,6 @@ String? _sanitizeDropdownValue(String? v, List<String> items) {
   return items.contains(v) ? v : null;
 }
 
-/// normalize common aliases (e.g. "IT" -> "Information Technology")
 String? _normalizeIndustry(String? v) {
   if (v == null) return null;
   final t = v.trim();
@@ -913,56 +1189,4 @@ String _joinCityCountry(String? city, String? country) {
   if (a.isEmpty) return b;
   if (b.isEmpty) return a;
   return '$a, $b';
-}
-
-class _DateButton extends StatelessWidget {
-  const _DateButton({
-    required this.date,
-    required this.onPick,
-    this.enabled = true,
-  });
-
-  final Timestamp? date;
-  final ValueChanged<Timestamp?> onPick;
-  final bool enabled;
-
-  @override
-  Widget build(BuildContext context) {
-    return InkWell(
-      onTap: !enabled
-          ? null
-          : () async {
-        final now = DateTime.now();
-        final initial =
-            date?.toDate() ?? DateTime(now.year, now.month, now.day);
-        final picked = await showDatePicker(
-          context: context,
-          firstDate: DateTime(1960),
-          lastDate: DateTime(now.year + 6),
-          initialDate: initial,
-        );
-        if (picked != null) {
-          final ts = Timestamp.fromDate(
-              DateTime(picked.year, picked.month, picked.day));
-          onPick(ts);
-        }
-      },
-      child: Container(
-        height: 48,
-        alignment: Alignment.centerLeft,
-        padding: const EdgeInsets.symmetric(horizontal: 12),
-        decoration: BoxDecoration(
-          color: const Color(0xFFF9FAFB),
-          borderRadius: BorderRadius.circular(10),
-          border: Border.all(color: const Color(0xFFE5E7EB)),
-        ),
-        child: Text(
-          date == null ? 'dd/mm/yyyy' : _fmtDate(date),
-          style: TextStyle(
-            color: enabled ? const Color(0xFF111827) : const Color(0xFF9CA3AF),
-          ),
-        ),
-      ),
-    );
-  }
 }

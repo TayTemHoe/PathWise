@@ -4,8 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
-import 'package:permission_handler/permission_handler.dart'; // Import permission_handler
-import 'package:path_wise/ViewModel/profile_view_model.dart';
+import 'package:permission_handler/permission_handler.dart';
+import 'package:path_wise/viewModel/profile_view_model.dart';
 
 class EditPersonalInfoScreen extends StatefulWidget {
   const EditPersonalInfoScreen({super.key});
@@ -25,6 +25,11 @@ class _EditPersonalInfoScreenState extends State<EditPersonalInfoScreen> {
   final _countryCtrl = TextEditingController();
 
   DateTime? _dob;
+
+  // Define KYYAP Style Colors locally to ensure standalone functionality
+  final Color _primaryColor = const Color(0xFF6C63FF);
+  final Color _textColor = const Color(0xFF1A1A1A);
+
 
   @override
   void initState() {
@@ -54,16 +59,11 @@ class _EditPersonalInfoScreenState extends State<EditPersonalInfoScreen> {
   }
 
   Future<void> _pickAndUploadPhoto(ProfileViewModel vm) async {
-    // 1. Request Permissions on Android
-    // This handles both older Android (Storage) and Android 13+ (Photos)
     if (Platform.isAndroid) {
       Map<Permission, PermissionStatus> statuses = await [
         Permission.storage,
         Permission.photos,
       ].request();
-
-      // We continue even if denied because ImagePicker might use the
-      // system Photo Picker which doesn't require app-level permissions on 13+.
     }
 
     try {
@@ -77,7 +77,6 @@ class _EditPersonalInfoScreenState extends State<EditPersonalInfoScreen> {
 
       final file = File(picked.path);
 
-      // Ensure file exists before trying to read/upload
       if (!await file.exists()) {
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
@@ -97,7 +96,6 @@ class _EditPersonalInfoScreenState extends State<EditPersonalInfoScreen> {
         return;
       }
 
-      // Show loading indicator in UI if needed, or rely on VM state
       final url = await vm.uploadProfilePicture(file, fileExt: ext == 'jpeg' ? 'jpg' : ext);
 
       if (!mounted) return;
@@ -108,12 +106,11 @@ class _EditPersonalInfoScreenState extends State<EditPersonalInfoScreen> {
         );
         setState(() {});
       } else {
-        // Now vm.error will contain the REAL exception (e.g., "FirebaseException: [firebase_storage/unauthorized]...")
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(vm.error ?? 'Unknown error occurred'),
             backgroundColor: Colors.red,
-            duration: const Duration(seconds: 5), // Show longer so you can read it
+            duration: const Duration(seconds: 5),
           ),
         );
       }
@@ -132,41 +129,43 @@ class _EditPersonalInfoScreenState extends State<EditPersonalInfoScreen> {
         final p = vm.profile;
 
         return Scaffold(
-          backgroundColor: const Color(0xFFF7F8FC),
+          // KYYAP Style: White background
+          backgroundColor: Colors.white,
           appBar: AppBar(
             elevation: 0,
-            backgroundColor: Colors.transparent,
-            flexibleSpace: Container(
-              decoration: const BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [Color(0xFF7C4DFF), Color(0xFF6EA8FF)],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                ),
-              ),
+            backgroundColor: Colors.white,
+            centerTitle: true,
+            leading: IconButton(
+              icon: const Icon(Icons.arrow_back_ios, color: Colors.black, size: 20),
+              onPressed: () => Navigator.pop(context),
             ),
-            title: const Text(
+            title: Text(
               'Personal Information',
-              style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700),
+              style: TextStyle(
+                color: _textColor,
+                fontWeight: FontWeight.bold,
+                fontSize: 20,
+              ),
             ),
           ),
           body: SingleChildScrollView(
-            padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
+            padding: const EdgeInsets.all(24),
             child: Form(
               key: _formKey,
               child: Column(
                 children: [
-                  // ===== Profile Picture card =====
-                  Card(
-                    elevation: 0,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                    child: Padding(
-                      padding: const EdgeInsets.all(16),
-                      child: Row(
-                        children: [
-                          CircleAvatar(
-                            radius: 36,
-                            backgroundColor: const Color(0xFFE5E7EB),
+                  // ===== Profile Picture Section =====
+                  Center(
+                    child: Stack(
+                      children: [
+                        Container(
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            border: Border.all(color: Colors.grey[200]!, width: 4),
+                          ),
+                          child: CircleAvatar(
+                            radius: 50,
+                            backgroundColor: Colors.grey[100],
                             backgroundImage: (p?.profilePictureUrl != null &&
                                 (p!.profilePictureUrl!.isNotEmpty))
                                 ? NetworkImage(p.profilePictureUrl!)
@@ -177,130 +176,127 @@ class _EditPersonalInfoScreenState extends State<EditPersonalInfoScreen> {
                               (p != null && p.name != null && p.name!.isNotEmpty)
                                   ? p.name!.trim().characters.first.toUpperCase()
                                   : 'A',
-                              style: const TextStyle(
-                                fontSize: 22,
-                                color: Color(0xFF111827),
+                              style: TextStyle(
+                                fontSize: 32,
+                                color: _primaryColor,
                                 fontWeight: FontWeight.bold,
                               ),
                             )
                                 : null,
                           ),
-                          const SizedBox(width: 16),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                ElevatedButton.icon(
-                                  onPressed: () => _pickAndUploadPhoto(vm),
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor: const Color(0xFFEEF2FF),
-                                    foregroundColor: const Color(0xFF4338CA),
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(10),
-                                    ),
-                                  ),
-                                  icon: const Icon(Icons.photo_camera_outlined, size: 18),
-                                  label: vm.savingRoot
-                                      ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
-                                      : const Text('Upload Photo'),
+                        ),
+                        Positioned(
+                          bottom: 0,
+                          right: 0,
+                          child: InkWell(
+                            onTap: () => _pickAndUploadPhoto(vm),
+                            child: Container(
+                              padding: const EdgeInsets.all(8),
+                              decoration: BoxDecoration(
+                                color: _primaryColor,
+                                shape: BoxShape.circle,
+                                border: Border.all(color: Colors.white, width: 2),
+                              ),
+                              child: vm.savingRoot
+                                  ? const SizedBox(
+                                width: 16,
+                                height: 16,
+                                child: CircularProgressIndicator(
+                                  color: Colors.white,
+                                  strokeWidth: 2,
                                 ),
-                                const SizedBox(height: 6),
-                                const Text(
-                                  'Upload a clear photo. Max 5MB (JPG, PNG, GIF)',
-                                  style: TextStyle(fontSize: 12, color: Color(0xFF6B7280)),
-                                ),
-                              ],
+                              )
+                                  : const Icon(Icons.camera_alt, color: Colors.white, size: 16),
                             ),
                           ),
-                        ],
-                      ),
+                        ),
+                      ],
                     ),
                   ),
+                  const SizedBox(height: 32),
 
+                  // ===== Basic Information =====
+                  _SectionTitle('Basic Information', color: _textColor),
                   const SizedBox(height: 16),
-
-                  // ===== Basic Information card =====
-                  _SectionTitle('Basic Information'),
-                  Card(
-                    elevation: 0,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                    child: Padding(
-                      padding: const EdgeInsets.all(16),
-                      child: Column(
-                        children: [
-                          _Field(
-                            label: 'Full Name *',
-                            controller: _nameCtrl,
-                            validator: (v) => v == null || v.trim().isEmpty ? 'Required' : null,
-                          ),
-                          _Field(
-                            label: 'Email Address *',
-                            controller: _emailCtrl,
-                            keyboardType: TextInputType.emailAddress,
-                            validator: (v) => v == null || v.trim().isEmpty ? 'Required' : null,
-                            // If you keep email non-editable, uncomment:
-                            // enabled: false,
-                          ),
-                          _Field(
-                            label: 'Phone Number *',
-                            controller: _phoneCtrl,
-                            keyboardType: TextInputType.phone,
-                            helper:
-                            'Include country code for better verification',
-                            validator: (v) => v == null || v.trim().isEmpty ? 'Required' : null,
-                          ),
-                          _DateField(
-                            label: 'Date of Birth',
-                            value: _dob,
-                            onPick: (d) => setState(() => _dob = d),
-                          ),
-                        ],
-                      ),
-                    ),
+                  _StyledField(
+                    label: 'Full Name',
+                    controller: _nameCtrl,
+                    validator: (v) => v == null || v.trim().isEmpty ? 'Required' : null,
+                    primaryColor: _primaryColor,
+                  ),
+                  const SizedBox(height: 20),
+                  _StyledField(
+                    label: 'Email Address',
+                    controller: _emailCtrl,
+                    keyboardType: TextInputType.emailAddress,
+                    validator: (v) => v == null || v.trim().isEmpty ? 'Required' : null,
+                    primaryColor: _primaryColor,
+                    prefixIcon: const Icon(Icons.email_outlined, color: Colors.grey),
+                  ),
+                  const SizedBox(height: 20),
+                  _StyledField(
+                    label: 'Phone Number',
+                    controller: _phoneCtrl,
+                    keyboardType: TextInputType.phone,
+                    validator: (v) => v == null || v.trim().isEmpty ? 'Required' : null,
+                    primaryColor: _primaryColor,
+                    prefixIcon: const Icon(Icons.phone_outlined, color: Colors.grey),
+                  ),
+                  const SizedBox(height: 20),
+                  _StyledDateField(
+                    label: 'Date of Birth',
+                    value: _dob,
+                    onPick: (d) => setState(() => _dob = d),
+                    primaryColor: _primaryColor,
                   ),
 
+                  const SizedBox(height: 32),
+
+                  // ===== Location Information =====
+                  _SectionTitle('Location Information', color: _textColor),
                   const SizedBox(height: 16),
-
-                  // ===== Location Information card =====
-                  _SectionTitle('Location Information'),
-                  Card(
-                    elevation: 0,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                    child: Padding(
-                      padding: const EdgeInsets.all(16),
-                      child: Column(
-                        children: [
-                          _Field(
-                            label: 'Current City *',
-                            controller: _cityCtrl,
-                            validator: (v) => v == null || v.trim().isEmpty ? 'Required' : null,
-                          ),
-                          _Field(
-                            label: 'Country *',
-                            controller: _countryCtrl,
-                            validator: (v) => v == null || v.trim().isEmpty ? 'Required' : null,
-                          ),
-                          _Field(
-                            label: 'State/Province',
-                            controller: _stateCtrl,
-                          ),
-                        ],
+                  _StyledField(
+                    label: 'Current City',
+                    controller: _cityCtrl,
+                    validator: (v) => v == null || v.trim().isEmpty ? 'Required' : null,
+                    primaryColor: _primaryColor,
+                    prefixIcon: const Icon(Icons.location_city_outlined, color: Colors.grey),
+                  ),
+                  const SizedBox(height: 20),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _StyledField(
+                          label: 'Country',
+                          controller: _countryCtrl,
+                          validator: (v) => v == null || v.trim().isEmpty ? 'Required' : null,
+                          primaryColor: _primaryColor,
+                        ),
                       ),
-                    ),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: _StyledField(
+                          label: 'State/Province',
+                          controller: _stateCtrl,
+                          primaryColor: _primaryColor,
+                        ),
+                      ),
+                    ],
                   ),
 
-                  const SizedBox(height: 24),
+                  const SizedBox(height: 40),
 
                   // ===== Actions =====
+                  // Save Button styled like KYYAP CustomButton
                   SizedBox(
                     width: double.infinity,
+                    height: 54,
                     child: ElevatedButton(
                       onPressed: vm.savingRoot
                           ? null
                           : () async {
                         if (!_formKey.currentState!.validate()) return;
 
-                        // If you keep email editable, ensure ViewModel supports it (see note below).
                         final ok = await vm.updatePersonalInfo(
                           name: _nameCtrl.text.trim(),
                           phone: _phoneCtrl.text.trim(),
@@ -313,37 +309,36 @@ class _EditPersonalInfoScreenState extends State<EditPersonalInfoScreen> {
                         if (!mounted) return;
                         if (ok) {
                           ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('Personal information saved')),
+                            const SnackBar(
+                              content: Text('Personal information saved'),
+                              backgroundColor: Color(0xFF00B894), // Success green
+                            ),
                           );
                           Navigator.pop(context);
                         } else {
                           ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(content: Text(vm.error ?? 'Failed to save')),
+                            SnackBar(
+                              content: Text(vm.error ?? 'Failed to save'),
+                              backgroundColor: const Color(0xFFD63031), // Error red
+                            ),
                           );
                         }
                       },
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF7C4DFF),
+                        backgroundColor: _primaryColor,
                         foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        elevation: 0,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
                       ),
                       child: vm.savingRoot
                           ? const SizedBox(
-                          height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2))
-                          : const Text('Save Personal Information'),
-                    ),
-                  ),
-                  const SizedBox(height: 10),
-                  SizedBox(
-                    width: double.infinity,
-                    child: OutlinedButton(
-                      onPressed: () => Navigator.pop(context),
-                      style: OutlinedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          height: 24, width: 24, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                          : const Text(
+                        'Save Changes',
+                        style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
                       ),
-                      child: const Text('Cancel'),
                     ),
                   ),
                 ],
@@ -356,92 +351,113 @@ class _EditPersonalInfoScreenState extends State<EditPersonalInfoScreen> {
   }
 }
 
-// ===== Helpers =====
+// ===== Reusable Components Styled to Match KYYAP =====
 
 class _SectionTitle extends StatelessWidget {
-  const _SectionTitle(this.title);
+  const _SectionTitle(this.title, {required this.color});
   final String title;
+  final Color color;
 
   @override
   Widget build(BuildContext context) {
     return Align(
       alignment: Alignment.centerLeft,
-      child: Padding(
-        padding: const EdgeInsets.only(left: 4, bottom: 8),
-        child: Text(
-          title,
-          style: const TextStyle(
-            fontWeight: FontWeight.w700,
-            fontSize: 16,
-            color: Color(0xFF111827),
-          ),
+      child: Text(
+        title,
+        style: TextStyle(
+          fontWeight: FontWeight.bold,
+          fontSize: 18,
+          color: color,
         ),
       ),
     );
   }
 }
 
-class _Field extends StatelessWidget {
-  const _Field({
+// Modified to match KYYAP's "CustomTextField" look
+class _StyledField extends StatelessWidget {
+  const _StyledField({
     required this.label,
     required this.controller,
-    this.helper,
+    required this.primaryColor,
     this.keyboardType,
     this.validator,
     this.enabled = true,
+    this.prefixIcon,
   });
 
   final String label;
   final TextEditingController controller;
-  final String? helper;
   final TextInputType? keyboardType;
   final String? Function(String?)? validator;
   final bool enabled;
+  final Color primaryColor;
+  final Widget? prefixIcon;
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 14),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(label, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
-          const SizedBox(height: 6),
-          TextFormField(
-            controller: controller,
-            validator: validator,
-            enabled: enabled,
-            keyboardType: keyboardType,
-            decoration: const InputDecoration(
-              filled: true,
-              fillColor: Color(0xFFF9FAFB),
-              border: OutlineInputBorder(
-                borderSide: BorderSide(color: Color(0xFFE5E7EB)),
-                borderRadius: BorderRadius.all(Radius.circular(10)),
-              ),
-              enabledBorder: OutlineInputBorder(
-                borderSide: BorderSide(color: Color(0xFFE5E7EB)),
-                borderRadius: BorderRadius.all(Radius.circular(10)),
-              ),
-              contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: const TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.w500,
+            color: Color(0xFF1A1A1A),
+          ),
+        ),
+        const SizedBox(height: 8),
+        TextFormField(
+          controller: controller,
+          validator: validator,
+          enabled: enabled,
+          keyboardType: keyboardType,
+          style: const TextStyle(fontSize: 16, color: Color(0xFF1A1A1A)),
+          decoration: InputDecoration(
+            filled: true,
+            fillColor: Colors.grey[50],
+            prefixIcon: prefixIcon,
+            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide(color: Colors.grey[300]!),
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide(color: Colors.grey[300]!),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide(color: primaryColor, width: 2),
+            ),
+            errorBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: const BorderSide(color: Colors.red, width: 1),
+            ),
+            focusedErrorBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: const BorderSide(color: Colors.red, width: 2),
             ),
           ),
-          if (helper != null)
-            Padding(
-              padding: const EdgeInsets.only(top: 4),
-              child: Text(helper!, style: const TextStyle(fontSize: 12, color: Color(0xFF6B7280))),
-            ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 }
 
-class _DateField extends StatelessWidget {
-  const _DateField({required this.label, required this.value, required this.onPick});
+class _StyledDateField extends StatelessWidget {
+  const _StyledDateField({
+    required this.label,
+    required this.value,
+    required this.onPick,
+    required this.primaryColor,
+  });
+
   final String label;
   final DateTime? value;
   final ValueChanged<DateTime> onPick;
+  final Color primaryColor;
 
   @override
   Widget build(BuildContext context) {
@@ -449,55 +465,77 @@ class _DateField extends StatelessWidget {
       text: value == null ? '' : DateFormat('dd/MM/yyyy').format(value!),
     );
 
-    return _Field(
+    return _StyledField(
       label: label,
       controller: ctrl,
-      keyboardType: TextInputType.none,
-    ).copyWith(
-      child: InkWell(
-        onTap: () async {
-          final now = DateTime.now();
-          final picked = await showDatePicker(
-            context: context,
-            initialDate: value ?? DateTime(now.year - 20),
-            firstDate: DateTime(1950),
-            lastDate: now,
-          );
-          if (picked != null) onPick(picked);
-        },
-        child: IgnorePointer(
-          child: TextFormField(
-            controller: ctrl,
-            decoration: const InputDecoration(
-              suffixIcon: Icon(Icons.calendar_today_outlined, size: 20),
-              filled: true,
-              fillColor: Color(0xFFF9FAFB),
-              border: OutlineInputBorder(
-                borderSide: BorderSide(color: Color(0xFFE5E7EB)),
-                borderRadius: BorderRadius.all(Radius.circular(10)),
+      primaryColor: primaryColor,
+      prefixIcon: const Icon(Icons.calendar_today, color: Colors.grey),
+    ).copyWithTap(
+      onTap: () async {
+        final now = DateTime.now();
+        final picked = await showDatePicker(
+          context: context,
+          initialDate: value ?? DateTime(now.year - 20),
+          firstDate: DateTime(1950),
+          lastDate: now,
+          builder: (context, child) {
+            return Theme(
+              data: Theme.of(context).copyWith(
+                colorScheme: ColorScheme.light(primary: primaryColor),
               ),
-              contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-            ),
-          ),
-        ),
-      ),
+              child: child!,
+            );
+          },
+        );
+        if (picked != null) onPick(picked);
+      },
     );
   }
 }
 
-// Small extension to reuse _Field decoration for _DateField
-extension on _Field {
-  Widget copyWith({required Widget child}) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 14),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(label, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
-          const SizedBox(height: 6),
-          child,
-        ],
-      ),
+extension on _StyledField {
+  Widget copyWithTap({required VoidCallback onTap}) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: const TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.w500,
+            color: Color(0xFF1A1A1A),
+          ),
+        ),
+        const SizedBox(height: 8),
+        InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(12),
+          child: IgnorePointer(
+            child: TextFormField(
+              controller: controller,
+              style: const TextStyle(fontSize: 16, color: Color(0xFF1A1A1A)),
+              decoration: InputDecoration(
+                filled: true,
+                fillColor: Colors.grey[50],
+                prefixIcon: prefixIcon,
+                contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide(color: Colors.grey[300]!),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide(color: Colors.grey[300]!),
+                ),
+                disabledBorder: OutlineInputBorder( // Ensure styled even when disabled/ignored
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide(color: Colors.grey[300]!),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ],
     );
   }
 }

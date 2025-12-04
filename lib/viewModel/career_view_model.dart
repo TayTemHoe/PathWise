@@ -140,6 +140,11 @@ class CareerViewModel extends ChangeNotifier {
     }
   }
 
+  void setLoading(bool value) {
+    _isLoading = value;
+    notifyListeners();
+  }
+
   /// Fetch all career suggestions history
   Future<void> fetchSuggestionsHistory(String userId) async {
     try {

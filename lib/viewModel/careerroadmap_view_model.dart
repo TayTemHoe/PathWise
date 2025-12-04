@@ -84,8 +84,8 @@ class CareerRoadmapViewModel extends ChangeNotifier {
   bool get profileOutdated => _profileOutdated;
 
   // Helper getters
-  String get uid => _auth.currentUser?.uid ?? 'U0001';
-
+  //String get uid => _auth.currentUser?.uid ?? 'U0001';
+  String get uid =>  'U0001';
   bool isStageExpanded(int index) => _expandedStages[index.toString()] ?? false;
   bool get hasRoadmap => _currentRoadmap != null;
   bool get hasSkillGap => _currentSkillGap != null;

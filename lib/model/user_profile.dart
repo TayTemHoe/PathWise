@@ -737,12 +737,14 @@ class PrefSalary {
   final int? min;
   final int? max;
   final String? type;                 // Monthly / Annual
+  final String? currency;
   final List<String>? benefitsPriority;
 
   const PrefSalary({
     this.min,
     this.max,
     this.type,
+    this.currency,
     this.benefitsPriority,
   });
 
@@ -752,6 +754,7 @@ class PrefSalary {
       min: _i(m['min']),
       max: _i(m['max']),
       type: _s(m['type']),
+      currency: _s(m['currency']),
       benefitsPriority: _ls(m['benefitsPriority']),
     );
   }
@@ -760,6 +763,7 @@ class PrefSalary {
     if (min != null) 'min': min,
     if (max != null) 'max': max,
     if (type != null) 'type': type,
+    if (currency != null) 'currency': currency,
     if (benefitsPriority != null) 'benefitsPriority': benefitsPriority,
   };
 
@@ -774,6 +778,7 @@ class PrefSalary {
       min: min ?? this.min,
       max: max ?? this.max,
       type: type ?? this.type,
+      currency: currency ?? this.currency,
       benefitsPriority: benefitsPriority ?? this.benefitsPriority,
     );
   }

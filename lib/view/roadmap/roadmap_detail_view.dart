@@ -1,15 +1,25 @@
+// lib/view/roadmap/roadmap_detail_view.dart
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:path_wise/model/careerroadmap_model.dart';
-import 'package:path_wise/view/roadmap/create_roadmap_view.dart';
 import 'package:path_wise/viewModel/careerroadmap_view_model.dart';
 
-
-// lib/view/roadmap/roadmap_detail_view.dart
+// Defining KYYAP Design Colors locally
+class _DesignColors {
+  static const Color primary = Color(0xFF6C63FF);
+  static const Color background = Color(0xFFF5F7FA);
+  static const Color textPrimary = Color(0xFF2D3436);
+  static const Color textSecondary = Color(0xFF636E72);
+  static const Color cardBackground = Colors.white;
+  static const Color success = Color(0xFF00B894);
+  static const Color info = Color(0xFF74B9FF);
+  static const Color warning = Color(0xFFFDCB6E);
+  static const Color error = Color(0xFFD63031);
+  static Color shadow = Colors.black.withOpacity(0.08);
+}
 
 /// Detailed view of a career roadmap with skill gaps and learning resources
-/// UC015: Complete implementation
 class RoadmapDetailView extends StatefulWidget {
   const RoadmapDetailView({Key? key}) : super(key: key);
 
@@ -19,12 +29,10 @@ class RoadmapDetailView extends StatefulWidget {
 
 class _RoadmapDetailViewState extends State<RoadmapDetailView> {
   final ScrollController _scrollController = ScrollController();
-  bool _showSkillGapButton = true;
 
   @override
   void initState() {
     super.initState();
-    _scrollController.addListener(_onScroll);
   }
 
   @override
@@ -33,97 +41,34 @@ class _RoadmapDetailViewState extends State<RoadmapDetailView> {
     super.dispose();
   }
 
-  void _onScroll() {
-    // Hide/show skill gap button based on scroll position
-    if (_scrollController.hasClients) {
-      final showButton = _scrollController.offset < 300;
-      if (showButton != _showSkillGapButton) {
-        setState(() => _showSkillGapButton = showButton);
-      }
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: Container(
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            colors: [Color(0xFF8B5CF6), Color(0xFF3B82F6)],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-          ),
+      backgroundColor: _DesignColors.background,
+      appBar: AppBar(
+        backgroundColor: _DesignColors.background,
+        elevation: 0,
+        centerTitle: true,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back, color: _DesignColors.textPrimary),
+          onPressed: () => Navigator.pop(context),
         ),
-        child: SafeArea(
-          child: Column(
-            children: [
-              _buildHeader(),
-              Expanded(
-                child: Container(
-                  decoration: const BoxDecoration(
-                    color: Color(0xFFF8FAFC),
-                    borderRadius: BorderRadius.only(
-                      topLeft: Radius.circular(24),
-                      topRight: Radius.circular(24),
-                    ),
-                  ),
-                  child: _buildBody(),
-                ),
+        title: Consumer<CareerRoadmapViewModel>(
+          builder: (context, viewModel, _) {
+            return Text(
+              viewModel.currentJobTitle ?? 'Career Roadmap',
+              style: const TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: _DesignColors.textPrimary,
               ),
-            ],
-          ),
+            );
+          },
         ),
       ),
-    );
-  }
-
-  Widget _buildHeader() {
-    return Consumer<CareerRoadmapViewModel>(
-      builder: (context, viewModel, _) {
-        return Padding(
-          padding: const EdgeInsets.all(20),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  IconButton(
-                    icon: const Icon(Icons.arrow_back, color: Colors.white),
-                    onPressed: () => Navigator.pop(context),
-                  ),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text(
-                          'Your Career Roadmap',
-                          style: TextStyle(
-                            fontSize: 24,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.white,
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          viewModel.currentJobTitle ?? 'Career Path',
-                          style: const TextStyle(
-                            fontSize: 14,
-                            color: Colors.white70,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  IconButton(
-                    icon: const Icon(Icons.bookmark_border, color: Colors.white),
-                    onPressed: () => viewModel.bookmarkRoadmap(),
-                  ),
-                ],
-              ),
-            ],
-          ),
-        );
-      },
+      body: SafeArea(
+        child: _buildBody(),
+      ),
     );
   }
 
@@ -131,27 +76,38 @@ class _RoadmapDetailViewState extends State<RoadmapDetailView> {
     return Consumer<CareerRoadmapViewModel>(
       builder: (context, viewModel, _) {
         if (viewModel.isLoading) {
-          return const Center(child: CircularProgressIndicator());
+          return const Center(
+            child: CircularProgressIndicator(
+              valueColor: AlwaysStoppedAnimation<Color>(_DesignColors.primary),
+            ),
+          );
         }
 
         if (!viewModel.hasRoadmap) {
           return const Center(
-            child: Text('No roadmap data available'),
+            child: Text(
+              'No roadmap data available',
+              style: TextStyle(color: _DesignColors.textSecondary),
+            ),
           );
         }
 
-        return ListView(
+        return SingleChildScrollView(
           controller: _scrollController,
-          padding: const EdgeInsets.all(16),
-          children: [
-            _buildRoadmapStages(viewModel),
-            const SizedBox(height: 24),
-            _buildSkillGapSection(viewModel),
-            if (viewModel.hasLearningResources) ...[
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _buildRoadmapStages(viewModel),
               const SizedBox(height: 24),
-              _buildLearningResourcesSection(viewModel),
+              _buildSkillGapSection(viewModel),
+              if (viewModel.hasLearningResources) ...[
+                const SizedBox(height: 24),
+                _buildLearningResourcesSection(viewModel),
+              ],
+              const SizedBox(height: 40), // Bottom padding
             ],
-          ],
+          ),
         );
       },
     );
@@ -164,9 +120,9 @@ class _RoadmapDetailViewState extends State<RoadmapDetailView> {
         const Text(
           'Your Career Journey',
           style: TextStyle(
-            fontSize: 20,
+            fontSize: 18,
             fontWeight: FontWeight.bold,
-            color: Color(0xFF1E293B),
+            color: _DesignColors.textPrimary,
           ),
         ),
         const SizedBox(height: 16),
@@ -186,19 +142,21 @@ class _RoadmapDetailViewState extends State<RoadmapDetailView> {
 
     return Column(
       children: [
-        Card(
-          margin: const EdgeInsets.only(bottom: 8),
-          elevation: 2,
-          shape: RoundedRectangleBorder(
+        Container(
+          margin: const EdgeInsets.only(bottom: 4),
+          decoration: BoxDecoration(
+            color: _DesignColors.cardBackground,
             borderRadius: BorderRadius.circular(16),
-            side: BorderSide(
-              color: isFirst
-                  ? const Color(0xFF10B981)
-                  : isExpanded
-                  ? const Color(0xFF8B5CF6)
-                  : Colors.transparent,
-              width: 2,
-            ),
+            boxShadow: [
+              BoxShadow(
+                color: _DesignColors.shadow,
+                blurRadius: 10,
+                offset: const Offset(0, 4),
+              ),
+            ],
+            border: isExpanded
+                ? Border.all(color: _DesignColors.primary, width: 1.5)
+                : Border.all(color: Colors.transparent),
           ),
           child: Column(
             children: [
@@ -216,13 +174,13 @@ class _RoadmapDetailViewState extends State<RoadmapDetailView> {
                             padding: const EdgeInsets.all(8),
                             decoration: BoxDecoration(
                               color: isFirst
-                                  ? const Color(0xFFD1FAE5)
-                                  : const Color(0xFFEDE9FE),
+                                  ? _DesignColors.success.withOpacity(0.1)
+                                  : _DesignColors.primary.withOpacity(0.1),
                               borderRadius: BorderRadius.circular(8),
                             ),
                             child: Icon(
-                              isFirst ? Icons.check_circle : Icons.radio_button_unchecked,
-                              color: isFirst ? const Color(0xFF10B981) : const Color(0xFF8B5CF6),
+                              isFirst ? Icons.check_circle : Icons.circle_outlined,
+                              color: isFirst ? _DesignColors.success : _DesignColors.primary,
                               size: 20,
                             ),
                           ),
@@ -231,45 +189,20 @@ class _RoadmapDetailViewState extends State<RoadmapDetailView> {
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Row(
-                                  children: [
-                                    Expanded(
-                                      child: Text(
-                                        stage.jobTitle,
-                                        style: const TextStyle(
-                                          fontSize: 16,
-                                          fontWeight: FontWeight.bold,
-                                          color: Color(0xFF1E293B),
-                                        ),
-                                      ),
-                                    ),
-                                    if (isFirst)
-                                      Container(
-                                        padding: const EdgeInsets.symmetric(
-                                          horizontal: 8,
-                                          vertical: 4,
-                                        ),
-                                        decoration: BoxDecoration(
-                                          color: const Color(0xFF10B981),
-                                          borderRadius: BorderRadius.circular(6),
-                                        ),
-                                        child: const Text(
-                                          'Current Position',
-                                          style: TextStyle(
-                                            fontSize: 10,
-                                            color: Colors.white,
-                                            fontWeight: FontWeight.bold,
-                                          ),
-                                        ),
-                                      ),
-                                  ],
+                                Text(
+                                  stage.jobTitle,
+                                  style: const TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.bold,
+                                    color: _DesignColors.textPrimary,
+                                  ),
                                 ),
                                 const SizedBox(height: 4),
                                 Text(
                                   stage.estimatedTimeframe,
-                                  style: TextStyle(
-                                    fontSize: 12,
-                                    color: Colors.grey[600],
+                                  style: const TextStyle(
+                                    fontSize: 13,
+                                    color: _DesignColors.textSecondary,
                                   ),
                                 ),
                               ],
@@ -277,24 +210,26 @@ class _RoadmapDetailViewState extends State<RoadmapDetailView> {
                           ),
                           Icon(
                             isExpanded ? Icons.expand_less : Icons.expand_more,
-                            color: const Color(0xFF8B5CF6),
+                            color: _DesignColors.textSecondary,
                           ),
                         ],
                       ),
+
+                      // Badges
                       const SizedBox(height: 12),
                       Wrap(
-                        spacing: 6,
-                        runSpacing: 6,
+                        spacing: 8,
+                        runSpacing: 8,
                         children: [
                           _buildInfoChip(
                             Icons.code,
                             '${stage.requiredSkills.length} skills',
-                            const Color(0xFF3B82F6),
+                            _DesignColors.info,
                           ),
                           _buildInfoChip(
                             Icons.attach_money,
                             stage.salaryRange,
-                            const Color(0xFF10B981),
+                            _DesignColors.success,
                           ),
                         ],
                       ),
@@ -313,29 +248,17 @@ class _RoadmapDetailViewState extends State<RoadmapDetailView> {
 
   Widget _buildStageConnector() {
     return Container(
-      margin: const EdgeInsets.only(left: 32, bottom: 8),
-      child: Row(
-        children: [
-          Container(
-            width: 2,
-            height: 24,
-            color: const Color(0xFF8B5CF6),
-          ),
-          const SizedBox(width: 8),
-          const Icon(
-            Icons.arrow_downward,
-            size: 16,
-            color: Color(0xFF8B5CF6),
-          ),
-        ],
-      ),
+      margin: const EdgeInsets.only(left: 32, bottom: 4),
+      height: 20,
+      width: 2,
+      color: _DesignColors.primary.withOpacity(0.3),
     );
   }
 
   Widget _buildExpandedStageContent(RoadmapStage stage) {
     return Container(
       decoration: BoxDecoration(
-        color: const Color(0xFFF8FAFC),
+        color: _DesignColors.background.withOpacity(0.5),
         borderRadius: const BorderRadius.only(
           bottomLeft: Radius.circular(16),
           bottomRight: Radius.circular(16),
@@ -352,15 +275,15 @@ class _RoadmapDetailViewState extends State<RoadmapDetailView> {
             style: TextStyle(
               fontSize: 14,
               fontWeight: FontWeight.bold,
-              color: Color(0xFF1E293B),
+              color: _DesignColors.textPrimary,
             ),
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 4),
           Text(
             stage.responsibilities,
-            style: TextStyle(
+            style: const TextStyle(
               fontSize: 13,
-              color: Colors.grey[700],
+              color: _DesignColors.textSecondary,
               height: 1.5,
             ),
           ),
@@ -370,69 +293,31 @@ class _RoadmapDetailViewState extends State<RoadmapDetailView> {
             style: TextStyle(
               fontSize: 14,
               fontWeight: FontWeight.bold,
-              color: Color(0xFF1E293B),
+              color: _DesignColors.textPrimary,
             ),
           ),
           const SizedBox(height: 8),
           Wrap(
-            spacing: 8,
-            runSpacing: 8,
+            spacing: 6,
+            runSpacing: 6,
             children: stage.requiredSkills.map((skill) {
               return Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 12,
-                  vertical: 6,
-                ),
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                 decoration: BoxDecoration(
-                  color: const Color(0xFFDDD6FE),
+                  color: _DesignColors.primary.withOpacity(0.1),
                   borderRadius: BorderRadius.circular(6),
                 ),
                 child: Text(
                   skill,
                   style: const TextStyle(
                     fontSize: 12,
-                    color: Color(0xFF7C3AED),
-                    fontWeight: FontWeight.w500,
+                    color: _DesignColors.primary,
+                    fontWeight: FontWeight.w600,
                   ),
                 ),
               );
             }).toList(),
           ),
-          const SizedBox(height: 16),
-          const Text(
-            'Progression Milestones',
-            style: TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.bold,
-              color: Color(0xFF1E293B),
-            ),
-          ),
-          const SizedBox(height: 8),
-          ...stage.progressionMilestones.map((milestone) {
-            return Padding(
-              padding: const EdgeInsets.only(bottom: 6),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Icon(
-                    Icons.check_circle_outline,
-                    size: 16,
-                    color: Color(0xFF10B981),
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      milestone,
-                      style: TextStyle(
-                        fontSize: 13,
-                        color: Colors.grey[700],
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            );
-          }).toList(),
         ],
       ),
     );
@@ -441,168 +326,125 @@ class _RoadmapDetailViewState extends State<RoadmapDetailView> {
   Widget _buildSkillGapSection(CareerRoadmapViewModel viewModel) {
     final readiness = viewModel.careerReadinessPercentage;
 
-    return Card(
-      elevation: 2,
-      shape: RoundedRectangleBorder(
+    return Container(
+      decoration: BoxDecoration(
+        color: _DesignColors.cardBackground,
         borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: _DesignColors.shadow,
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
       ),
-      child: Padding(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'Skill Gap Analysis',
-              style: TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
-                color: Color(0xFF1E293B),
-              ),
+      padding: const EdgeInsets.all(20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Skill Gap Analysis',
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+              color: _DesignColors.textPrimary,
             ),
-            const SizedBox(height: 20),
-            Center(
-              child: SizedBox(
-                width: 150,
-                height: 150,
-                child: Stack(
-                  alignment: Alignment.center,
-                  children: [
-                    SizedBox(
-                      width: 150,
-                      height: 150,
-                      child: CircularProgressIndicator(
-                        value: readiness / 100,
-                        strokeWidth: 12,
-                        backgroundColor: const Color(0xFFE2E8F0),
-                        valueColor: AlwaysStoppedAnimation<Color>(
-                          _getReadinessColor(readiness),
-                        ),
-                      ),
-                    ),
-                    Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(
-                          '${readiness.toStringAsFixed(0)}%',
-                          style: const TextStyle(
-                            fontSize: 36,
-                            fontWeight: FontWeight.bold,
-                            color: Color(0xFF1E293B),
-                          ),
-                        ),
-                        const Text(
-                          'Ready',
-                          style: TextStyle(
-                            fontSize: 14,
-                            color: Color(0xFF64748B),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-            ),
-            const SizedBox(height: 20),
-            Center(
-              child: Text(
-                viewModel.roadmapStages.isNotEmpty
-                    ? 'Ready for ${viewModel.roadmapStages.first.jobTitle}'
-                    : 'Career Readiness',
-                style: const TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w500,
-                  color: Color(0xFF64748B),
-                ),
-                textAlign: TextAlign.center,
-              ),
-            ),
-            const SizedBox(height: 24),
-            if (viewModel.criticalSkillGaps > 0) ...[
-              _buildSkillGapCategory(
-                'Critical Skills',
-                viewModel.criticalSkillGaps,
-                Colors.red,
-                viewModel.getSkillGapsByPriority('Critical'),
-              ),
-              const SizedBox(height: 12),
-            ],
-            if (viewModel.highSkillGaps > 0) ...[
-              _buildSkillGapCategory(
-                'Important Skills',
-                viewModel.highSkillGaps,
-                Colors.orange,
-                viewModel.getSkillGapsByPriority('High'),
-              ),
-              const SizedBox(height: 12),
-            ],
-            if (viewModel.mediumSkillGaps > 0) ...[
-              _buildSkillGapCategory(
-                'Nice-to-have',
-                viewModel.mediumSkillGaps,
-                Colors.green,
-                viewModel.getSkillGapsByPriority('Medium'),
-              ),
-            ],
-            if (viewModel.totalSkillGaps == 0) ...[
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFD1FAE5),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Row(
-                  children: [
-                    const Icon(
-                      Icons.celebration,
-                      color: Color(0xFF10B981),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Text(
-                        'Excellent! You already have all the required skills!',
-                        style: TextStyle(
-                          fontSize: 14,
-                          color: Colors.green[900],
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-            if (viewModel.totalSkillGaps > 0 && !viewModel.hasLearningResources) ...[
-              const SizedBox(height: 20),
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton.icon(
-                  onPressed: viewModel.isLoadingResources
-                      ? null
-                      : () => _generateLearningResources(viewModel),
-                  icon: viewModel.isLoadingResources
-                      ? const SizedBox(
-                    width: 20,
-                    height: 20,
+          ),
+          const SizedBox(height: 20),
+          Center(
+            child: SizedBox(
+              width: 140,
+              height: 140,
+              child: Stack(
+                alignment: Alignment.center,
+                children: [
+                  SizedBox(
+                    width: 140,
+                    height: 140,
                     child: CircularProgressIndicator(
-                      strokeWidth: 2,
-                      valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                    ),
-                  )
-                      : const Icon(Icons.school),
-                  label: const Text('Find Learning Resources'),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF8B5CF6),
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
+                      value: readiness / 100,
+                      strokeWidth: 10,
+                      backgroundColor: _DesignColors.background,
+                      valueColor: AlwaysStoppedAnimation<Color>(
+                        _getReadinessColor(readiness),
+                      ),
                     ),
                   ),
+                  Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        '${readiness.toStringAsFixed(0)}%',
+                        style: const TextStyle(
+                          fontSize: 32,
+                          fontWeight: FontWeight.bold,
+                          color: _DesignColors.textPrimary,
+                        ),
+                      ),
+                      const Text(
+                        'Ready',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: _DesignColors.textSecondary,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 24),
+
+          if (viewModel.criticalSkillGaps > 0) ...[
+            _buildSkillGapCategory(
+              'Critical Skills',
+              viewModel.criticalSkillGaps,
+              _DesignColors.error,
+              viewModel.getSkillGapsByPriority('Critical'),
+            ),
+            const SizedBox(height: 16),
+          ],
+
+          if (viewModel.highSkillGaps > 0) ...[
+            _buildSkillGapCategory(
+              'Important Skills',
+              viewModel.highSkillGaps,
+              Colors.orange,
+              viewModel.getSkillGapsByPriority('High'),
+            ),
+            const SizedBox(height: 16),
+          ],
+
+          if (viewModel.totalSkillGaps > 0 && !viewModel.hasLearningResources) ...[
+            const SizedBox(height: 8),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                onPressed: viewModel.isLoadingResources
+                    ? null
+                    : () => _generateLearningResources(viewModel),
+                icon: viewModel.isLoadingResources
+                    ? const SizedBox(
+                  width: 16,
+                  height: 16,
+                  child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                )
+                    : const Icon(Icons.school, size: 18),
+                label: const Text('Find Learning Resources'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: _DesignColors.primary,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  elevation: 0,
                 ),
               ),
-            ],
+            ),
           ],
-        ),
+        ],
       ),
     );
   }
@@ -619,8 +461,8 @@ class _RoadmapDetailViewState extends State<RoadmapDetailView> {
         Row(
           children: [
             Container(
-              width: 12,
-              height: 12,
+              width: 8,
+              height: 8,
               decoration: BoxDecoration(
                 color: color,
                 shape: BoxShape.circle,
@@ -632,15 +474,15 @@ class _RoadmapDetailViewState extends State<RoadmapDetailView> {
               style: const TextStyle(
                 fontSize: 14,
                 fontWeight: FontWeight.bold,
-                color: Color(0xFF1E293B),
+                color: _DesignColors.textPrimary,
               ),
             ),
             const Spacer(),
             Text(
               '$count missing',
-              style: TextStyle(
+              style: const TextStyle(
                 fontSize: 12,
-                color: Colors.grey[600],
+                color: _DesignColors.textSecondary,
               ),
             ),
           ],
@@ -651,21 +493,18 @@ class _RoadmapDetailViewState extends State<RoadmapDetailView> {
           runSpacing: 8,
           children: gaps.map((gap) {
             return Container(
-              padding: const EdgeInsets.symmetric(
-                horizontal: 10,
-                vertical: 6,
-              ),
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
               decoration: BoxDecoration(
                 color: color.withOpacity(0.1),
                 borderRadius: BorderRadius.circular(6),
-                border: Border.all(color: color.withOpacity(0.3)),
+                border: Border.all(color: color.withOpacity(0.2)),
               ),
               child: Text(
                 gap.skillName,
                 style: TextStyle(
                   fontSize: 12,
                   color: color,
-                  fontWeight: FontWeight.w500,
+                  fontWeight: FontWeight.w600,
                 ),
               ),
             );
@@ -678,229 +517,124 @@ class _RoadmapDetailViewState extends State<RoadmapDetailView> {
   Widget _buildLearningResourcesSection(CareerRoadmapViewModel viewModel) {
     final resources = viewModel.currentLearningResources!.resources;
 
-    return Card(
-      elevation: 2,
-      shape: RoundedRectangleBorder(
+    return Container(
+      decoration: BoxDecoration(
+        color: _DesignColors.cardBackground,
         borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: _DesignColors.shadow,
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
       ),
-      child: Padding(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                const Text(
-                  'Learning Resources',
-                  style: TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
-                    color: Color(0xFF1E293B),
-                  ),
+      padding: const EdgeInsets.all(20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.menu_book, color: _DesignColors.primary, size: 20),
+              const SizedBox(width: 8),
+              const Text(
+                'Learning Resources',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: _DesignColors.textPrimary,
                 ),
-                const Spacer(),
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 8,
-                    vertical: 4,
-                  ),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF3B82F6),
-                    borderRadius: BorderRadius.circular(6),
-                  ),
-                  child: Text(
-                    'For System Design',
-                    style: const TextStyle(
-                      fontSize: 10,
-                      color: Colors.white,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-            ...resources.map((resource) {
-              return _buildResourceCard(resource);
-            }).toList(),
-          ],
-        ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          ...resources.map((resource) {
+            return _buildResourceCard(resource);
+          }).toList(),
+        ],
       ),
     );
   }
 
   Widget _buildResourceCard(LearningResourceEntry resource) {
-    return Card(
+    return Container(
       margin: const EdgeInsets.only(bottom: 12),
-      shape: RoundedRectangleBorder(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: _DesignColors.background,
         borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.grey.withOpacity(0.1)),
       ),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: const Icon(Icons.play_lesson, color: _DesignColors.primary, size: 24),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        resource.courseName,
-                        style: const TextStyle(
-                          fontSize: 15,
-                          fontWeight: FontWeight.bold,
-                          color: Color(0xFF1E293B),
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        resource.provider,
-                        style: TextStyle(
-                          fontSize: 13,
-                          color: Colors.grey[600],
-                        ),
-                      ),
-                    ],
+                Text(
+                  resource.courseName,
+                  style: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.bold,
+                    color: _DesignColors.textPrimary,
                   ),
                 ),
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 8,
-                    vertical: 4,
-                  ),
-                  decoration: BoxDecoration(
-                    color: resource.cost == 0
-                        ? const Color(0xFF10B981)
-                        : const Color(0xFFF59E0B),
-                    borderRadius: BorderRadius.circular(6),
-                  ),
-                  child: Text(
-                    resource.cost == 0 ? 'Free' : 'RM ${resource.cost}',
-                    style: const TextStyle(
-                      fontSize: 11,
-                      color: Colors.white,
-                      fontWeight: FontWeight.bold,
-                    ),
+                const SizedBox(height: 4),
+                Text(
+                  resource.provider,
+                  style: const TextStyle(
+                    fontSize: 12,
+                    color: _DesignColors.textSecondary,
                   ),
                 ),
-              ],
-            ),
-            const SizedBox(height: 8),
-            Row(
-              children: [
-                const Icon(Icons.star, size: 16, color: Color(0xFFFBBF24)),
-                const SizedBox(width: 4),
-                const Text(
-                  '4.8',
-                  style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
-                ),
-                const SizedBox(width: 12),
-                const Icon(Icons.access_time, size: 16, color: Color(0xFF64748B)),
-                const SizedBox(width: 4),
-                const Text(
-                  '6 weeks',
-                  style: TextStyle(fontSize: 13),
-                ),
-              ],
-            ),
-            if (resource.certification != 'No Certificate') ...[
-              const SizedBox(height: 8),
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFDDD6FE),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Row(
+                const SizedBox(height: 8),
+                Row(
                   children: [
-                    const Icon(
-                      Icons.verified,
-                      size: 16,
-                      color: Color(0xFF8B5CF6),
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: resource.cost == 0 ? _DesignColors.success.withOpacity(0.1) : _DesignColors.warning.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
                       child: Text(
-                        resource.certification,
-                        style: const TextStyle(
-                          fontSize: 12,
-                          color: Color(0xFF7C3AED),
-                          fontWeight: FontWeight.w500,
+                        resource.cost == 0 ? 'Free' : 'Paid',
+                        style: TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                          color: resource.cost == 0 ? _DesignColors.success : Colors.orange,
                         ),
+                      ),
+                    ),
+                    const Spacer(),
+                    InkWell(
+                      onTap: () => _launchUrl(resource.courseLink),
+                      child: const Row(
+                        children: [
+                          Text(
+                            'View Course',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: _DesignColors.primary,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          Icon(Icons.arrow_forward_ios, size: 10, color: _DesignColors.primary),
+                        ],
                       ),
                     ),
                   ],
                 ),
-              ),
-            ],
-            const SizedBox(height: 12),
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton(
-                onPressed: () => _launchLearningResource(resource.courseLink, resource.courseName),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF3B82F6),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                ),
-                child: const Text('Start Learning',
-                  style: TextStyle(
-                  color: Colors.white,
-                ),),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  /// Launch learning resource URL with confirmation dialog
-  Future<void> _launchLearningResource(String courseLink, String courseName) async {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: Row(
-          children: [
-            Icon(Icons.open_in_new, color: Color(0xFF8B5CF6)),
-            SizedBox(width: 8),
-            Expanded(
-              child: Text(
-                'Open Learning Resource',
-                style: TextStyle(fontSize: 18),
-              ),
-            ),
-          ],
-        ),
-        content: Text(
-          'You\'ll be redirected to access the "$courseName" course.',
-          style: TextStyle(fontSize: 14, color: Colors.grey[700]),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: Text(
-              'Cancel',
-              style: TextStyle(color: Colors.grey[600]),
-            ),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              Navigator.pop(context);
-              _openCourseLink(courseLink, courseName);
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Color(0xFF8B5CF6),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(8),
-              ),
-            ),
-            child: Text('Continue',style: TextStyle(color: Colors.white),
+              ],
             ),
           ),
         ],
@@ -908,56 +642,9 @@ class _RoadmapDetailViewState extends State<RoadmapDetailView> {
     );
   }
 
-  /// Open course link in external browser
-  /// Handles errors gracefully with user feedback
-  Future<void> _openCourseLink(String courseLink, String courseName) async {
-    try {
-      final uri = Uri.parse(courseLink);
-
-      // Validate URL format
-      if (!courseLink.startsWith('http://') && !courseLink.startsWith('https://')) {
-        _showErrorSnackBar('Invalid course link format');
-        return;
-      }
-
-      if (await canLaunchUrl(uri)) {
-        await launchUrl(uri, mode: LaunchMode.externalApplication);
-
-        // Show success message
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Opening $courseName...'),
-              backgroundColor: Color(0xFF10B981),
-              duration: Duration(seconds: 2),
-            ),
-          );
-        }
-      } else {
-        _showErrorSnackBar('Could not open the course link');
-      }
-    } catch (e) {
-      debugPrint('❌ Error launching course link: $e');
-      _showErrorSnackBar('Failed to open course link: ${e.toString()}');
-    }
-  }
-
-  /// Display error message as SnackBar
-  void _showErrorSnackBar(String message) {
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(message),
-          backgroundColor: Colors.red,
-          duration: Duration(seconds: 3),
-        ),
-      );
-    }
-  }
-
   Widget _buildInfoChip(IconData icon, String label, Color color) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
       decoration: BoxDecoration(
         color: color.withOpacity(0.1),
         borderRadius: BorderRadius.circular(8),
@@ -966,7 +653,7 @@ class _RoadmapDetailViewState extends State<RoadmapDetailView> {
         mainAxisSize: MainAxisSize.min,
         children: [
           Icon(icon, size: 14, color: color),
-          const SizedBox(width: 4),
+          const SizedBox(width: 6),
           Text(
             label,
             style: TextStyle(
@@ -981,485 +668,44 @@ class _RoadmapDetailViewState extends State<RoadmapDetailView> {
   }
 
   Color _getReadinessColor(double readiness) {
-    if (readiness >= 80) return const Color(0xFF10B981);
-    if (readiness >= 50) return const Color(0xFFF59E0B);
-    return const Color(0xFFEF4444);
+    if (readiness >= 80) return _DesignColors.success;
+    if (readiness >= 50) return _DesignColors.warning; // or Orange
+    return _DesignColors.error;
+  }
+
+  Future<void> _launchUrl(String urlString) async {
+    final Uri url = Uri.parse(urlString);
+    if (!await launchUrl(url)) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Could not launch $urlString')),
+        );
+      }
+    }
   }
 
   Future<void> _generateLearningResources(CareerRoadmapViewModel viewModel) async {
     showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (context) => const AlertDialog(
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            CircularProgressIndicator(),
-            SizedBox(height: 16),
-            Text(
-              'Finding the best learning resources...',
-              textAlign: TextAlign.center,
-            ),
-          ],
+      builder: (context) => const Center(
+        child: CircularProgressIndicator(
+          valueColor: AlwaysStoppedAnimation<Color>(_DesignColors.primary),
         ),
       ),
     );
 
     final success = await viewModel.generateLearningResources();
 
-    Navigator.pop(context);
+    if (mounted) Navigator.pop(context);
 
-    if (mounted) {
+    if (!success && mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(
-            success
-                ? viewModel.successMessage ?? 'Learning resources generated!'
-                : viewModel.errorMessage ?? 'Failed to generate resources',
-          ),
-          backgroundColor: success ? Colors.green : Colors.red,
+          content: Text(viewModel.errorMessage ?? 'Failed to find resources'),
+          backgroundColor: _DesignColors.error,
         ),
       );
     }
   }
-}
-
-/// Main screen showing all career roadmaps
-/// UC015: Initial entry point for viewing roadmaps
-class RoadmapListView extends StatefulWidget {
-  const RoadmapListView({Key? key}) : super(key: key);
-
-  @override
-  State<RoadmapListView> createState() => _RoadmapListViewState();
-}
-
-class _RoadmapListViewState extends State<RoadmapListView> {
-  List<Map<String, dynamic>> _roadmaps = [];
-  bool _isLoading = true;
-
-  @override
-  void initState() {
-    super.initState();
-    _loadRoadmaps();
-  }
-
-  Future<void> _loadRoadmaps() async {
-    setState(() => _isLoading = true);
-
-    final viewModel = context.read<CareerRoadmapViewModel>();
-    final roadmaps = await viewModel.getAllRoadmaps();
-
-    setState(() {
-      _roadmaps = roadmaps;
-      _isLoading = false;
-    });
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      body: Container(
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            colors: [Color(0xFF8B5CF6), Color(0xFF3B82F6)],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-          ),
-        ),
-        child: SafeArea(
-          child: Column(
-            children: [
-              _buildHeader(),
-              Expanded(
-                child: Container(
-                  decoration: const BoxDecoration(
-                    color: Color(0xFFF8FAFC),
-                    borderRadius: BorderRadius.only(
-                      topLeft: Radius.circular(24),
-                      topRight: Radius.circular(24),
-                    ),
-                  ),
-                  child: _buildBody(),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () => _navigateToCreateRoadmap(),
-        backgroundColor: const Color(0xFF8B5CF6),
-        icon: const Icon(Icons.add),
-        label: const Text('Create Roadmap'),
-      ),
-    );
-  }
-
-  Widget _buildHeader() {
-    return Padding(
-      padding: const EdgeInsets.all(20),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            'Career Roadmaps',
-            style: TextStyle(
-              fontSize: 28,
-              fontWeight: FontWeight.bold,
-              color: Colors.white,
-            ),
-          ),
-          const SizedBox(height: 8),
-          const Text(
-            'Explore your career progression paths',
-            style: TextStyle(
-              fontSize: 14,
-              color: Colors.white70,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildBody() {
-    if (_isLoading) {
-      return const Center(child: CircularProgressIndicator());
-    }
-
-    if (_roadmaps.isEmpty) {
-      return _buildEmptyState();
-    }
-
-    return RefreshIndicator(
-      onRefresh: _loadRoadmaps,
-      child: ListView.builder(
-        padding: const EdgeInsets.all(16),
-        itemCount: _roadmaps.length,
-        itemBuilder: (context, index) {
-          return _buildRoadmapCard(_roadmaps[index]);
-        },
-      ),
-    );
-  }
-
-  Widget _buildEmptyState() {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(32),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Container(
-              padding: const EdgeInsets.all(24),
-              decoration: BoxDecoration(
-                color: const Color(0xFFEDE9FE),
-                borderRadius: BorderRadius.circular(20),
-              ),
-              child: const Icon(
-                Icons.map_outlined,
-                size: 80,
-                color: Color(0xFF8B5CF6),
-              ),
-            ),
-            const SizedBox(height: 24),
-            const Text(
-              'No Career Roadmaps Yet',
-              style: TextStyle(
-                fontSize: 22,
-                fontWeight: FontWeight.bold,
-                color: Color(0xFF1E293B),
-              ),
-            ),
-            const SizedBox(height: 12),
-            Text(
-              'Create your first career roadmap to see your\nprogression path and skill gaps',
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                fontSize: 14,
-                color: Colors.grey[600],
-                height: 1.5,
-              ),
-            ),
-            const SizedBox(height: 32),
-            ElevatedButton.icon(
-              onPressed: () => _navigateToCreateRoadmap(),
-              icon: const Icon(Icons.add),
-              label: const Text('Create Your First Roadmap'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF8B5CF6),
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 24,
-                  vertical: 16,
-                ),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildRoadmapCard(Map<String, dynamic> roadmapData) {
-    final roadmapId = roadmapData['id'] as String;
-    final jobTitle = roadmapData['jobTitle'] as String;
-    final roadmapList = roadmapData['roadmap'] as List<dynamic>;
-    final stageCount = roadmapList.length;
-
-    return Card(
-      margin: const EdgeInsets.only(bottom: 16),
-      elevation: 2,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
-      ),
-      child: InkWell(
-        onTap: () => _viewRoadmap(roadmapId, jobTitle),
-        borderRadius: BorderRadius.circular(16),
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFEDE9FE),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: const Icon(
-                      Icons.route,
-                      color: Color(0xFF8B5CF6),
-                      size: 24,
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          jobTitle,
-                          style: const TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                            color: Color(0xFF1E293B),
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          '$stageCount career stages',
-                          style: TextStyle(
-                            fontSize: 14,
-                            color: Colors.grey[600],
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  PopupMenuButton<String>(
-                    onSelected: (value) {
-                      if (value == 'delete') {
-                        _deleteRoadmap(roadmapId, jobTitle);
-                      }
-                    },
-                    itemBuilder: (context) => [
-                      const PopupMenuItem(
-                        value: 'delete',
-                        child: Row(
-                          children: [
-                            Icon(Icons.delete, color: Colors.red, size: 20),
-                            SizedBox(width: 8),
-                            Text('Delete'),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-              const SizedBox(height: 16),
-              _buildProgressIndicator(roadmapList),
-              const SizedBox(height: 12),
-              Row(
-                children: [
-                  _buildInfoChip(
-                    Icons.trending_up,
-                    'View Progression',
-                    const Color(0xFF3B82F6),
-                  ),
-                  const SizedBox(width: 8),
-                  _buildInfoChip(
-                    Icons.school,
-                    'See Skills',
-                    const Color(0xFF10B981),
-                  ),
-                ],
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildProgressIndicator(List<dynamic> stages) {
-    return Row(
-      children: List.generate(stages.length, (index) {
-        final isLast = index == stages.length - 1;
-        return Expanded(
-          child: Row(
-            children: [
-              Expanded(
-                child: Container(
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF8B5CF6),
-                    borderRadius: BorderRadius.circular(2),
-                  ),
-                ),
-              ),
-              if (!isLast)
-                Container(
-                  width: 8,
-                  height: 8,
-                  margin: const EdgeInsets.symmetric(horizontal: 4),
-                  decoration: const BoxDecoration(
-                    color: Color(0xFF8B5CF6),
-                    shape: BoxShape.circle,
-                  ),
-                ),
-            ],
-          ),
-        );
-      }),
-    );
-  }
-
-  Widget _buildInfoChip(IconData icon, String label, Color color) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-      decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 16, color: color),
-          const SizedBox(width: 4),
-          Text(
-            label,
-            style: TextStyle(
-              fontSize: 12,
-              color: color,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Future<void> _navigateToCreateRoadmap() async {
-    final result = await Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => const CreateRoadmapView(),
-      ),
-    );
-
-    if (result == true) {
-      _loadRoadmaps();
-    }
-  }
-
-  Future<void> _viewRoadmap(String roadmapId, String jobTitle) async {
-    final viewModel = context.read<CareerRoadmapViewModel>();
-
-    // Show loading
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) => const Center(child: CircularProgressIndicator()),
-    );
-
-    final success = await viewModel.loadRoadmapById(roadmapId);
-
-    Navigator.pop(context); // Close loading
-
-    if (success && mounted) {
-      Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (context) => const RoadmapDetailView(),
-        ),
-      );
-    } else if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(viewModel.errorMessage ?? 'Failed to load roadmap'),
-          backgroundColor: Colors.red,
-        ),
-      );
-    }
-  }
-
-  Future<void> _deleteRoadmap(String roadmapId, String jobTitle) async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Delete Roadmap'),
-        content: Text(
-          'Are you sure you want to delete the roadmap for "$jobTitle"? This action cannot be undone.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            onPressed: () => Navigator.pop(context, true),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.red,
-            ),
-            child: const Text('Delete'),
-          ),
-        ],
-      ),
-    );
-
-    if (confirmed != true) return;
-
-    final viewModel = context.read<CareerRoadmapViewModel>();
-
-    // Load the roadmap first
-    await viewModel.loadRoadmapById(roadmapId);
-
-    // Delete it
-    final success = await viewModel.deleteCurrentRoadmap();
-
-    if (success && mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Roadmap deleted successfully'),
-          backgroundColor: Colors.green,
-        ),
-      );
-      _loadRoadmaps();
-    } else if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(viewModel.errorMessage ?? 'Failed to delete roadmap'),
-          backgroundColor: Colors.red,
-        ),
-      );
-    }
-  }
-
-
 }
