@@ -2,7 +2,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:path_wise/model/interview_model.dart';
-import 'package:path_wise/services/gemini_service.dart';
+import 'package:path_wise/services/gemini_service2.dart';
 import 'package:path_wise/services/interview_service.dart';
 
 /// viewModel for managing interview simulator sessions

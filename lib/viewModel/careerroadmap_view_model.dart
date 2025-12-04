@@ -3,7 +3,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 import 'package:path_wise/model/careerroadmap_model.dart';
 import 'package:path_wise/model/user_profile.dart';
-import 'package:path_wise/services/gemini_service.dart';
+import 'package:path_wise/services/gemini_service2.dart';
 import 'package:path_wise/services/roadmap_service.dart';
 import 'package:path_wise/viewModel/profile_view_model.dart';
 
@@ -84,8 +84,8 @@ class CareerRoadmapViewModel extends ChangeNotifier {
   bool get profileOutdated => _profileOutdated;
 
   // Helper getters
-  String get uid => _auth.currentUser?.uid ?? 'U0001';
-
+  //String get uid => _auth.currentUser?.uid ?? 'U0001';
+  String get uid =>  'U0001';
   bool isStageExpanded(int index) => _expandedStages[index.toString()] ?? false;
   bool get hasRoadmap => _currentRoadmap != null;
   bool get hasSkillGap => _currentSkillGap != null;

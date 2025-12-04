@@ -45,10 +45,10 @@ class ProfileViewModel extends ChangeNotifier {
 
   String? get error => _error;
 
-  String get uid {
-    final u = _auth.currentUser;
-    return u?.uid ?? 'U0001'; // fallback for local testing
-  }
+  String get uid => 'U0001';
+  //final u = _auth.currentUser;
+  //return u?.uid ?? 'U0001'; // fallback for local testing
+
 
   // ------------- Internal setters -------------
   void _setLoading(bool v) {
@@ -83,11 +83,20 @@ class ProfileViewModel extends ChangeNotifier {
 
   // ------------- Loaders -------------
   Future<void> loadAll() async {
+    debugPrint('🔄 ProfileViewModel: Starting loadAll() for uid=$uid');
     _setLoading(true);
     _setError(null);
     try {
       final up = await _service.getUserWithSubcollections(uid);
+
+      // ✅ DEBUG: Print what we got from service
+      debugPrint('📦 ProfileViewModel: Received profile=${up != null}');
+      debugPrint('📦 ProfileViewModel: Skills count=${up?.skills?.length ?? 0}');
+      debugPrint('📦 ProfileViewModel: Education count=${up?.education?.length ?? 0}');
+      debugPrint('📦 ProfileViewModel: Experience count=${up?.experience?.length ?? 0}');
+
       if (up == null) {
+        debugPrint('⚠️ ProfileViewModel: No profile found, creating new one');
         // First-time bootstrap minimal doc
         await _service.createOrMergeUser(
           uid,
@@ -96,12 +105,19 @@ class ProfileViewModel extends ChangeNotifier {
           ),
         );
         final created = await _service.getUserWithSubcollections(uid);
+        debugPrint('✅ ProfileViewModel: Created profile=${created != null}');
         _applyBundle(created);
       } else {
         _applyBundle(up);
       }
+
+      // ✅ DEBUG: Print final state
+      debugPrint('✅ ProfileViewModel: Final state - Skills=${_skills.length}, Education=${_education.length}, Experience=${_experience.length}');
+
       await _recalcAndPatchCompletion();
-    } catch (e) {
+    } catch (e, stackTrace) {
+      debugPrint('❌ ProfileViewModel: Error in loadAll(): $e');
+      debugPrint('Stack trace: $stackTrace');
       _setError(e);
     } finally {
       _setLoading(false);
@@ -111,10 +127,21 @@ class ProfileViewModel extends ChangeNotifier {
   Future<void> refresh() => loadAll();
 
   void _applyBundle(UserProfile? up) {
+    debugPrint('📝 ProfileViewModel: _applyBundle called');
+    debugPrint('📝 Skills before: ${_skills.length}');
+
     _profile = up;
     _skills = up?.skills ?? const [];
     _education = up?.education ?? const [];
     _experience = up?.experience ?? const [];
+
+    debugPrint('📝 Skills after: ${_skills.length}');
+    if (_skills.isNotEmpty) {
+      for (var skill in _skills) {
+        debugPrint('  - Skill: ${skill.name}, Category: "${skill.category}"');
+      }
+    }
+
     notifyListeners();
   }
 
@@ -219,7 +246,7 @@ class ProfileViewModel extends ChangeNotifier {
     _setError(null);
     try {
       // Print debug info
-      print('Attempting upload for user: $uid');
+      debugPrint('Attempting upload for user: $uid');
 
       final url = await _service.uploadProfilePicture(uid: uid, file: file, fileExt: fileExt);
       if (url != null) {
@@ -233,7 +260,7 @@ class ProfileViewModel extends ChangeNotifier {
       return url;
     } catch (e) {
       // Capture the full error string
-      print('viewModel Upload Error: $e');
+      debugPrint('viewModel Upload Error: $e');
       _setError(e.toString());
       return null;
     } finally {
@@ -243,15 +270,19 @@ class ProfileViewModel extends ChangeNotifier {
 
   // ------------- Skills CRUD -------------
   Future<bool> addSkill(Skill draft) async {
+    debugPrint('➕ Adding skill: ${draft.name}, Category: "${draft.category}"');
     _setSavingSkill(true);
     _setError(null);
     try {
       final created = await _service.createSkill(uid: uid, skill: draft);
+      debugPrint('✅ Skill created with ID: ${created.id}');
       _skills = [..._skills, created]..sort((a, b) => (a.order ?? 0).compareTo(b.order ?? 0));
+      debugPrint('✅ Total skills now: ${_skills.length}');
       notifyListeners();
       await _recalcAndPatchCompletion();
       return true;
     } catch (e) {
+      debugPrint('❌ Error adding skill: $e');
       _setError(e);
       return false;
     } finally {
@@ -260,16 +291,19 @@ class ProfileViewModel extends ChangeNotifier {
   }
 
   Future<bool> saveSkill(Skill skill) async {
+    debugPrint('💾 Updating skill: ${skill.name}, Category: "${skill.category}"');
     _setSavingSkill(true);
     _setError(null);
     try {
       await _service.updateSkill(uid: uid, skill: skill);
       _skills = _skills.map((s) => s.id == skill.id ? skill : s).toList()
         ..sort((a, b) => (a.order ?? 0).compareTo(b.order ?? 0));
+      debugPrint('✅ Skill updated successfully');
       notifyListeners();
       await _recalcAndPatchCompletion();
       return true;
     } catch (e) {
+      debugPrint('❌ Error updating skill: $e');
       _setError(e);
       return false;
     } finally {
@@ -278,15 +312,18 @@ class ProfileViewModel extends ChangeNotifier {
   }
 
   Future<bool> deleteSkill(String skillId) async {
+    debugPrint('🗑️ Deleting skill: $skillId');
     _setSavingSkill(true);
     _setError(null);
     try {
       await _service.deleteSkill(uid: uid, skillId: skillId);
       _skills = _skills.where((s) => s.id != skillId).toList();
+      debugPrint('✅ Skill deleted. Total skills now: ${_skills.length}');
       notifyListeners();
       await _recalcAndPatchCompletion();
       return true;
     } catch (e) {
+      debugPrint('❌ Error deleting skill: $e');
       _setError(e);
       return false;
     } finally {
@@ -296,15 +333,19 @@ class ProfileViewModel extends ChangeNotifier {
 
   // ------------- Education CRUD -------------
   Future<bool> addEducation(Education draft) async {
+    debugPrint('➕ Adding education: ${draft.institution}');
     _setSavingEducation(true);
     _setError(null);
     try {
       final created = await _service.createEducation(uid: uid, education: draft);
+      debugPrint('✅ Education created with ID: ${created.id}');
       _education = [..._education, created]..sort((a, b) => (a.order ?? 0).compareTo(b.order ?? 0));
+      debugPrint('✅ Total education entries now: ${_education.length}');
       notifyListeners();
       await _recalcAndPatchCompletion();
       return true;
     } catch (e) {
+      debugPrint('❌ Error adding education: $e');
       _setError(e);
       return false;
     } finally {
@@ -313,16 +354,19 @@ class ProfileViewModel extends ChangeNotifier {
   }
 
   Future<bool> saveEducation(Education edu) async {
+    debugPrint('💾 Updating education: ${edu.institution}');
     _setSavingEducation(true);
     _setError(null);
     try {
       await _service.updateEducation(uid: uid, education: edu);
       _education = _education.map((e) => e.id == edu.id ? edu : e).toList()
         ..sort((a, b) => (a.order ?? 0).compareTo(b.order ?? 0));
+      debugPrint('✅ Education updated successfully');
       notifyListeners();
       await _recalcAndPatchCompletion();
       return true;
     } catch (e) {
+      debugPrint('❌ Error updating education: $e');
       _setError(e);
       return false;
     } finally {
@@ -331,15 +375,18 @@ class ProfileViewModel extends ChangeNotifier {
   }
 
   Future<bool> deleteEducation(String eduId) async {
+    debugPrint('🗑️ Deleting education: $eduId');
     _setSavingEducation(true);
     _setError(null);
     try {
       await _service.deleteEducation(uid: uid, eduId: eduId);
       _education = _education.where((e) => e.id != eduId).toList();
+      debugPrint('✅ Education deleted. Total entries now: ${_education.length}');
       notifyListeners();
       await _recalcAndPatchCompletion();
       return true;
     } catch (e) {
+      debugPrint('❌ Error deleting education: $e');
       _setError(e);
       return false;
     } finally {
@@ -349,15 +396,19 @@ class ProfileViewModel extends ChangeNotifier {
 
   // ------------- Experience CRUD -------------
   Future<bool> addExperience(Experience draft) async {
+    debugPrint('➕ Adding experience: ${draft.company}');
     _setSavingExperience(true);
     _setError(null);
     try {
       final created = await _service.createExperience(uid: uid, experience: draft);
+      debugPrint('✅ Experience created with ID: ${created.id}');
       _experience = [..._experience, created]..sort((a, b) => (a.order ?? 0).compareTo(b.order ?? 0));
+      debugPrint('✅ Total experience entries now: ${_experience.length}');
       notifyListeners();
       await _recalcAndPatchCompletion();
       return true;
     } catch (e) {
+      debugPrint('❌ Error adding experience: $e');
       _setError(e);
       return false;
     } finally {
@@ -366,16 +417,19 @@ class ProfileViewModel extends ChangeNotifier {
   }
 
   Future<bool> saveExperience(Experience exp) async {
+    debugPrint('💾 Updating experience: ${exp.company}');
     _setSavingExperience(true);
     _setError(null);
     try {
       await _service.updateExperience(uid: uid, experience: exp);
       _experience = _experience.map((e) => e.id == exp.id ? exp : e).toList()
         ..sort((a, b) => (a.order ?? 0).compareTo(b.order ?? 0));
+      debugPrint('✅ Experience updated successfully');
       notifyListeners();
       await _recalcAndPatchCompletion();
       return true;
     } catch (e) {
+      debugPrint('❌ Error updating experience: $e');
       _setError(e);
       return false;
     } finally {
@@ -384,15 +438,18 @@ class ProfileViewModel extends ChangeNotifier {
   }
 
   Future<bool> deleteExperience(String expId) async {
+    debugPrint('🗑️ Deleting experience: $expId');
     _setSavingExperience(true);
     _setError(null);
     try {
       await _service.deleteExperience(uid: uid, expId: expId);
       _experience = _experience.where((e) => e.id != expId).toList();
+      debugPrint('✅ Experience deleted. Total entries now: ${_experience.length}');
       notifyListeners();
       await _recalcAndPatchCompletion();
       return true;
     } catch (e) {
+      debugPrint('❌ Error deleting experience: $e');
       _setError(e);
       return false;
     } finally {

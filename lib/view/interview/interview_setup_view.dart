@@ -1,10 +1,23 @@
-// lib/view/interview/interview_setup_page.dart
+// lib/view/interview/interview_setup_view.dart
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:path_wise/viewModel/interview_view_model.dart';
 import 'package:path_wise/viewModel/career_view_model.dart';
 import 'package:path_wise/viewModel/profile_view_model.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+
+// Defining KYYAP Design Colors locally
+class _DesignColors {
+  static const Color primary = Color(0xFF6C63FF);
+  static const Color background = Color(0xFFF5F7FA);
+  static const Color textPrimary = Color(0xFF2D3436);
+  static const Color textSecondary = Color(0xFF636E72);
+  static const Color cardBackground = Colors.white;
+  static const Color success = Color(0xFF00B894);
+  static const Color warning = Color(0xFFFDCB6E);
+  static const Color error = Color(0xFFD63031);
+  static Color shadow = Colors.black.withOpacity(0.08);
+}
 
 class InterviewSetupPage extends StatefulWidget {
   const InterviewSetupPage({Key? key}) : super(key: key);
@@ -51,7 +64,8 @@ class _InterviewSetupPageState extends State<InterviewSetupPage> {
     final user = FirebaseAuth.instance.currentUser;
 
     if (user != null && !careerVM.hasLatestSuggestion) {
-      await careerVM.latestSuggestion?.matches??[];
+      // In a real app you might trigger a fetch here
+      // await careerVM.fetchSuggestions();
     }
   }
 
@@ -68,19 +82,19 @@ class _InterviewSetupPageState extends State<InterviewSetupPage> {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Please select a job title and at least one question category'),
-          backgroundColor: Colors.red,
-          duration: Duration(seconds: 3),
+          backgroundColor: _DesignColors.error,
+          behavior: SnackBarBehavior.floating,
         ),
       );
       return;
     }
 
-    final user = 'U0001';
+    final user = FirebaseAuth.instance.currentUser;
     if (user == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('User not logged in'),
-          backgroundColor: Colors.red,
+          backgroundColor: _DesignColors.error,
         ),
       );
       return;
@@ -96,24 +110,39 @@ class _InterviewSetupPageState extends State<InterviewSetupPage> {
       barrierDismissible: false,
       builder: (context) => WillPopScope(
         onWillPop: () async => false,
-        child: const AlertDialog(
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              CircularProgressIndicator(),
-              SizedBox(height: 20),
-              Text(
-                'Generating Interview Questions...',
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
-                textAlign: TextAlign.center,
-              ),
-              SizedBox(height: 8),
-              Text(
-                'This may take 3-5 seconds',
-                style: TextStyle(fontSize: 13, color: Colors.grey),
-                textAlign: TextAlign.center,
-              ),
-            ],
+        child: Dialog(
+          backgroundColor: Colors.transparent,
+          elevation: 0,
+          child: Container(
+            padding: const EdgeInsets.all(24),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: const [
+                CircularProgressIndicator(
+                  valueColor: AlwaysStoppedAnimation<Color>(_DesignColors.primary),
+                ),
+                SizedBox(height: 20),
+                Text(
+                  'Generating Interview Questions...',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    color: _DesignColors.textPrimary,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                SizedBox(height: 8),
+                Text(
+                  'AI is tailoring questions to your profile...',
+                  style: TextStyle(fontSize: 13, color: _DesignColors.textSecondary),
+                  textAlign: TextAlign.center,
+                ),
+              ],
+            ),
           ),
         ),
       ),
@@ -123,8 +152,7 @@ class _InterviewSetupPageState extends State<InterviewSetupPage> {
       final interviewVM = context.read<InterviewViewModel>();
       final profileVM = context.read<ProfileViewModel>();
 
-
-      // Start new interview session - generates questions via AI
+      // Start new interview session
       final success = await interviewVM.startNewInterviewSession(
         userId: profileVM.uid,
         jobTitle: jobTitle,
@@ -138,36 +166,32 @@ class _InterviewSetupPageState extends State<InterviewSetupPage> {
       if (mounted) Navigator.of(context).pop();
 
       if (success && mounted) {
-        // Show success message (M2)
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Your interview simulation has begun. Take your time.'),
-            backgroundColor: Colors.green,
-            duration: Duration(seconds: 2),
+            content: Text('Interview session ready'),
+            backgroundColor: _DesignColors.success,
+            behavior: SnackBarBehavior.floating,
           ),
         );
 
-        // Navigate to interview session page
         Navigator.of(context).pushReplacementNamed('/interview-session');
       } else if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(interviewVM.errorMessage ?? 'Failed to start interview'),
-            backgroundColor: Colors.red,
-            duration: const Duration(seconds: 4),
+            backgroundColor: _DesignColors.error,
+            behavior: SnackBarBehavior.floating,
           ),
         );
       }
     } catch (e) {
-      // Close loading dialog if still open
-      if (mounted) Navigator.of(context).pop();
-
       if (mounted) {
+        Navigator.of(context).pop(); // Close loading
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Error: ${e.toString()}'),
-            backgroundColor: Colors.red,
-            duration: const Duration(seconds: 4),
+            backgroundColor: _DesignColors.error,
+            behavior: SnackBarBehavior.floating,
           ),
         );
       }
@@ -183,34 +207,51 @@ class _InterviewSetupPageState extends State<InterviewSetupPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.grey[50],
+      backgroundColor: _DesignColors.background,
       appBar: AppBar(
-        title: const Text('Interview Setup'),
-        backgroundColor: const Color(0xFF8B5CF6),
-        foregroundColor: Colors.white,
+        title: const Text(
+          'Interview Setup',
+          style: TextStyle(
+            fontSize: 20,
+            fontWeight: FontWeight.bold,
+            color: _DesignColors.textPrimary,
+          ),
+        ),
+        backgroundColor: _DesignColors.background,
         elevation: 0,
+        centerTitle: true,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back, color: _DesignColors.textPrimary),
+          onPressed: () => Navigator.pop(context),
+        ),
       ),
       body: Consumer<CareerViewModel>(
         builder: (context, careerVM, child) {
           if (careerVM.isLoading) {
             return const Center(
-              child: CircularProgressIndicator(),
+              child: CircularProgressIndicator(
+                valueColor: AlwaysStoppedAnimation<Color>(_DesignColors.primary),
+              ),
             );
           }
 
           return SingleChildScrollView(
-            padding: const EdgeInsets.only(bottom: 24),
+            padding: const EdgeInsets.all(20),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const SizedBox(height: 8),
                 _buildJobTitleSection(careerVM),
+                const SizedBox(height: 20),
                 _buildDifficultySection(),
+                const SizedBox(height: 20),
                 _buildSessionSettingsSection(),
+                const SizedBox(height: 20),
                 _buildQuestionCategoriesSection(),
+                const SizedBox(height: 20),
                 _buildSummarySection(),
+                const SizedBox(height: 24),
                 _buildStartButton(),
-                const SizedBox(height: 16),
+                const SizedBox(height: 20),
               ],
             ),
           );
@@ -219,89 +260,136 @@ class _InterviewSetupPageState extends State<InterviewSetupPage> {
     );
   }
 
+  Widget _buildSectionContainer({required Widget child}) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: _DesignColors.cardBackground,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: _DesignColors.shadow,
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: child,
+    );
+  }
+
+  Widget _buildSectionTitle(IconData icon, String title) {
+    return Row(
+      children: [
+        Container(
+          padding: const EdgeInsets.all(8),
+          decoration: BoxDecoration(
+            color: _DesignColors.primary.withOpacity(0.1),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Icon(icon, color: _DesignColors.primary, size: 20),
+        ),
+        const SizedBox(width: 12),
+        Text(
+          title,
+          style: const TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.bold,
+            color: _DesignColors.textPrimary,
+          ),
+        ),
+      ],
+    );
+  }
+
   Widget _buildJobTitleSection(CareerViewModel careerVM) {
     final suggestions = careerVM.latestSuggestion?.matches ?? [];
     final hasSuggestions = suggestions.isNotEmpty;
 
-    return Card(
-      margin: const EdgeInsets.all(16),
-      elevation: 2,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      child: Padding(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Icon(Icons.work_outline, color: Theme.of(context).primaryColor),
-                const SizedBox(width: 8),
-                const Text(
-                  'Select Job Title',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+    return _buildSectionContainer(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _buildSectionTitle(Icons.work_outline, 'Select Job Title'),
+          const SizedBox(height: 16),
+
+          // Suggested jobs section
+          if (!_useCustomJob && hasSuggestions) ...[
+            const Text(
+              'Recommended for you:',
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+                color: _DesignColors.textSecondary,
+              ),
+            ),
+            const SizedBox(height: 12),
+            ...suggestions.map((match) {
+              return RadioListTile<String>(
+                title: Text(
+                  match.jobTitle,
+                  style: const TextStyle(
+                    fontSize: 14,
+                    color: _DesignColors.textPrimary,
+                    fontWeight: FontWeight.w500,
+                  ),
                 ),
-              ],
+                subtitle: Text(
+                  'Fit Score: ${match.fitScore}%',
+                  style: const TextStyle(fontSize: 12, color: _DesignColors.textSecondary),
+                ),
+                value: match.jobTitle,
+                groupValue: _selectedJobTitle,
+                onChanged: (value) {
+                  setState(() {
+                    _selectedJobTitle = value;
+                    _useCustomJob = false;
+                  });
+                },
+                activeColor: _DesignColors.primary,
+                contentPadding: EdgeInsets.zero,
+                dense: true,
+              );
+            }).toList(),
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 8),
+              child: Divider(),
+            ),
+          ],
+
+          // No suggestions warning
+          if (!_useCustomJob && !hasSuggestions) ...[
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: _DesignColors.warning.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: _DesignColors.warning.withOpacity(0.3)),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.info_outline, color: Colors.orange, size: 18),
+                  const SizedBox(width: 8),
+                  const Expanded(
+                    child: Text(
+                      'No suggestions available. Please enter a custom job title.',
+                      style: TextStyle(fontSize: 12, color: _DesignColors.textPrimary),
+                    ),
+                  ),
+                ],
+              ),
             ),
             const SizedBox(height: 16),
+          ],
 
-            // Suggested jobs section
-            if (!_useCustomJob && hasSuggestions) ...[
-              const Text(
-                'Choose from your career suggestions:',
-                style: TextStyle(fontSize: 13, color: Colors.grey),
-              ),
-              const SizedBox(height: 12),
-              ...suggestions.map((match) {
-                return RadioListTile<String>(
-                  title: Text(match.jobTitle),
-                  subtitle: Text(
-                    'Fit Score: ${match.fitScore}%',
-                    style: const TextStyle(fontSize: 12),
-                  ),
-                  value: match.jobTitle,
-                  groupValue: _selectedJobTitle,
-                  onChanged: (value) {
-                    setState(() {
-                      _selectedJobTitle = value;
-                      _useCustomJob = false;
-                    });
-                  },
-                  activeColor: const Color(0xFF8B5CF6),
-                  contentPadding: EdgeInsets.zero,
-                );
-              }).toList(),
-              const Divider(height: 32),
-            ],
-
-            // No suggestions warning
-            if (!_useCustomJob && !hasSuggestions) ...[
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: Colors.orange[50],
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: Colors.orange[200]!),
-                ),
-                child: Row(
-                  children: [
-                    Icon(Icons.info_outline, color: Colors.orange[700], size: 20),
-                    const SizedBox(width: 12),
-                    const Expanded(
-                      child: Text(
-                        'No career suggestions available. Please use custom job title.',
-                        style: TextStyle(fontSize: 13),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 16),
-            ],
-
-            // Custom job toggle
-            Row(
-              children: [
-                Checkbox(
+          // Custom job toggle
+          Row(
+            children: [
+              SizedBox(
+                height: 24,
+                width: 24,
+                child: Checkbox(
                   value: _useCustomJob,
                   onChanged: (value) {
                     setState(() {
@@ -313,74 +401,113 @@ class _InterviewSetupPageState extends State<InterviewSetupPage> {
                       }
                     });
                   },
-                  activeColor: const Color(0xFF8B5CF6),
+                  activeColor: _DesignColors.primary,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
                 ),
-                const Text(
-                  'Enter custom job title',
-                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
+              ),
+              const SizedBox(width: 8),
+              const Text(
+                'Enter custom job title',
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w500,
+                  color: _DesignColors.textPrimary,
                 ),
-              ],
-            ),
-
-            // Custom job input
-            if (_useCustomJob) ...[
-              const SizedBox(height: 12),
-              TextField(
-                controller: _customJobController,
-                decoration: InputDecoration(
-                  hintText: 'e.g., Software Engineer, Data Analyst',
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  filled: true,
-                  fillColor: Colors.grey[100],
-                  prefixIcon: const Icon(Icons.edit),
-                ),
-                onChanged: (_) => setState(() {}),
               ),
             ],
+          ),
+
+          // Custom job input
+          if (_useCustomJob) ...[
+            const SizedBox(height: 12),
+            TextField(
+              controller: _customJobController,
+              style: const TextStyle(color: _DesignColors.textPrimary, fontSize: 14),
+              decoration: InputDecoration(
+                hintText: 'e.g., Software Engineer',
+                hintStyle: TextStyle(color: Colors.grey[400]),
+                filled: true,
+                fillColor: _DesignColors.background,
+                contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide.none,
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide(color: Colors.grey[200]!),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: const BorderSide(color: _DesignColors.primary),
+                ),
+                prefixIcon: const Icon(Icons.edit_outlined, color: _DesignColors.primary, size: 20),
+              ),
+              onChanged: (_) => setState(() {}),
+            ),
           ],
-        ),
+        ],
       ),
     );
   }
 
   Widget _buildDifficultySection() {
-    return Card(
-      margin: const EdgeInsets.symmetric(horizontal: 16),
-      elevation: 2,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      child: Padding(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
+    return _buildSectionContainer(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _buildSectionTitle(Icons.school_outlined, 'Difficulty Level'),
+          const SizedBox(height: 16),
+          Row(
+            children: [
+              _buildDifficultyChip('Beginner', _DesignColors.success),
+              const SizedBox(width: 12),
+              _buildDifficultyChip('Intermediate', _DesignColors.warning),
+              const SizedBox(width: 12),
+              _buildDifficultyChip('Advanced', _DesignColors.error),
+            ],
+          ),
+          const SizedBox(height: 16),
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: _DesignColors.primary.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Icon(Icons.school_outlined, color: Theme.of(context).primaryColor),
+                const Icon(Icons.info_outline, size: 18, color: _DesignColors.primary),
                 const SizedBox(width: 8),
-                const Text(
-                  'Difficulty Level',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                Expanded(
+                  child: Text(
+                    _getDifficultyDescription(),
+                    style: const TextStyle(
+                      fontSize: 12,
+                      color: _DesignColors.textSecondary,
+                      height: 1.3,
+                    ),
+                  ),
                 ),
               ],
             ),
-            const SizedBox(height: 16),
-            Row(
-              children: [
-                _buildDifficultyChip('Beginner', Colors.green),
-                const SizedBox(width: 12),
-                _buildDifficultyChip('Intermediate', Colors.orange),
-                const SizedBox(width: 12),
-                _buildDifficultyChip('Advanced', Colors.red),
-              ],
-            ),
-            const SizedBox(height: 12),
-            _buildDifficultyDescription(),
-          ],
-        ),
+          ),
+        ],
       ),
     );
+  }
+
+  String _getDifficultyDescription() {
+    switch (_difficultyLevel) {
+      case 'Beginner':
+        return 'Basic concepts and fundamental questions suitable for entry-level positions.';
+      case 'Intermediate':
+        return 'Moderate complexity with practical scenarios and role-specific challenges.';
+      case 'Advanced':
+        return 'Complex scenarios requiring expert knowledge, system design, and leadership skills.';
+      default:
+        return '';
+    }
   }
 
   Widget _buildDifficultyChip(String level, Color color) {
@@ -392,20 +519,20 @@ class _InterviewSetupPageState extends State<InterviewSetupPage> {
         child: Container(
           padding: const EdgeInsets.symmetric(vertical: 12),
           decoration: BoxDecoration(
-            color: isSelected ? color : Colors.grey[100],
+            color: isSelected ? color : _DesignColors.background,
             borderRadius: BorderRadius.circular(12),
             border: Border.all(
-              color: isSelected ? color : Colors.grey[300]!,
-              width: 2,
+              color: isSelected ? color : Colors.grey[200]!,
+              width: 1.5,
             ),
           ),
           child: Text(
             level,
             textAlign: TextAlign.center,
             style: TextStyle(
-              color: isSelected ? Colors.white : Colors.black87,
-              fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-              fontSize: 13,
+              color: isSelected ? Colors.white : _DesignColors.textSecondary,
+              fontWeight: FontWeight.bold,
+              fontSize: 12,
             ),
           ),
         ),
@@ -413,27 +540,65 @@ class _InterviewSetupPageState extends State<InterviewSetupPage> {
     );
   }
 
-  Widget _buildDifficultyDescription() {
-    final descriptions = {
-      'Beginner': 'Basic concepts and fundamental questions',
-      'Intermediate': 'Moderate complexity with practical scenarios',
-      'Advanced': 'Complex scenarios requiring expert knowledge',
-    };
-
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: Colors.blue[50],
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Row(
+  Widget _buildSessionSettingsSection() {
+    return _buildSectionContainer(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(Icons.info_outline, size: 18, color: Colors.blue[700]),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Text(
-              descriptions[_difficultyLevel]!,
-              style: TextStyle(fontSize: 12, color: Colors.blue[900]),
+          _buildSectionTitle(Icons.tune_outlined, 'Session Settings'),
+          const SizedBox(height: 20),
+
+          // Duration Slider
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text('Duration', style: TextStyle(fontWeight: FontWeight.w600)),
+              Text('${_sessionDuration.toInt()} mins', style: const TextStyle(color: _DesignColors.primary, fontWeight: FontWeight.bold)),
+            ],
+          ),
+          SliderTheme(
+            data: SliderThemeData(
+              activeTrackColor: _DesignColors.primary,
+              inactiveTrackColor: _DesignColors.primary.withOpacity(0.1),
+              thumbColor: _DesignColors.primary,
+              overlayColor: _DesignColors.primary.withOpacity(0.2),
+              trackHeight: 4,
+            ),
+            child: Slider(
+              value: _sessionDuration,
+              min: 15,
+              max: 60,
+              divisions: 3,
+              label: '${_sessionDuration.toInt()} min',
+              onChanged: (value) => setState(() => _sessionDuration = value),
+            ),
+          ),
+
+          const SizedBox(height: 12),
+
+          // Questions Slider
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text('Questions', style: TextStyle(fontWeight: FontWeight.w600)),
+              Text('${_numQuestions.toInt()} questions', style: const TextStyle(color: _DesignColors.primary, fontWeight: FontWeight.bold)),
+            ],
+          ),
+          SliderTheme(
+            data: SliderThemeData(
+              activeTrackColor: _DesignColors.primary,
+              inactiveTrackColor: _DesignColors.primary.withOpacity(0.1),
+              thumbColor: _DesignColors.primary,
+              overlayColor: _DesignColors.primary.withOpacity(0.2),
+              trackHeight: 4,
+            ),
+            child: Slider(
+              value: _numQuestions,
+              min: 5,
+              max: 10,
+              divisions: 5,
+              label: '${_numQuestions.toInt()}',
+              onChanged: (value) => setState(() => _numQuestions = value),
             ),
           ),
         ],
@@ -441,155 +606,55 @@ class _InterviewSetupPageState extends State<InterviewSetupPage> {
     );
   }
 
-  Widget _buildSessionSettingsSection() {
-    return Card(
-      margin: const EdgeInsets.all(16),
-      elevation: 2,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      child: Padding(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Icon(Icons.settings_outlined, color: Theme.of(context).primaryColor),
-                const SizedBox(width: 8),
-                const Text(
-                  'Session Settings',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                ),
-              ],
-            ),
-            const SizedBox(height: 24),
-
-            // Duration
-            Row(
-              children: [
-                const Icon(Icons.timer, color: Color(0xFF8B5CF6), size: 20),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Duration: ${_sessionDuration.toInt()} minutes',
-                        style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
-                      ),
-                      Slider(
-                        value: _sessionDuration,
-                        min: 15,
-                        max: 60,
-                        divisions: 9,
-                        label: '${_sessionDuration.toInt()} min',
-                        activeColor: const Color(0xFF8B5CF6),
-                        onChanged: (value) => setState(() => _sessionDuration = value),
-                      ),
-                      Text(
-                        'Range: 15-60 minutes',
-                        style: TextStyle(fontSize: 12, color: Colors.grey[600]),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-
-            // Questions
-            Row(
-              children: [
-                const Icon(Icons.question_answer, color: Color(0xFF8B5CF6), size: 20),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Number of Questions: ${_numQuestions.toInt()}',
-                        style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
-                      ),
-                      Slider(
-                        value: _numQuestions,
-                        min: 5,
-                        max: 10,
-                        divisions: 5,
-                        label: '${_numQuestions.toInt()}',
-                        activeColor: const Color(0xFF8B5CF6),
-                        onChanged: (value) => setState(() => _numQuestions = value),
-                      ),
-                      Text(
-                        'Range: 5-10 questions',
-                        style: TextStyle(fontSize: 12, color: Colors.grey[600]),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
   Widget _buildQuestionCategoriesSection() {
-    return Card(
-      margin: const EdgeInsets.symmetric(horizontal: 16),
-      elevation: 2,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      child: Padding(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Icon(Icons.category_outlined, color: Theme.of(context).primaryColor),
-                const SizedBox(width: 8),
-                const Text(
-                  'Question Types',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                ),
-              ],
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'Select multiple categories (AI will distribute randomly)',
-              style: TextStyle(fontSize: 13, color: Colors.grey[600]),
-            ),
-            const SizedBox(height: 16),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: _availableCategories.map((category) {
-                final isSelected = _selectedCategories.contains(category);
-                return FilterChip(
-                  label: Text(category),
-                  selected: isSelected,
-                  onSelected: (selected) {
-                    setState(() {
-                      if (selected) {
-                        _selectedCategories.add(category);
-                      } else {
-                        // Keep at least one category selected
-                        if (_selectedCategories.length > 1) {
-                          _selectedCategories.remove(category);
-                        }
+    return _buildSectionContainer(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _buildSectionTitle(Icons.category_outlined, 'Question Types'),
+          const SizedBox(height: 8),
+          const Text(
+            'Select categories to focus on (AI will mix them)',
+            style: TextStyle(fontSize: 12, color: _DesignColors.textSecondary),
+          ),
+          const SizedBox(height: 16),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: _availableCategories.map((category) {
+              final isSelected = _selectedCategories.contains(category);
+              return FilterChip(
+                label: Text(category),
+                selected: isSelected,
+                onSelected: (selected) {
+                  setState(() {
+                    if (selected) {
+                      _selectedCategories.add(category);
+                    } else {
+                      if (_selectedCategories.length > 1) {
+                        _selectedCategories.remove(category);
                       }
-                    });
-                  },
-                  selectedColor: const Color(0xFF8B5CF6),
-                  labelStyle: TextStyle(
-                    color: isSelected ? Colors.white : Colors.black87,
-                    fontSize: 12,
+                    }
+                  });
+                },
+                selectedColor: _DesignColors.primary.withOpacity(0.1),
+                backgroundColor: _DesignColors.background,
+                checkmarkColor: _DesignColors.primary,
+                labelStyle: TextStyle(
+                  color: isSelected ? _DesignColors.primary : _DesignColors.textSecondary,
+                  fontSize: 12,
+                  fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                ),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                  side: BorderSide(
+                    color: isSelected ? _DesignColors.primary : Colors.transparent,
                   ),
-                  checkmarkColor: Colors.white,
-                );
-              }).toList(),
-            ),
-          ],
-        ),
+                ),
+              );
+            }).toList(),
+          ),
+        ],
       ),
     );
   }
@@ -599,70 +664,68 @@ class _InterviewSetupPageState extends State<InterviewSetupPage> {
         ? (_customJobController.text.trim().isEmpty ? 'Not entered' : _customJobController.text.trim())
         : (_selectedJobTitle ?? 'Not selected');
 
-    return Card(
-      margin: const EdgeInsets.all(16),
-      elevation: 3,
-      color: const Color(0xFFF3F4F6),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      child: Padding(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                const Icon(Icons.summarize, color: Color(0xFF8B5CF6)),
-                const SizedBox(width: 8),
-                const Text(
-                  'Summary',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                ),
-              ],
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 20),
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: _DesignColors.primary.withOpacity(0.1), width: 1.5),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Session Summary',
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
+              color: _DesignColors.textPrimary,
             ),
-            const Divider(height: 24),
-            _buildSummaryRow('Job Title', jobTitle),
-            _buildSummaryRow('Difficulty', _difficultyLevel),
-            _buildSummaryRow('Duration', '${_sessionDuration.toInt()} minutes'),
-            _buildSummaryRow('Questions', '${_numQuestions.toInt()}'),
-            _buildSummaryRow(
-              'Categories',
-              _selectedCategories.join(', '),
-              isLast: true,
-            ),
-          ],
-        ),
+          ),
+          const SizedBox(height: 16),
+          _buildSummaryRow('Job Title', jobTitle),
+          _buildSummaryRow('Difficulty', _difficultyLevel),
+          _buildSummaryRow('Format', '${_numQuestions.toInt()} Questions / ${_sessionDuration.toInt()} Mins'),
+          _buildSummaryRow(
+            'Focus',
+            _selectedCategories.join(', '),
+            isLast: true,
+          ),
+        ],
       ),
     );
   }
 
   Widget _buildSummaryRow(String label, String value, {bool isLast = false}) {
-    return Column(
-      children: [
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            SizedBox(
-              width: 100,
-              child: Text(
-                label,
-                style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+    return Padding(
+      padding: EdgeInsets.only(bottom: isLast ? 0 : 12),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 100,
+            child: Text(
+              label,
+              style: const TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+                color: _DesignColors.textSecondary,
               ),
             ),
-            const Text(': ', style: TextStyle(fontWeight: FontWeight.w600)),
-            Expanded(
-              child: Text(
-                value,
-                style: TextStyle(fontSize: 14, color: Colors.grey[700]),
+          ),
+          Expanded(
+            child: Text(
+              value,
+              style: const TextStyle(
+                fontSize: 13,
+                color: _DesignColors.textPrimary,
+                fontWeight: FontWeight.w500,
               ),
             ),
-          ],
-        ),
-        if (!isLast) ...[
-          const SizedBox(height: 12),
-          Divider(color: Colors.grey[300], height: 1),
-          const SizedBox(height: 12),
+          ),
         ],
-      ],
+      ),
     );
   }
 
@@ -670,21 +733,27 @@ class _InterviewSetupPageState extends State<InterviewSetupPage> {
     final isValid = _isFormValid();
 
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
+      padding: const EdgeInsets.symmetric(horizontal: 20),
       child: SizedBox(
         width: double.infinity,
-        height: 56,
+        height: 52,
         child: ElevatedButton.icon(
           onPressed: isValid ? _startInterview : null,
-          icon: const Icon(Icons.play_arrow, size: 24),
+          icon: const Icon(Icons.play_arrow_rounded, color: Colors.white),
           label: const Text(
-            'Start Interview Session',
-            style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white),
+            'Start Interview',
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
+              color: Colors.white,
+            ),
           ),
           style: ElevatedButton.styleFrom(
-            backgroundColor: const Color(0xFF8B5CF6),
+            backgroundColor: _DesignColors.primary,
             disabledBackgroundColor: Colors.grey[300],
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
             elevation: isValid ? 4 : 0,
           ),
         ),

@@ -6,6 +6,17 @@ import 'package:path_wise/viewModel/career_view_model.dart';
 import 'package:path_wise/viewModel/profile_view_model.dart';
 import 'package:path_wise/view/roadmap/roadmap_detail_view.dart';
 
+// Defining KYYAP Design Colors locally
+class _DesignColors {
+  static const Color primary = Color(0xFF6C63FF);
+  static const Color background = Color(0xFFF5F7FA);
+  static const Color textPrimary = Color(0xFF2D3436);
+  static const Color textSecondary = Color(0xFF636E72);
+  static const Color warning = Color(0xFFFDCB6E); // KYYAP Warning
+  static const Color error = Color(0xFFD63031);
+  static const Color cardBackground = Colors.white;
+}
+
 /// Screen for creating a new career roadmap
 /// Allows user to select from career suggestions
 class CreateRoadmapView extends StatefulWidget {
@@ -29,9 +40,11 @@ class _CreateRoadmapViewState extends State<CreateRoadmapView> {
   Future<void> _loadExistingRoadmaps() async {
     final viewModel = context.read<CareerRoadmapViewModel>();
     final roadmaps = await viewModel.getAllRoadmaps();
-    setState(() {
-      _existingRoadmaps = roadmaps;
-    });
+    if (mounted) {
+      setState(() {
+        _existingRoadmaps = roadmaps;
+      });
+    }
   }
 
   bool _isRoadmapExists(String jobTitle) {
@@ -49,71 +62,46 @@ class _CreateRoadmapViewState extends State<CreateRoadmapView> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: Container(
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            colors: [Color(0xFF8B5CF6), Color(0xFF3B82F6)],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-          ),
+      backgroundColor: _DesignColors.background,
+      appBar: AppBar(
+        backgroundColor: _DesignColors.background,
+        elevation: 0,
+        centerTitle: true,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back, color: _DesignColors.textPrimary),
+          onPressed: () => Navigator.pop(context),
         ),
-        child: SafeArea(
-          child: Column(
-            children: [
-              _buildHeader(),
-              Expanded(
-                child: Container(
-                  decoration: const BoxDecoration(
-                    color: Color(0xFFF8FAFC),
-                    borderRadius: BorderRadius.only(
-                      topLeft: Radius.circular(24),
-                      topRight: Radius.circular(24),
-                    ),
-                  ),
-                  child: _buildBody(),
-                ),
-              ),
-            ],
+        title: const Text(
+          'Create Roadmap',
+          style: TextStyle(
+            fontSize: 20,
+            fontWeight: FontWeight.bold,
+            color: _DesignColors.textPrimary,
           ),
         ),
       ),
-    );
-  }
-
-  Widget _buildHeader() {
-    return Padding(
-      padding: const EdgeInsets.all(20),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              IconButton(
-                icon: const Icon(Icons.arrow_back, color: Colors.white),
-                onPressed: () => Navigator.pop(context),
-              ),
-              const Text(
-                'Create Career Roadmap',
+      body: SafeArea(
+        child: Column(
+          children: [
+            // Sub-header / Description
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+              child: Text(
+                'Choose a career path from your AI suggestions to generate a personalized roadmap.',
+                textAlign: TextAlign.center,
                 style: TextStyle(
-                  fontSize: 24,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.white,
+                  fontSize: 14,
+                  color: _DesignColors.textSecondary.withOpacity(0.8),
                 ),
               ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          const Padding(
-            padding: EdgeInsets.only(left: 48),
-            child: Text(
-              'Choose a career path from your suggestions',
-              style: TextStyle(
-                fontSize: 14,
-                color: Colors.white70,
-              ),
             ),
-          ),
-        ],
+            const SizedBox(height: 8),
+
+            Expanded(
+              child: _buildBody(),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -122,7 +110,11 @@ class _CreateRoadmapViewState extends State<CreateRoadmapView> {
     return Consumer<CareerViewModel>(
       builder: (context, careerVM, _) {
         if (careerVM.isLoading) {
-          return const Center(child: CircularProgressIndicator());
+          return const Center(
+            child: CircularProgressIndicator(
+              valueColor: AlwaysStoppedAnimation<Color>(_DesignColors.primary),
+            ),
+          );
         }
 
         if (!careerVM.hasLatestSuggestion) {
@@ -132,22 +124,27 @@ class _CreateRoadmapViewState extends State<CreateRoadmapView> {
         return Column(
           children: [
             _buildProfileUpdateWarning(),
+
             Expanded(
               child: ListView(
-                padding: const EdgeInsets.all(16),
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
                 children: [
-                  const Text(
-                    'Select a Career Path',
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                      color: Color(0xFF1E293B),
+                  const Padding(
+                    padding: EdgeInsets.only(bottom: 16, left: 4),
+                    child: Text(
+                      'Suggested Career Paths',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: _DesignColors.textPrimary,
+                      ),
                     ),
                   ),
-                  const SizedBox(height: 16),
                   ...careerVM.latestSuggestion!.matches.map((match) {
                     return _buildCareerSuggestionCard(match.jobTitle);
                   }).toList(),
+                  // Add extra padding at bottom so FAB/Button doesn't cover content
+                  const SizedBox(height: 80),
                 ],
               ),
             ),
@@ -172,18 +169,18 @@ class _CreateRoadmapViewState extends State<CreateRoadmapView> {
         if (monthsAgo <= 4) return const SizedBox.shrink();
 
         return Container(
-          margin: const EdgeInsets.all(16),
+          margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            color: const Color(0xFFFEF3C7),
+            color: _DesignColors.warning.withOpacity(0.15),
             borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: const Color(0xFFF59E0B)),
+            border: Border.all(color: _DesignColors.warning),
           ),
           child: Row(
             children: [
               const Icon(
                 Icons.warning_amber_rounded,
-                color: Color(0xFFF59E0B),
+                color: Color(0xFFE67E22), // Darker orange for icon visibility
                 size: 24,
               ),
               const SizedBox(width: 12),
@@ -195,15 +192,16 @@ class _CreateRoadmapViewState extends State<CreateRoadmapView> {
                       'Profile Update Recommended',
                       style: TextStyle(
                         fontWeight: FontWeight.bold,
-                        color: Color(0xFF92400E),
+                        color: Color(0xFFD35400),
+                        fontSize: 14,
                       ),
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      'Last updated $monthsAgo months ago. Update your profile for more accurate recommendations.',
+                      'Last updated $monthsAgo months ago. Update for better accuracy.',
                       style: const TextStyle(
                         fontSize: 12,
-                        color: Color(0xFF92400E),
+                        color: Color(0xFFD35400),
                       ),
                     ),
                   ],
@@ -214,17 +212,15 @@ class _CreateRoadmapViewState extends State<CreateRoadmapView> {
                   // Navigate to profile update
                 },
                 style: TextButton.styleFrom(
-                  backgroundColor: const Color(0xFFF59E0B),
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 8,
-                  ),
+                  padding: const EdgeInsets.symmetric(horizontal: 8),
+                  minimumSize: const Size(60, 36),
                 ),
                 child: const Text(
                   'Update',
                   style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 12,
+                    color: Color(0xFFE67E22),
+                    fontWeight: FontWeight.bold,
+                    fontSize: 13,
                   ),
                 ),
               ),
@@ -242,50 +238,44 @@ class _CreateRoadmapViewState extends State<CreateRoadmapView> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Container(
-              padding: const EdgeInsets.all(24),
-              decoration: BoxDecoration(
-                color: const Color(0xFFEDE9FE),
-                borderRadius: BorderRadius.circular(20),
-              ),
-              child: const Icon(
-                Icons.lightbulb_outline,
-                size: 80,
-                color: Color(0xFF8B5CF6),
-              ),
+            Icon(
+              Icons.lightbulb_outline,
+              size: 80,
+              color: Colors.grey[300],
             ),
             const SizedBox(height: 24),
             const Text(
               'No Career Suggestions',
               style: TextStyle(
-                fontSize: 22,
+                fontSize: 20,
                 fontWeight: FontWeight.bold,
-                color: Color(0xFF1E293B),
+                color: _DesignColors.textPrimary,
               ),
             ),
             const SizedBox(height: 12),
             Text(
-              'You need to generate career suggestions first\nbefore creating a roadmap',
+              'Generate career suggestions in the Career tab first to create a roadmap.',
               textAlign: TextAlign.center,
               style: TextStyle(
                 fontSize: 14,
-                color: Colors.grey[600],
+                color: _DesignColors.textSecondary.withOpacity(0.8),
                 height: 1.5,
               ),
             ),
             const SizedBox(height: 32),
             ElevatedButton.icon(
               onPressed: () => Navigator.pop(context),
-              icon: const Icon(Icons.arrow_back),
-              label: const Text('Go to Career Suggestions'),
+              icon: const Icon(Icons.arrow_back, size: 20),
+              label: const Text('Go Back'),
               style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF8B5CF6),
+                backgroundColor: _DesignColors.primary,
+                foregroundColor: Colors.white,
                 padding: const EdgeInsets.symmetric(
                   horizontal: 24,
-                  vertical: 16,
+                  vertical: 12,
                 ),
                 shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(25),
                 ),
               ),
             ),
@@ -299,19 +289,21 @@ class _CreateRoadmapViewState extends State<CreateRoadmapView> {
     final isSelected = _selectedJobTitle == jobTitle;
     final exists = _isRoadmapExists(jobTitle);
 
-    return Card(
+    return Container(
       margin: const EdgeInsets.only(bottom: 12),
-      elevation: isSelected ? 4 : 1,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-        side: BorderSide(
-          color: isSelected
-              ? const Color(0xFF8B5CF6)
-              : exists
-              ? Colors.orange
-              : Colors.transparent,
-          width: 2,
-        ),
+      decoration: BoxDecoration(
+        color: _DesignColors.cardBackground,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+        border: isSelected
+            ? Border.all(color: _DesignColors.primary, width: 2)
+            : Border.all(color: Colors.transparent, width: 2),
       ),
       child: InkWell(
         onTap: () {
@@ -323,48 +315,55 @@ class _CreateRoadmapViewState extends State<CreateRoadmapView> {
             });
           }
         },
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(16),
         child: Padding(
           padding: const EdgeInsets.all(16),
           child: Row(
             children: [
+              // Icon Container
               Container(
-                padding: const EdgeInsets.all(8),
+                padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
                   color: isSelected
-                      ? const Color(0xFF8B5CF6)
+                      ? _DesignColors.primary
                       : exists
-                      ? Colors.orange
-                      : const Color(0xFFEDE9FE),
-                  borderRadius: BorderRadius.circular(8),
+                      ? Colors.orange.withOpacity(0.1)
+                      : _DesignColors.primary.withOpacity(0.1),
+                  shape: BoxShape.circle,
                 ),
                 child: Icon(
                   isSelected
-                      ? Icons.check_circle
+                      ? Icons.check
                       : exists
-                      ? Icons.error_outline
+                      ? Icons.priority_high
                       : Icons.work_outline,
-                  color: isSelected || exists ? Colors.white : const Color(0xFF8B5CF6),
-                  size: 24,
+                  color: isSelected
+                      ? Colors.white
+                      : exists
+                      ? Colors.orange
+                      : _DesignColors.primary,
+                  size: 20,
                 ),
               ),
-              const SizedBox(width: 12),
+              const SizedBox(width: 16),
+
+              // Text Info
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
                       jobTitle,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.bold,
-                        color: Color(0xFF1E293B),
+                        color: isSelected ? _DesignColors.primary : _DesignColors.textPrimary,
                       ),
                     ),
                     if (exists) ...[
                       const SizedBox(height: 4),
                       const Text(
-                        'Roadmap already exists',
+                        'Roadmap already created',
                         style: TextStyle(
                           fontSize: 12,
                           color: Colors.orange,
@@ -375,11 +374,6 @@ class _CreateRoadmapViewState extends State<CreateRoadmapView> {
                   ],
                 ),
               ),
-              if (isSelected)
-                const Icon(
-                  Icons.arrow_forward,
-                  color: Color(0xFF8B5CF6),
-                ),
             ],
           ),
         ),
@@ -389,35 +383,39 @@ class _CreateRoadmapViewState extends State<CreateRoadmapView> {
 
   Widget _buildGenerateButton() {
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         color: Colors.white,
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 10,
+            color: Colors.black.withOpacity(0.08),
+            blurRadius: 15,
             offset: const Offset(0, -5),
           ),
         ],
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
       ),
       child: SafeArea(
         child: SizedBox(
           width: double.infinity,
+          height: 50,
           child: ElevatedButton(
             onPressed: _isLoading ? null : _generateRoadmap,
             style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF8B5CF6),
-              padding: const EdgeInsets.symmetric(vertical: 16),
+              backgroundColor: _DesignColors.primary,
+              foregroundColor: Colors.white,
+              elevation: 0,
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(12),
               ),
+              padding: const EdgeInsets.symmetric(vertical: 0), // Height controlled by SizedBox
             ),
             child: _isLoading
                 ? const SizedBox(
-              height: 20,
-              width: 20,
+              height: 24,
+              width: 24,
               child: CircularProgressIndicator(
-                strokeWidth: 2,
+                strokeWidth: 2.5,
                 valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
               ),
             )
@@ -442,28 +440,27 @@ class _CreateRoadmapViewState extends State<CreateRoadmapView> {
     final roadmapVM = context.read<CareerRoadmapViewModel>();
     final profileVM = context.read<ProfileViewModel>();
 
-    // Show M6: Analyzing Skills
-    _showLoadingDialog('Analyzing your skills and generating roadmap...');
+    // Show clean loading dialog
+    _showLoadingDialog('Analyzing skills & generating roadmap...');
 
     final success = await roadmapVM.generateCareerRoadmap(
       jobTitle: _selectedJobTitle!,
       profileViewModel: profileVM,
     );
 
-    Navigator.pop(context); // Close loading dialog
+    if (mounted) Navigator.pop(context); // Close loading dialog
 
     setState(() => _isLoading = false);
 
     if (success && mounted) {
-      // Show success message
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(roadmapVM.successMessage ?? 'Roadmap generated successfully!'),
-          backgroundColor: Colors.green,
+          backgroundColor: const Color(0xFF00B894), // Success Green
+          behavior: SnackBarBehavior.floating,
         ),
       );
 
-      // Navigate to roadmap detail view
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(
@@ -471,11 +468,11 @@ class _CreateRoadmapViewState extends State<CreateRoadmapView> {
         ),
       );
     } else if (mounted) {
-      // Show error message
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(roadmapVM.errorMessage ?? 'Failed to generate roadmap'),
-          backgroundColor: Colors.red,
+          backgroundColor: _DesignColors.error,
+          behavior: SnackBarBehavior.floating,
         ),
       );
     }
@@ -485,18 +482,28 @@ class _CreateRoadmapViewState extends State<CreateRoadmapView> {
     showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (context) => AlertDialog(
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const CircularProgressIndicator(),
-            const SizedBox(height: 16),
-            Text(
-              message,
-              textAlign: TextAlign.center,
-              style: const TextStyle(fontSize: 14),
-            ),
-          ],
+      builder: (context) => Dialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const CircularProgressIndicator(
+                valueColor: AlwaysStoppedAnimation<Color>(_DesignColors.primary),
+              ),
+              const SizedBox(height: 20),
+              Text(
+                message,
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  fontSize: 15,
+                  color: _DesignColors.textPrimary,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -508,28 +515,28 @@ class _CreateRoadmapViewState extends State<CreateRoadmapView> {
     final action = await showDialog<String>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Roadmap Already Exists'),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text('Roadmap Exists'),
         content: Text(
-          'A career roadmap for "$jobTitle" already exists. Would you like to view it or delete and create a new one?',
+          'A roadmap for "$jobTitle" already exists. What would you like to do?',
+          style: const TextStyle(color: _DesignColors.textSecondary),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
+            child: const Text('Cancel', style: TextStyle(color: _DesignColors.textSecondary)),
           ),
           TextButton(
             onPressed: () => Navigator.pop(context, 'delete'),
-            style: TextButton.styleFrom(
-              foregroundColor: Colors.red,
-            ),
-            child: const Text('Delete & Create New'),
+            child: const Text('Delete & New', style: TextStyle(color: _DesignColors.error)),
           ),
           ElevatedButton(
             onPressed: () => Navigator.pop(context, 'view'),
             style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF8B5CF6),
+              backgroundColor: _DesignColors.primary,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
             ),
-            child: const Text('View Existing'),
+            child: const Text('View Existing', style: TextStyle(color: Colors.white)),
           ),
         ],
       ),
@@ -544,12 +551,9 @@ class _CreateRoadmapViewState extends State<CreateRoadmapView> {
 
   Future<void> _viewExistingRoadmap(String roadmapId) async {
     final viewModel = context.read<CareerRoadmapViewModel>();
-
     _showLoadingDialog('Loading roadmap...');
-
     final success = await viewModel.loadRoadmapById(roadmapId);
-
-    Navigator.pop(context); // Close loading
+    if (mounted) Navigator.pop(context);
 
     if (success && mounted) {
       Navigator.pushReplacement(
@@ -564,24 +568,22 @@ class _CreateRoadmapViewState extends State<CreateRoadmapView> {
   Future<void> _deleteAndSelectRoadmap(String roadmapId, String jobTitle) async {
     final viewModel = context.read<CareerRoadmapViewModel>();
 
-    // Load and delete the existing roadmap
+    // Load and delete
     await viewModel.loadRoadmapById(roadmapId);
     final success = await viewModel.deleteCurrentRoadmap();
 
     if (success) {
-      // Reload existing roadmaps
       await _loadExistingRoadmaps();
+      if(mounted) {
+        setState(() {
+          _selectedJobTitle = jobTitle;
+        });
 
-      // Select this job title
-      setState(() {
-        _selectedJobTitle = jobTitle;
-      });
-
-      if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Previous roadmap deleted. You can now create a new one.'),
-            backgroundColor: Colors.green,
+            backgroundColor: Color(0xFF00B894),
+            behavior: SnackBarBehavior.floating,
           ),
         );
       }

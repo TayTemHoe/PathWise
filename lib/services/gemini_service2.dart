@@ -9,7 +9,7 @@ import 'package:path_wise/model/user_profile.dart';
 import 'package:path_wise/viewModel/profile_view_model.dart';
 
 class AiService {
-  final String apiKey = 'AIzaSyDIyRw4MEfeE0cTJ80tXB6_5RurcTVj2Go';
+  final String apiKey = 'AIzaSyDOmbENlNrvNacS9fCbUqD9PSyEhilP9Ss';
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
   // Correct Gemini API endpoint

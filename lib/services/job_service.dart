@@ -5,7 +5,7 @@ import 'package:flutter/foundation.dart';
 import 'package:path_wise/model/job_models.dart';
 
 class JobService {
-  final String apiKey = 'cbfdb0b43emsh0b6a5cfa8235903p1b0a25jsnefb054e0d52c';
+  final String apiKey = 'f2d1f59c5cmsh20bf9b01cf6ae7cp1ab00ajsn7ba5f1714182';
   final String apiHost = 'jsearch.p.rapidapi.com';
   final String searchEndpoint = 'https://jsearch.p.rapidapi.com/search';
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
@@ -75,7 +75,7 @@ class JobService {
     String? query,
     String? country,
     String? datePosted,
-    int page = 3,
+    int page = 2,
   }) async {
     try {
       // Build query parameters

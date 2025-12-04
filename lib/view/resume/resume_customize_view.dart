@@ -6,6 +6,19 @@ import 'package:path_wise/viewModel/profile_view_model.dart';
 import 'package:path_wise/model/resume_model.dart';
 import 'package:path_wise/view/resume/resume_preview_view.dart';
 
+// Defining KYYAP Design Colors locally
+class _DesignColors {
+  static const Color primary = Color(0xFF6C63FF);
+  static const Color background = Color(0xFFF5F7FA);
+  static const Color textPrimary = Color(0xFF2D3436);
+  static const Color textSecondary = Color(0xFF636E72);
+  static const Color cardBackground = Colors.white;
+  static const Color success = Color(0xFF00B894);
+  static const Color error = Color(0xFFD63031);
+  static const Color warning = Color(0xFFFDCB6E);
+  static Color shadow = Colors.black.withOpacity(0.08);
+}
+
 class CustomizeResumePage extends StatefulWidget {
   final ResumeDoc? resume;
   final bool isEditing;
@@ -112,91 +125,100 @@ class _CustomizeResumePageState extends State<CustomizeResumePage>
     super.dispose();
   }
 
+  /// Handle back navigation confirmation
+  Future<bool> _onWillPop() async {
+    final shouldPop = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text('Unsaved Changes'),
+        content: const Text(
+          'If you exit now, your resume will be lost. Do you want to save first?',
+          style: TextStyle(color: _DesignColors.textSecondary),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(true), // Return true to pop (Continue)
+            child: const Text('Continue', style: TextStyle(color: _DesignColors.textSecondary)),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.of(context).pop(false); // Close dialog
+              _saveResume(); // Trigger Save
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: _DesignColors.primary,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            ),
+            child: const Text('Save', style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+
+    return shouldPop ?? false;
+  }
+
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      body: Container(
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [Color(0xFF7C3AED), Color(0xFF9F7AEA)],
+    return WillPopScope(
+      onWillPop: _onWillPop,
+      child: Scaffold(
+        backgroundColor: _DesignColors.background,
+        appBar: AppBar(
+          backgroundColor: _DesignColors.background,
+          elevation: 0,
+          centerTitle: true,
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back, color: _DesignColors.textPrimary),
+            onPressed: () async {
+              if (await _onWillPop()) {
+                if (mounted) Navigator.pop(context);
+              }
+            },
           ),
-        ),
-        child: SafeArea(
-          child: Column(
+          title: Column(
             children: [
-              _buildHeader(),
-              Expanded(
-                child: Container(
-                  decoration: const BoxDecoration(
-                    color: Color(0xFFF5F5F5),
-                    borderRadius: BorderRadius.only(
-                      topLeft: Radius.circular(30),
-                      topRight: Radius.circular(30),
-                    ),
-                  ),
-                  child: Column(
-                    children: [
-                      const SizedBox(height: 20),
-                      _buildTabBar(),
-                      Expanded(
-                        child: TabBarView(
-                          controller: _tabController,
-                          children: [
-                            _buildSectionsTab(),
-                            _buildContentTab(),
-                            _buildTypographyTab(),
-                            _buildColorsTab(),
-                          ],
-                        ),
-                      ),
-                      _buildActionButtons(),
-                    ],
-                  ),
+              const Text(
+                'Customize Resume',
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                  color: _DesignColors.textPrimary,
+                ),
+              ),
+              Text(
+                _getTemplateName(_selectedTemplate),
+                style: const TextStyle(
+                  fontSize: 12,
+                  color: _DesignColors.textSecondary,
+                  fontWeight: FontWeight.normal,
                 ),
               ),
             ],
           ),
         ),
-      ),
-    );
-  }
-
-  Widget _buildHeader() {
-    return Padding(
-      padding: const EdgeInsets.all(20),
-      child: Row(
-        children: [
-          IconButton(
-            icon: const Icon(Icons.arrow_back, color: Colors.white),
-            onPressed: () => Navigator.pop(context),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'Customize Resume',
-                  style: TextStyle(
-                    fontSize: 24,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.white,
-                  ),
+        body: SafeArea(
+          child: Column(
+            children: [
+              const SizedBox(height: 10),
+              _buildTabBar(),
+              const SizedBox(height: 10),
+              Expanded(
+                child: TabBarView(
+                  controller: _tabController,
+                  children: [
+                    _buildSectionsTab(),
+                    _buildContentTab(),
+                    _buildTypographyTab(),
+                    _buildColorsTab(),
+                  ],
                 ),
-                const SizedBox(height: 4),
-                Text(
-                  _getTemplateName(_selectedTemplate),
-                  style: const TextStyle(
-                    fontSize: 13,
-                    color: Colors.white70,
-                  ),
-                ),
-              ],
-            ),
+              ),
+              _buildActionButtons(),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }
@@ -207,25 +229,38 @@ class _CustomizeResumePageState extends State<CustomizeResumePage>
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: _DesignColors.shadow,
+            blurRadius: 4,
+            offset: const Offset(0, 2),
+          ),
+        ],
       ),
       child: TabBar(
         controller: _tabController,
         indicator: BoxDecoration(
-          borderRadius: BorderRadius.circular(10),
-          color: const Color(0xFF7C3AED),
+          borderRadius: BorderRadius.circular(12),
+          color: _DesignColors.primary.withOpacity(0.1),
+          border: Border.all(color: _DesignColors.primary.withOpacity(0.2)),
         ),
-        labelColor: Colors.white,
-        unselectedLabelColor: const Color(0xFF6B7280),
+        indicatorSize: TabBarIndicatorSize.tab,
+        labelColor: _DesignColors.primary,
+        unselectedLabelColor: _DesignColors.textSecondary,
         labelStyle: const TextStyle(
-          fontSize: 11,
-          fontWeight: FontWeight.w600,
+          fontSize: 12,
+          fontWeight: FontWeight.bold,
         ),
-        isScrollable: false,
+        unselectedLabelStyle: const TextStyle(
+          fontSize: 12,
+          fontWeight: FontWeight.w500,
+        ),
+        padding: const EdgeInsets.all(4),
         tabs: const [
-          Tab(icon: Icon(Icons.view_agenda, size: 18), text: 'Sections'),
-          Tab(icon: Icon(Icons.edit_note, size: 18), text: 'Content'),
-          Tab(icon: Icon(Icons.text_fields, size: 18), text: 'Fonts'),
-          Tab(icon: Icon(Icons.palette, size: 18), text: 'Colors'),
+          Tab(icon: Icon(Icons.view_agenda_outlined, size: 20), text: 'Sections'),
+          Tab(icon: Icon(Icons.edit_note_outlined, size: 20), text: 'Content'),
+          Tab(icon: Icon(Icons.text_fields_outlined, size: 20), text: 'Fonts'),
+          Tab(icon: Icon(Icons.palette_outlined, size: 20), text: 'Colors'),
         ],
       ),
     );
@@ -238,54 +273,25 @@ class _CustomizeResumePageState extends State<CustomizeResumePage>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
-            'Resume Title',
-            style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.bold,
-              color: Color(0xFF1F2937),
-            ),
-          ),
-          const SizedBox(height: 12),
-          TextField(
+          _buildInputLabel('Resume Title'),
+          const SizedBox(height: 8),
+          _buildTextField(
             controller: _titleController,
-            decoration: InputDecoration(
-              hintText: 'e.g., Software Engineer Resume',
-              filled: true,
-              fillColor: Colors.white,
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-                borderSide: BorderSide.none,
-              ),
-              prefixIcon: const Icon(Icons.title),
-            ),
+            hint: 'e.g., Software Engineer Resume',
+            icon: Icons.title,
           ),
           const SizedBox(height: 24),
-          const Text(
-            'Choose Template',
-            style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.bold,
-              color: Color(0xFF1F2937),
-            ),
-          ),
+          _buildInputLabel('Choose Template'),
           const SizedBox(height: 12),
           _buildTemplateSelector(),
           const SizedBox(height: 24),
+          _buildInputLabel('Resume Sections'),
+          const SizedBox(height: 4),
           const Text(
-            'Resume Sections',
-            style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.bold,
-              color: Color(0xFF1F2937),
-            ),
-          ),
-          const SizedBox(height: 8),
-          const Text(
-            'Required sections are always included',
+            'Toggle sections you want to include',
             style: TextStyle(
               fontSize: 13,
-              color: Color(0xFF6B7280),
+              color: _DesignColors.textSecondary,
             ),
           ),
           const SizedBox(height: 12),
@@ -341,36 +347,44 @@ class _CustomizeResumePageState extends State<CustomizeResumePage>
       onTap: () => setState(() => _selectedTemplate = type),
       child: Container(
         decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(12),
+          color: _DesignColors.cardBackground,
+          borderRadius: BorderRadius.circular(16),
           border: Border.all(
-            color: isSelected ? color : Colors.transparent,
+            color: isSelected ? _DesignColors.primary : Colors.transparent,
             width: 2,
           ),
+          boxShadow: [
+            BoxShadow(
+              color: isSelected ? _DesignColors.primary.withOpacity(0.1) : _DesignColors.shadow,
+              blurRadius: 8,
+              offset: const Offset(0, 4),
+            ),
+          ],
         ),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(icon, size: 32, color: isSelected ? color : Colors.grey),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: (isSelected ? _DesignColors.primary : color).withOpacity(0.1),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                  icon,
+                  size: 24,
+                  color: isSelected ? _DesignColors.primary : color
+              ),
+            ),
             const SizedBox(height: 8),
             Text(
               name,
               style: TextStyle(
                 fontSize: 13,
-                fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                color: isSelected ? color : Colors.grey[700],
+                fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+                color: isSelected ? _DesignColors.primary : _DesignColors.textPrimary,
               ),
             ),
-            if (isSelected)
-              Container(
-                margin: const EdgeInsets.only(top: 4),
-                width: 6,
-                height: 6,
-                decoration: BoxDecoration(
-                  color: color,
-                  shape: BoxShape.circle,
-                ),
-              ),
           ],
         ),
       ),
@@ -380,8 +394,15 @@ class _CustomizeResumePageState extends State<CustomizeResumePage>
   Widget _buildSectionToggles() {
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
+        color: _DesignColors.cardBackground,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: _DesignColors.shadow,
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
       ),
       child: Column(
         children: [
@@ -441,7 +462,7 @@ class _CustomizeResumePageState extends State<CustomizeResumePage>
       decoration: BoxDecoration(
         border: isLast
             ? null
-            : const Border(bottom: BorderSide(color: Color(0xFFE5E7EB))),
+            : Border(bottom: BorderSide(color: Colors.grey.withOpacity(0.1))),
       ),
       child: SwitchListTile(
         value: value,
@@ -453,6 +474,7 @@ class _CustomizeResumePageState extends State<CustomizeResumePage>
               style: const TextStyle(
                 fontSize: 14,
                 fontWeight: FontWeight.w500,
+                color: _DesignColors.textPrimary,
               ),
             ),
             if (required) ...[
@@ -460,22 +482,23 @@ class _CustomizeResumePageState extends State<CustomizeResumePage>
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                 decoration: BoxDecoration(
-                  color: Colors.red[50],
+                  color: _DesignColors.error.withOpacity(0.1),
                   borderRadius: BorderRadius.circular(4),
                 ),
                 child: const Text(
                   'Required',
                   style: TextStyle(
-                    fontSize: 9,
-                    color: Colors.red,
-                    fontWeight: FontWeight.w600,
+                    fontSize: 10,
+                    color: _DesignColors.error,
+                    fontWeight: FontWeight.bold,
                   ),
                 ),
               ),
             ],
           ],
         ),
-        activeColor: const Color(0xFF7C3AED),
+        activeColor: _DesignColors.primary,
+        activeTrackColor: _DesignColors.primary.withOpacity(0.2),
       ),
     );
   }
@@ -488,32 +511,17 @@ class _CustomizeResumePageState extends State<CustomizeResumePage>
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           if (_sections.aboutMe) ...[
-            const Text(
-              'About Me / Professional Summary',
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.bold,
-                color: Color(0xFF1F2937),
-              ),
-            ),
+            _buildInputLabel('About Me / Professional Summary'),
             const SizedBox(height: 8),
             const Text(
               'Write a brief summary about yourself (2-3 sentences)',
-              style: TextStyle(fontSize: 12, color: Color(0xFF6B7280)),
+              style: TextStyle(fontSize: 12, color: _DesignColors.textSecondary),
             ),
             const SizedBox(height: 12),
-            TextField(
+            _buildTextField(
               controller: _aboutMeController,
+              hint: 'e.g., Passionate software engineer with 3+ years...',
               maxLines: 5,
-              decoration: InputDecoration(
-                hintText: 'e.g., Passionate software engineer with 3+ years...',
-                filled: true,
-                fillColor: Colors.white,
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide.none,
-                ),
-              ),
             ),
             const SizedBox(height: 24),
           ],
@@ -521,20 +529,13 @@ class _CustomizeResumePageState extends State<CustomizeResumePage>
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                const Text(
-                  'References',
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                    color: Color(0xFF1F2937),
-                  ),
-                ),
+                _buildInputLabel('References'),
                 TextButton.icon(
                   onPressed: _addReference,
                   icon: const Icon(Icons.add, size: 18),
                   label: const Text('Add'),
                   style: TextButton.styleFrom(
-                    foregroundColor: const Color(0xFF7C3AED),
+                    foregroundColor: _DesignColors.primary,
                   ),
                 ),
               ],
@@ -550,16 +551,22 @@ class _CustomizeResumePageState extends State<CustomizeResumePage>
   Widget _buildReferencesList() {
     if (_referenceControllers.isEmpty) {
       return Container(
-        padding: const EdgeInsets.all(24),
+        padding: const EdgeInsets.all(32),
+        width: double.infinity,
         decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(12),
+          color: _DesignColors.cardBackground,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: Colors.grey.withOpacity(0.2)),
         ),
-        child: const Center(
-          child: Text(
-            'No references added yet',
-            style: TextStyle(color: Color(0xFF6B7280)),
-          ),
+        child: Column(
+          children: [
+            Icon(Icons.people_outline, size: 48, color: Colors.grey[300]),
+            const SizedBox(height: 16),
+            const Text(
+              'No references added yet',
+              style: TextStyle(color: _DesignColors.textSecondary),
+            ),
+          ],
         ),
       );
     }
@@ -574,11 +581,18 @@ class _CustomizeResumePageState extends State<CustomizeResumePage>
   Widget _buildReferenceCard(int index) {
     final controllers = _referenceControllers[index];
     return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(16),
+      margin: const EdgeInsets.only(bottom: 16),
+      padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
+        color: _DesignColors.cardBackground,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: _DesignColors.shadow,
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -591,59 +605,33 @@ class _CustomizeResumePageState extends State<CustomizeResumePage>
                 style: const TextStyle(
                   fontSize: 14,
                   fontWeight: FontWeight.bold,
+                  color: _DesignColors.textPrimary,
                 ),
               ),
               IconButton(
-                icon: const Icon(Icons.delete, size: 20),
-                color: Colors.red,
+                icon: const Icon(Icons.delete_outline, size: 20),
+                color: _DesignColors.error,
                 onPressed: () => _removeReference(index),
               ),
             ],
           ),
-          const SizedBox(height: 12),
-          TextField(
-            controller: controllers['name'],
-            decoration: InputDecoration(
-              labelText: 'Name',
-              hintText: 'e.g., Dr. John Smith',
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(8),
-              ),
-              contentPadding: const EdgeInsets.symmetric(
-                horizontal: 12,
-                vertical: 12,
-              ),
-            ),
+          const SizedBox(height: 16),
+          _buildTextField(
+            controller: controllers['name']!,
+            label: 'Name',
+            hint: 'e.g., Dr. John Smith',
           ),
           const SizedBox(height: 12),
-          TextField(
-            controller: controllers['position'],
-            decoration: InputDecoration(
-              labelText: 'Position / Title',
-              hintText: 'e.g., Senior Lecturer at UTAR',
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(8),
-              ),
-              contentPadding: const EdgeInsets.symmetric(
-                horizontal: 12,
-                vertical: 12,
-              ),
-            ),
+          _buildTextField(
+            controller: controllers['position']!,
+            label: 'Position / Title',
+            hint: 'e.g., Senior Lecturer at UTAR',
           ),
           const SizedBox(height: 12),
-          TextField(
-            controller: controllers['contact'],
-            decoration: InputDecoration(
-              labelText: 'Contact (Email/Phone)',
-              hintText: 'e.g., john@example.com',
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(8),
-              ),
-              contentPadding: const EdgeInsets.symmetric(
-                horizontal: 12,
-                vertical: 12,
-              ),
-            ),
+          _buildTextField(
+            controller: controllers['contact']!,
+            label: 'Contact (Email/Phone)',
+            hint: 'e.g., john@example.com',
           ),
         ],
       ),
@@ -676,14 +664,7 @@ class _CustomizeResumePageState extends State<CustomizeResumePage>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
-            'Font Sizes',
-            style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.bold,
-              color: Color(0xFF1F2937),
-            ),
-          ),
+          _buildInputLabel('Font Sizes'),
           const SizedBox(height: 16),
           _buildFontSizeControl(
             'Header 1 (Name & Job Title)',
@@ -693,7 +674,7 @@ class _CustomizeResumePageState extends State<CustomizeResumePage>
                 (v) =>
                 setState(() => _font = _font.copyWith(header1FontSize: v)),
           ),
-          const SizedBox(height: 20),
+          const SizedBox(height: 16),
           _buildFontSizeControl(
             'Header 2 (Section Titles)',
             _font.header2FontSize,
@@ -702,7 +683,7 @@ class _CustomizeResumePageState extends State<CustomizeResumePage>
                 (v) =>
                 setState(() => _font = _font.copyWith(header2FontSize: v)),
           ),
-          const SizedBox(height: 20),
+          const SizedBox(height: 16),
           _buildFontSizeControl(
             'Content (Body Text)',
             _font.contentFontSize,
@@ -724,8 +705,15 @@ class _CustomizeResumePageState extends State<CustomizeResumePage>
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
+        color: _DesignColors.cardBackground,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: _DesignColors.shadow,
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -739,6 +727,7 @@ class _CustomizeResumePageState extends State<CustomizeResumePage>
                   style: const TextStyle(
                     fontSize: 14,
                     fontWeight: FontWeight.w600,
+                    color: _DesignColors.textPrimary,
                   ),
                 ),
               ),
@@ -746,7 +735,7 @@ class _CustomizeResumePageState extends State<CustomizeResumePage>
                 padding: const EdgeInsets.symmetric(
                     horizontal: 12, vertical: 6),
                 decoration: BoxDecoration(
-                  color: const Color(0xFF7C3AED).withOpacity(0.1),
+                  color: _DesignColors.primary.withOpacity(0.1),
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Text(
@@ -754,7 +743,7 @@ class _CustomizeResumePageState extends State<CustomizeResumePage>
                   style: const TextStyle(
                     fontSize: 14,
                     fontWeight: FontWeight.bold,
-                    color: Color(0xFF7C3AED),
+                    color: _DesignColors.primary,
                   ),
                 ),
               ),
@@ -763,10 +752,11 @@ class _CustomizeResumePageState extends State<CustomizeResumePage>
           const SizedBox(height: 12),
           SliderTheme(
             data: SliderThemeData(
-              activeTrackColor: const Color(0xFF7C3AED),
-              inactiveTrackColor: Colors.grey[300],
-              thumbColor: const Color(0xFF7C3AED),
-              overlayColor: const Color(0xFF7C3AED).withOpacity(0.2),
+              activeTrackColor: _DesignColors.primary,
+              inactiveTrackColor: Colors.grey[200],
+              thumbColor: _DesignColors.primary,
+              overlayColor: _DesignColors.primary.withOpacity(0.2),
+              trackHeight: 4,
             ),
             child: Slider(
               value: value.toDouble(),
@@ -788,18 +778,11 @@ class _CustomizeResumePageState extends State<CustomizeResumePage>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
-            'Color Scheme',
-            style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.bold,
-              color: Color(0xFF1F2937),
-            ),
-          ),
+          _buildInputLabel('Color Scheme'),
           const SizedBox(height: 8),
           const Text(
             'Choose colors for your resume theme',
-            style: TextStyle(fontSize: 12, color: Color(0xFF6B7280)),
+            style: TextStyle(fontSize: 12, color: _DesignColors.textSecondary),
           ),
           const SizedBox(height: 16),
           ..._colorSchemes.map((scheme) => _buildColorSchemeCard(scheme)),
@@ -823,12 +806,19 @@ class _CustomizeResumePageState extends State<CustomizeResumePage>
         margin: const EdgeInsets.only(bottom: 12),
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(12),
+          color: _DesignColors.cardBackground,
+          borderRadius: BorderRadius.circular(16),
           border: Border.all(
-            color: isSelected ? const Color(0xFF7C3AED) : Colors.transparent,
+            color: isSelected ? _DesignColors.primary : Colors.transparent,
             width: 2,
           ),
+          boxShadow: [
+            BoxShadow(
+              color: isSelected ? _DesignColors.primary.withOpacity(0.1) : _DesignColors.shadow,
+              blurRadius: 8,
+              offset: const Offset(0, 4),
+            ),
+          ],
         ),
         child: Row(
           children: [
@@ -839,7 +829,7 @@ class _CustomizeResumePageState extends State<CustomizeResumePage>
                   height: 40,
                   decoration: BoxDecoration(
                     color: _parseColor(scheme['primary']),
-                    borderRadius: BorderRadius.circular(8),
+                    borderRadius: BorderRadius.circular(10),
                   ),
                 ),
                 const SizedBox(width: 8),
@@ -848,7 +838,7 @@ class _CustomizeResumePageState extends State<CustomizeResumePage>
                   height: 40,
                   decoration: BoxDecoration(
                     color: _parseColor(scheme['secondary']),
-                    borderRadius: BorderRadius.circular(8),
+                    borderRadius: BorderRadius.circular(10),
                   ),
                 ),
               ],
@@ -857,16 +847,17 @@ class _CustomizeResumePageState extends State<CustomizeResumePage>
             Expanded(
               child: Text(
                 scheme['name'],
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 14,
                   fontWeight: FontWeight.w600,
+                  color: isSelected ? _DesignColors.primary : _DesignColors.textPrimary,
                 ),
               ),
             ),
             if (isSelected)
               const Icon(
                 Icons.check_circle,
-                color: Color(0xFF7C3AED),
+                color: _DesignColors.primary,
               ),
           ],
         ),
@@ -879,10 +870,10 @@ class _CustomizeResumePageState extends State<CustomizeResumePage>
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: _DesignColors.cardBackground,
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.1),
+            color: _DesignColors.shadow,
             blurRadius: 10,
             offset: const Offset(0, -4),
           ),
@@ -896,7 +887,7 @@ class _CustomizeResumePageState extends State<CustomizeResumePage>
               child: OutlinedButton(
                 onPressed: _previewResume,
                 style: OutlinedButton.styleFrom(
-                  side: const BorderSide(color: Color(0xFF7C3AED)),
+                  side: const BorderSide(color: _DesignColors.primary),
                   padding: const EdgeInsets.symmetric(vertical: 14),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12),
@@ -905,39 +896,31 @@ class _CustomizeResumePageState extends State<CustomizeResumePage>
                 child: const Text(
                   'Preview',
                   style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
-                    color: Color(0xFF7C3AED),
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    color: _DesignColors.primary,
                   ),
                 ),
               ),
             ),
             const SizedBox(width: 12),
             Expanded(
-              child: Container(
-                decoration: BoxDecoration(
-                  gradient: const LinearGradient(
-                    colors: [Color(0xFF7C3AED), Color(0xFF9F7AEA)],
+              child: ElevatedButton(
+                onPressed: _saveResume,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: _DesignColors.primary,
+                  elevation: 0,
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
                   ),
-                  borderRadius: BorderRadius.circular(12),
                 ),
-                child: ElevatedButton(
-                  onPressed: _saveResume,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.transparent,
-                    shadowColor: Colors.transparent,
-                    padding: const EdgeInsets.symmetric(vertical: 14),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                  ),
-                  child: const Text(
-                    'Save Resume',
-                    style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.white
-                    ),
+                child: const Text(
+                  'Save Resume',
+                  style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white
                   ),
                 ),
               ),
@@ -948,7 +931,67 @@ class _CustomizeResumePageState extends State<CustomizeResumePage>
     );
   }
 
-  // ===== HELPER METHODS =====
+  Widget _buildInputLabel(String text) {
+    return Text(
+      text,
+      style: const TextStyle(
+        fontSize: 16,
+        fontWeight: FontWeight.bold,
+        color: _DesignColors.textPrimary,
+      ),
+    );
+  }
+
+  Widget _buildTextField({
+    required TextEditingController controller,
+    String? hint,
+    String? label,
+    IconData? icon,
+    int maxLines = 1,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (label != null) ...[
+          Text(
+            label,
+            style: const TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w500,
+              color: _DesignColors.textPrimary,
+            ),
+          ),
+          const SizedBox(height: 6),
+        ],
+        TextField(
+          controller: controller,
+          maxLines: maxLines,
+          style: const TextStyle(color: _DesignColors.textPrimary),
+          decoration: InputDecoration(
+            hintText: hint,
+            hintStyle: TextStyle(color: Colors.grey[400]),
+            prefixIcon: icon != null ? Icon(icon, color: _DesignColors.primary) : null,
+            filled: true,
+            fillColor: Colors.white,
+            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide(color: Colors.grey[300]!),
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide(color: Colors.grey[300]!),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: const BorderSide(color: _DesignColors.primary, width: 2),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
   Color _parseColor(String hex) {
     final hexColor = hex.replaceAll('#', '');
     final r = int.parse(hexColor.substring(0, 2), radix: 16);
@@ -987,8 +1030,7 @@ class _CustomizeResumePageState extends State<CustomizeResumePage>
 
     final previewResume = ResumeDoc(
       id: widget.resume?.id ?? 'temp',
-      title: _titleController.text.isEmpty ? 'My Resume' : _titleController
-          .text,
+      title: _titleController.text.isEmpty ? 'My Resume' : _titleController.text,
       template: _selectedTemplate,
       theme: _theme,
       font: _font,
@@ -1012,9 +1054,8 @@ class _CustomizeResumePageState extends State<CustomizeResumePage>
     if (profileVM.profile == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text(
-              'Profile not found. Please complete your profile first.'),
-          backgroundColor: Colors.red,
+          content: Text('Profile not found. Please complete your profile first.'),
+          backgroundColor: _DesignColors.error,
         ),
       );
       return;
@@ -1034,7 +1075,6 @@ class _CustomizeResumePageState extends State<CustomizeResumePage>
         ))
         .toList();
 
-    // Show improved loading dialog
     showDialog(
       context: context,
       barrierDismissible: false,
@@ -1050,8 +1090,7 @@ class _CustomizeResumePageState extends State<CustomizeResumePage>
         theme: _theme,
         font: _font,
         sections: _sections,
-        aboutMe: _aboutMeController.text.isEmpty ? null : _aboutMeController
-            .text,
+        aboutMe: _aboutMeController.text.isEmpty ? null : _aboutMeController.text,
         references: _references,
         updatedAt: DateTime.now(),
       );
@@ -1063,8 +1102,7 @@ class _CustomizeResumePageState extends State<CustomizeResumePage>
         theme: _theme,
         font: _font,
         sections: _sections,
-        aboutMe: _aboutMeController.text.isEmpty ? null : _aboutMeController
-            .text,
+        aboutMe: _aboutMeController.text.isEmpty ? null : _aboutMeController.text,
         references: _references,
       );
     }
@@ -1074,56 +1112,23 @@ class _CustomizeResumePageState extends State<CustomizeResumePage>
 
       if (success) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Row(
-              children: [
-                const Icon(Icons.check_circle, color: Colors.white),
-                const SizedBox(width: 12),
-                const Expanded(
-                  child: Text(
-                    'Resume saved successfully!',
-                    style: TextStyle(fontSize: 14),
-                  ),
-                ),
-              ],
-            ),
-            backgroundColor: Colors.green,
-            behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(10),
-            ),
-            margin: const EdgeInsets.all(16),
+          const SnackBar(
+            content: Text('Resume saved successfully!'),
+            backgroundColor: _DesignColors.success,
           ),
         );
         Navigator.popUntil(context, (route) => route.isFirst);
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Row(
-              children: [
-                const Icon(Icons.error_outline, color: Colors.white),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Text(
-                    resumeVM.error ?? 'Failed to save resume',
-                    style: const TextStyle(fontSize: 14),
-                  ),
-                ),
-              ],
-            ),
-            backgroundColor: Colors.red,
-            behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(10),
-            ),
-            margin: const EdgeInsets.all(16),
+            content: Text(resumeVM.error ?? 'Failed to save resume'),
+            backgroundColor: _DesignColors.error,
           ),
         );
       }
     }
   }
 
-// Add this helper method to build improved loading dialog
   Widget _buildLoadingDialog(String message) {
     return Dialog(
       backgroundColor: Colors.transparent,
@@ -1133,30 +1138,12 @@ class _CustomizeResumePageState extends State<CustomizeResumePage>
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(16),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.1),
-              blurRadius: 10,
-              offset: const Offset(0, 4),
-            ),
-          ],
         ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Container(
-              width: 60,
-              height: 60,
-              decoration: BoxDecoration(
-                color: const Color(0xFF7C3AED).withOpacity(0.1),
-                shape: BoxShape.circle,
-              ),
-              child: const Center(
-                child: CircularProgressIndicator(
-                  strokeWidth: 3,
-                  valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF7C3AED)),
-                ),
-              ),
+            const CircularProgressIndicator(
+              valueColor: AlwaysStoppedAnimation<Color>(_DesignColors.primary),
             ),
             const SizedBox(height: 20),
             Text(
@@ -1164,16 +1151,7 @@ class _CustomizeResumePageState extends State<CustomizeResumePage>
               style: const TextStyle(
                 fontSize: 16,
                 fontWeight: FontWeight.w600,
-                color: Color(0xFF1F2937),
-              ),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 8),
-            const Text(
-              'Please wait...',
-              style: TextStyle(
-                fontSize: 13,
-                color: Color(0xFF6B7280),
+                color: _DesignColors.textPrimary,
               ),
               textAlign: TextAlign.center,
             ),

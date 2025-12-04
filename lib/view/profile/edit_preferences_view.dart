@@ -6,6 +6,10 @@ import 'package:path_wise/viewModel/profile_view_model.dart';
 class EditPreferencesScreen extends StatelessWidget {
   const EditPreferencesScreen({super.key});
 
+  // KYYAP Style Constants
+  final Color _backgroundColor = Colors.white;
+  final Color _textColor = const Color(0xFF1A1A1A);
+
   @override
   Widget build(BuildContext context) {
     // If provider not found, show helpful message instead of throwing
@@ -29,29 +33,29 @@ class EditPreferencesScreen extends StatelessWidget {
     }
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF7F8FC),
+      backgroundColor: _backgroundColor,
       appBar: AppBar(
         elevation: 0,
-        backgroundColor: Colors.transparent,
-        flexibleSpace: Container(
-          decoration: const BoxDecoration(
-            gradient: LinearGradient(
-              colors: [Color(0xFF7C4DFF), Color(0xFF6EA8FF)],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-            ),
+        backgroundColor: _backgroundColor,
+        centerTitle: true,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_ios, color: Colors.black, size: 20),
+          onPressed: () => Navigator.maybePop(context),
+        ),
+        title: Text(
+          'Career Preferences',
+          style: TextStyle(
+            color: _textColor,
+            fontWeight: FontWeight.bold,
+            fontSize: 20,
           ),
         ),
-        title: const Text(
-          'Career Preferences',
-          style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700),
-        ),
       ),
-
-      // 🔁 Rebuild only when preferences change inside the VM
+      // 🔧 FIX: Use both profile and user to get preferences
       body: Selector<ProfileViewModel, Preferences?>(
         selector: (_, vm) {
-          final prof = vm.profile ?? vm.user; // support both naming styles
+          // Try both profile and user
+          final prof = vm.profile ?? vm.user;
           return prof?.preferences;
         },
         builder: (context, prefs, _) {
@@ -74,25 +78,34 @@ class _PreferencesForm extends StatefulWidget {
 }
 
 class _PreferencesFormState extends State<_PreferencesForm> {
+  // Style Constants
+  final Color _primaryColor = const Color(0xFF6C63FF);
+  final Color _textColor = const Color(0xFF1A1A1A);
+
   // local state
   late List<String> desiredRoles;
   late List<String> industries;
   late List<String> preferredLocations;
   late bool willingToRelocate;
   late String remoteAcceptance; // Yes / HybridOnly / No
-  late List<String> workEnvironment; // keep one value as [value]
-  late String companySize; // Startup / Small / Medium / Large / Any
+  late List<String> workEnvironment;
+  late String companySize;
   late String salaryType; // Monthly / Annual
   late int salaryMin;
   late int salaryMax;
   String? salaryCurrency;
   late List<String> benefitsPriority;
 
+  // Initial State for dirty checking
+  late Preferences _initialState;
+
   final _newRoleCtrl = TextEditingController();
   final _newLocationCtrl = TextEditingController();
   bool _saving = false;
 
   void _loadFrom(Preferences p) {
+    _initialState = p;
+
     desiredRoles = [...(p.desiredJobTitles ?? const [])];
     industries = [...(p.industries ?? const [])];
     preferredLocations = [...(p.preferredLocations ?? const [])];
@@ -104,6 +117,10 @@ class _PreferencesFormState extends State<_PreferencesForm> {
     salaryType = p.salary?.type ?? 'Monthly';
     salaryMin = p.salary?.min ?? 0;
     salaryMax = p.salary?.max ?? (salaryType == 'Monthly' ? 10000 : 120000);
+
+    // 🔧 FIX: Load currency from saved preferences, default to MYR if not set
+    salaryCurrency = p.salary?.currency ?? 'MYR';
+
     benefitsPriority = [...(p.salary?.benefitsPriority ?? const [])];
   }
 
@@ -113,13 +130,50 @@ class _PreferencesFormState extends State<_PreferencesForm> {
     _loadFrom(widget.initial);
   }
 
+  bool _hasUnsavedChanges() {
+    bool listsDiffer(List<String> a, List<String> b) {
+      if (a.length != b.length) return true;
+      final setA = Set.of(a);
+      final setB = Set.of(b);
+      return !setA.containsAll(setB);
+    }
+
+    if (listsDiffer(desiredRoles, _initialState.desiredJobTitles ?? [])) return true;
+    if (listsDiffer(industries, _initialState.industries ?? [])) return true;
+    if (listsDiffer(preferredLocations, _initialState.preferredLocations ?? [])) return true;
+    if (willingToRelocate != (_initialState.willingToRelocate ?? false)) return true;
+    if (remoteAcceptance != (_initialState.remoteAcceptance ?? 'HybridOnly')) return true;
+
+    List<String> initialWorkEnv = _initialState.workEnvironment ?? [];
+    if (initialWorkEnv.isEmpty) initialWorkEnv = ['Hybrid'];
+    if (listsDiffer(workEnvironment, initialWorkEnv)) return true;
+
+    if (companySize != (_initialState.companySize ?? 'Any')) return true;
+
+    final initialMin = _initialState.salary?.min ?? 0;
+    if (salaryMin != initialMin) return true;
+    if (salaryType != (_initialState.salary?.type ?? 'Monthly')) return true;
+
+    // 🔧 FIX: Check currency changes
+    if (salaryCurrency != (_initialState.salary?.currency ?? 'MYR')) return true;
+
+    if (salaryMax != (_initialState.salary?.max ?? (salaryType == 'Monthly' ? 10000 : 120000))) return true;
+
+    if (listsDiffer(benefitsPriority, _initialState.salary?.benefitsPriority ?? [])) return true;
+
+    return false;
+  }
+
   @override
   void didUpdateWidget(covariant _PreferencesForm oldWidget) {
     super.didUpdateWidget(oldWidget);
-    // if VM fed a new preferences object, rehydrate local state
+    // 🔧 FIX: Reload form when widget changes (after save completes)
     if (oldWidget.initial.toFirestore().toString() !=
         widget.initial.toFirestore().toString()) {
-      _loadFrom(widget.initial);
+      debugPrint('🔄 Preferences changed, reloading form');
+      setState(() {
+        _loadFrom(widget.initial);
+      });
     }
   }
 
@@ -128,6 +182,106 @@ class _PreferencesFormState extends State<_PreferencesForm> {
     _newRoleCtrl.dispose();
     _newLocationCtrl.dispose();
     super.dispose();
+  }
+
+  Future<void> _handleSave() async {
+    if (desiredRoles.isEmpty ||
+        industries.isEmpty ||
+        preferredLocations.isEmpty ||
+        salaryMin <= 0) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please complete roles, industries, locations, and salary.'),
+          backgroundColor: Color(0xFFF59E0B),
+        ),
+      );
+      return;
+    }
+
+    // 🔧 FIX: Include currency in the save
+    final updated = Preferences(
+      desiredJobTitles: desiredRoles,
+      industries: industries,
+      preferredLocations: preferredLocations,
+      willingToRelocate: willingToRelocate,
+      remoteAcceptance: remoteAcceptance,
+      workEnvironment: workEnvironment,
+      companySize: companySize,
+      salary: PrefSalary(
+        min: salaryMin,
+        max: salaryMax,
+        type: salaryType,
+        currency: salaryCurrency, // 🔧 Now saving currency
+        benefitsPriority: benefitsPriority,
+      ),
+    );
+
+    setState(() => _saving = true);
+
+    debugPrint('💾 Saving preferences: ${updated.toFirestore()}');
+
+    final ok = await context.read<ProfileViewModel>().updatePreferences(updated);
+
+    if (!mounted) return;
+    setState(() => _saving = false);
+
+    if (ok) {
+      // 🔧 FIX: Reload profile data from Firestore after save
+      debugPrint('✅ Preferences saved, reloading profile...');
+      await context.read<ProfileViewModel>().loadAll();
+
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Preferences saved successfully'),
+          backgroundColor: Color(0xFF00B894),
+        ),
+      );
+      Navigator.pop(context);
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Failed to save preferences'),
+          backgroundColor: Color(0xFFD63031),
+        ),
+      );
+    }
+  }
+
+  Future<void> _showUnsavedDialog() async {
+    await showDialog(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text('Unsaved Changes', style: TextStyle(fontWeight: FontWeight.bold)),
+        content: const Text(
+          'You have unsaved changes. Do you want to save them before leaving?',
+          style: TextStyle(color: Color(0xFF6B7280)),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () {
+              Navigator.pop(dialogContext);
+              Navigator.pop(context);
+            },
+            child: const Text('Discard', style: TextStyle(color: Colors.grey)),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              Navigator.pop(dialogContext);
+              await _handleSave();
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: _primaryColor,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            ),
+            child: const Text('Save', style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
@@ -139,119 +293,172 @@ class _PreferencesFormState extends State<_PreferencesForm> {
       max: salaryMax,
     );
 
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final isNarrow = constraints.maxWidth < 380;
-
-        return ListView(
-          padding: const EdgeInsets.fromLTRB(16, 16, 16, 28),
-          children: [
-            // Compact, overflow-safe header using Wrap
-            Container(
-              padding: const EdgeInsets.all(14),
-              decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.15),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Wrap(
-                    spacing: 12,
-                    runSpacing: 8,
+    return PopScope(
+      canPop: false,
+      onPopInvoked: (didPop) async {
+        if (didPop) return;
+        if (_hasUnsavedChanges()) {
+          await _showUnsavedDialog();
+        } else {
+          Navigator.pop(context);
+        }
+      },
+      child: ListView(
+        padding: const EdgeInsets.all(24),
+        children: [
+          // Stats Card
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+            decoration: BoxDecoration(
+              color: const Color(0xFFF9FAFB),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: const Color(0xFFE5E7EB)),
+            ),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      _StatPill(title: 'Target Roles', value: '${desiredRoles.length}'),
-                      _StatPill(title: 'Preferred Industries', value: '${industries.length}'),
+                      Row(
+                        children: [
+                          _StatItem(value: '${desiredRoles.length}', label: 'Roles', primaryColor: _primaryColor),
+                          const SizedBox(width: 24),
+                          _StatItem(value: '${industries.length}', label: 'Industries', primaryColor: _primaryColor),
+                        ],
+                      ),
+                      if (salaryMin > 0) ...[
+                        const SizedBox(height: 12),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(color: const Color(0xFFE5E7EB)),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.monetization_on_outlined, size: 16, color: _primaryColor),
+                              const SizedBox(width: 8),
+                              Flexible(
+                                child: Text(
+                                  summarySalary,
+                                  style: TextStyle(color: _textColor, fontSize: 13, fontWeight: FontWeight.w600),
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
                     ],
                   ),
-                  if (salaryMin > 0) ...[
-                    const SizedBox(height: 10),
-                    Text(
-                      'Salary Expectation: $summarySalary',
-                      style: const TextStyle(color: Colors.white, fontSize: 12),
-                      overflow: TextOverflow.ellipsis,
-                      maxLines: 2,
-                      softWrap: true,
-                    ),
-                  ],
-                ],
-              ),
+                ),
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: _primaryColor.withOpacity(0.1),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(Icons.tune, color: _primaryColor, size: 24),
+                ),
+              ],
             ),
-            const SizedBox(height: 16),
+          ),
+          const SizedBox(height: 32),
 
-            _jobPreferences(),
-            _industryPreferences(),
-            _locationPreferences(),
-            _workEnvSection(),
-            _salaryBenefitsSection(summarySalary),
+          _jobPreferences(),
+          const SizedBox(height: 24),
+          _industryPreferences(),
+          const SizedBox(height: 24),
+          _locationPreferences(),
+          const SizedBox(height: 24),
+          _workEnvSection(),
+          const SizedBox(height: 24),
+          _salaryBenefitsSection(summarySalary),
 
-            const SizedBox(height: 16),
+          const SizedBox(height: 32),
 
-            // Overflow-safe actions: Wrap on small screens, Row on wide
-            if (isNarrow)
-              Wrap(
-                spacing: 12,
-                runSpacing: 12,
-                children: [
-                  _saveBtn(),
-                  _cancelBtn(),
-                ],
-              )
-            else
-              Row(
-                children: [
-                  Expanded(child: _saveBtn()),
-                  const SizedBox(width: 12),
-                  Expanded(child: _cancelBtn()),
-                ],
+          // Actions
+          SizedBox(
+            width: double.infinity,
+            height: 54,
+            child: ElevatedButton(
+              onPressed: _saving ? null : _handleSave,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: _primaryColor,
+                foregroundColor: Colors.white,
+                elevation: 0,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
               ),
-          ],
-        );
-      },
+              child: _saving
+                  ? const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                  : const Text('Save Preferences', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+            ),
+          ),
+          const SizedBox(height: 16),
+          SizedBox(
+            width: double.infinity,
+            height: 54,
+            child: OutlinedButton(
+              onPressed: () async {
+                if (_hasUnsavedChanges()) {
+                  await _showUnsavedDialog();
+                } else {
+                  Navigator.pop(context);
+                }
+              },
+              style: OutlinedButton.styleFrom(
+                side: BorderSide(color: Colors.grey[300]!),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+              child: Text('Cancel', style: TextStyle(color: _textColor, fontSize: 16, fontWeight: FontWeight.w500)),
+            ),
+          ),
+        ],
+      ),
     );
   }
 
-  // ---- Sections -------------------------------------------------------------
+  // ---- Sections Refactored with KYYAP Style ----
 
-  Widget _jobPreferences() => _Section(
-    icon: Icons.track_changes_rounded,
+  Widget _jobPreferences() => _SectionContainer(
     title: 'Job Preferences',
     child: Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const _Label('Desired Job Titles *'),
-        const SizedBox(height: 4),
-        const Text(
-          'Add the specific roles you’re interested in',
-          style: TextStyle(color: Color(0xFF6B7280), fontSize: 12),
-        ),
         const SizedBox(height: 8),
         if (desiredRoles.isNotEmpty)
           Wrap(
             spacing: 8,
-            runSpacing: 6,
-            children: desiredRoles
-                .map((r) => InputChip(
-              label: Text(r, overflow: TextOverflow.ellipsis),
+            runSpacing: 8,
+            children: desiredRoles.map((r) => _StyledChip(
+              label: r,
               onDeleted: () => setState(() => desiredRoles.remove(r)),
-            ))
-                .toList(),
+              primaryColor: _primaryColor,
+            )).toList(),
           ),
-        const SizedBox(height: 8),
-        // Use Flexible widths to prevent overflow
+        const SizedBox(height: 12),
         Row(
           children: [
             Expanded(
-              child: TextField(
+              child: _StyledTextField(
                 controller: _newRoleCtrl,
-                decoration: _input('Enter job title (e.g., Senior Developer)'),
+                hint: 'e.g., Senior Developer',
                 onSubmitted: (_) => _addRole(),
               ),
             ),
-            const SizedBox(width: 8),
-            ConstrainedBox(
-              constraints: const BoxConstraints(minWidth: 76, maxWidth: 96),
-              child: ElevatedButton(onPressed: _addRole, child: const Text('Add')),
+            const SizedBox(width: 12),
+            ElevatedButton(
+              onPressed: _addRole,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: _primaryColor,
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+              child: const Text('Add', style: TextStyle(color: Colors.white)),
             ),
           ],
         ),
@@ -259,401 +466,353 @@ class _PreferencesFormState extends State<_PreferencesForm> {
     ),
   );
 
-  Widget _industryPreferences() => _Section(
-    icon: Icons.apartment_rounded,
+  Widget _industryPreferences() => _SectionContainer(
     title: 'Industry Preferences *',
     child: Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Text(
-          'Select the industries you’re interested in working in',
-          style: TextStyle(color: Color(0xFF6B7280), fontSize: 12),
-        ),
-        const SizedBox(height: 8),
-        Wrap(
-          spacing: 10,
-          runSpacing: -4,
-          children: _industryOptions
-              .map((idLabel) => FilterChip(
-            label: Text(idLabel.$2),
-            selected: industries.contains(idLabel.$1),
-            onSelected: (s) => setState(() {
-              if (s) {
-                industries.add(idLabel.$1);
-              } else {
-                industries.remove(idLabel.$1);
-              }
-            }),
-          ))
-              .toList(),
-        ),
-        const SizedBox(height: 8),
-        Text(
-          'Selected: ${industries.length} '
-              '${industries.length == 1 ? 'industry' : 'industries'}',
-          style: const TextStyle(color: Color(0xFF6B7280), fontSize: 12),
-        ),
-      ],
-    ),
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+    Text(
+    'Select the industries you"re interested in working in' ,
+    style: TextStyle(color: Colors.grey[600], fontSize: 14),
+  ),
+  const SizedBox(height: 12),
+  Wrap(
+  spacing: 8,
+  runSpacing: 8,
+  children: _industryOptions.map((idLabel) => ChoiceChip(
+  label: Text(idLabel.$2),
+  selected: industries.contains(idLabel.$1),
+  selectedColor: _primaryColor.withOpacity(0.1),
+  labelStyle: TextStyle(
+  color: industries.contains(idLabel.$1) ? _primaryColor : Colors.grey[700],
+  fontWeight: industries.contains(idLabel.$1) ? FontWeight.bold : FontWeight.normal,
+  ),
+  backgroundColor: Colors.white,
+  shape: RoundedRectangleBorder(
+  borderRadius: BorderRadius.circular(20),
+  side: BorderSide(
+  color: industries.contains(idLabel.$1) ? _primaryColor : Colors.grey[300]!
+  ),
+  ),
+  onSelected: (s) => setState(() {
+  if (s) industries.add(idLabel.$1);
+  else industries.remove(idLabel.$1);
+  }),
+  )).toList(),
+  ),
+  ],
+  ),
   );
 
-  Widget _locationPreferences() => _Section(
-    icon: Icons.place_outlined,
-    title: 'Location Preferences *',
-    child: Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const _Label('Preferred Work Locations'),
-        const SizedBox(height: 6),
-        if (preferredLocations.isNotEmpty)
-          Wrap(
-            spacing: 8,
-            runSpacing: 6,
-            children: preferredLocations
-                .map((loc) => InputChip(
-              label: Text(loc, overflow: TextOverflow.ellipsis),
-              onDeleted: () => setState(() => preferredLocations.remove(loc)),
-            ))
-                .toList(),
-          ),
-        const SizedBox(height: 8),
-        Row(
-          children: [
-            Expanded(
-              child: TextField(
-                controller: _newLocationCtrl,
-                decoration: _input('Enter location (e.g., Kuala Lumpur)'),
-                onSubmitted: (_) => _addLocation(),
-              ),
-            ),
-            const SizedBox(width: 8),
-            ConstrainedBox(
-              constraints: const BoxConstraints(minWidth: 76, maxWidth: 96),
-              child: ElevatedButton(
-                onPressed: _addLocation,
-                child: const Text('Add'),
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 12),
-        SwitchListTile.adaptive(
-          contentPadding: EdgeInsets.zero,
-          value: willingToRelocate,
-          onChanged: (v) => setState(() => willingToRelocate = v),
-          title: const Text('Willing to relocate for the right opportunity'),
-        ),
-        const SizedBox(height: 8),
-        const _Label('Remote Work Preference'),
-        const SizedBox(height: 6),
-        Wrap(
-          spacing: 8,
-          runSpacing: 6,
-          children: _remoteOptions
-              .map((opt) => ChoiceChip(
-            label: Text(opt.$2),
-            selected: remoteAcceptance == opt.$1,
-            onSelected: (_) => setState(() => remoteAcceptance = opt.$1),
-          ))
-              .toList(),
-        ),
-      ],
-    ),
+  Widget _locationPreferences() => _SectionContainer(
+  title: 'Location Preferences *',
+  child: Column(
+  crossAxisAlignment: CrossAxisAlignment.start,
+  children: [
+  const _Label('Preferred Work Locations'),
+  const SizedBox(height: 8),
+  if (preferredLocations.isNotEmpty)
+  Wrap(
+  spacing: 8,
+  runSpacing: 8,
+  children: preferredLocations.map((loc) => _StyledChip(
+  label: loc,
+  onDeleted: () => setState(() => preferredLocations.remove(loc)),
+  primaryColor: _primaryColor,
+  )).toList(),
+  ),
+  const SizedBox(height: 12),
+  Row(
+  children: [
+  Expanded(
+  child: _StyledTextField(
+  controller: _newLocationCtrl,
+  hint: 'e.g., Kuala Lumpur',
+  onSubmitted: (_) => _addLocation(),
+  ),
+  ),
+  const SizedBox(width: 12),
+  ElevatedButton(
+  onPressed: _addLocation,
+  style: ElevatedButton.styleFrom(
+  backgroundColor: _primaryColor,
+  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+  ),
+  child: const Text('Add', style: TextStyle(color: Colors.white)),
+  ),
+  ],
+  ),
+  const SizedBox(height: 16),
+  SwitchListTile(
+  contentPadding: EdgeInsets.zero,
+  value: willingToRelocate,
+  activeColor: _primaryColor,
+  onChanged: (v) => setState(() => willingToRelocate = v),
+  title: const Text('Willing to relocate', style: TextStyle(fontWeight: FontWeight.w500)),
+  ),
+  const SizedBox(height: 12),
+  const _Label('Remote Work Preference'),
+  const SizedBox(height: 8),
+  Wrap(
+  spacing: 8,
+  children: _remoteOptions.map((opt) => ChoiceChip(
+  label: Text(opt.$2),
+  selected: remoteAcceptance == opt.$1,
+  selectedColor: _primaryColor.withOpacity(0.1),
+  labelStyle: TextStyle(
+  color: remoteAcceptance == opt.$1 ? _primaryColor : Colors.grey[700],
+  fontWeight: FontWeight.bold,
+  ),
+  backgroundColor: Colors.white,
+  shape: RoundedRectangleBorder(
+  borderRadius: BorderRadius.circular(8),
+  side: BorderSide(
+  color: remoteAcceptance == opt.$1 ? _primaryColor : Colors.grey[300]!
+  ),
+  ),
+  onSelected: (_) => setState(() => remoteAcceptance = opt.$1),
+  )).toList(),
+  ),
+  ],
+  ),
   );
 
-  Widget _workEnvSection() => _Section(
-    icon: Icons.home_work_outlined,
-    title: 'Work Environment',
-    child: Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const _Label('Work Type Preference'),
-        const SizedBox(height: 6),
-        Wrap(
-          spacing: 8,
-          runSpacing: 6,
-          children: _workTypes
-              .map((w) => ChoiceChip(
-            label: Text(w),
-            selected: workEnvironment.isNotEmpty && workEnvironment.first == w,
-            onSelected: (_) => setState(() => workEnvironment = [w]),
-          ))
-              .toList(),
-        ),
-        const SizedBox(height: 12),
-        const _Label('Company Size Preference'),
-        const SizedBox(height: 6),
-        Wrap(
-          spacing: 8,
-          runSpacing: 6,
-          children: _companySizes
-              .map((s) => ChoiceChip(
-            label: Text(s),
-            selected: companySize == s,
-            onSelected: (_) => setState(() => companySize = s),
-          ))
-              .toList(),
-        ),
-      ],
-    ),
+  Widget _workEnvSection() => _SectionContainer(
+  title: 'Work Environment',
+  child: Column(
+  crossAxisAlignment: CrossAxisAlignment.start,
+  children: [
+  const _Label('Work Type Preference'),
+  const SizedBox(height: 8),
+  Wrap(
+  spacing: 8,
+  runSpacing: 8,
+  children: _workTypes.map((w) => ChoiceChip(
+  label: Text(w),
+  selected: workEnvironment.isNotEmpty && workEnvironment.first == w,
+  selectedColor: _primaryColor.withOpacity(0.1),
+  labelStyle: TextStyle(
+  color: (workEnvironment.isNotEmpty && workEnvironment.first == w) ? _primaryColor : Colors.grey[700],
+  fontWeight: FontWeight.bold,
+  ),
+  backgroundColor: Colors.white,
+  shape: RoundedRectangleBorder(
+  borderRadius: BorderRadius.circular(8),
+  side: BorderSide(
+  color: (workEnvironment.isNotEmpty && workEnvironment.first == w) ? _primaryColor : Colors.grey[300]!
+  ),
+  ),
+  onSelected: (_) => setState(() => workEnvironment = [w]),
+  )).toList(),
+  ),
+  const SizedBox(height: 16),
+  const _Label('Company Size Preference'),
+  const SizedBox(height: 8),
+  Wrap(
+  spacing: 8,
+  runSpacing: 8,
+  children: _companySizes.map((s) => ChoiceChip(
+  label: Text(s),
+  selected: companySize == s,
+  selectedColor: _primaryColor.withOpacity(0.1),
+  labelStyle: TextStyle(
+  color: companySize == s ? _primaryColor : Colors.grey[700],
+  fontWeight: FontWeight.bold,
+  ),
+  backgroundColor: Colors.white,
+  shape: RoundedRectangleBorder(
+  borderRadius: BorderRadius.circular(8),
+  side: BorderSide(
+  color: companySize == s ? _primaryColor : Colors.grey[300]!
+  ),
+  ),
+  onSelected: (_) => setState(() => companySize = s),
+  )).toList(),
+  ),
+  ],
+  ),
   );
 
-  Widget _salaryBenefitsSection(String summarySalary) => _Section(
-    icon: Icons.attach_money_rounded,
-    title: 'Salary & Benefits',
-    child: Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const _Label('Salary Expectations *'),
-        const SizedBox(height: 6),
-
-        // two dropdowns kept inside a Row with Expanded -> safe
-        // Replace the Row containing Currency + Type dropdowns (around line 407-432)
-// with this fixed version:
-
-        Row(
-          children: [
-            Expanded(
-              child: DropdownButtonFormField<String>(
-                value: salaryCurrency,
-                items: const [
-                  DropdownMenuItem(
-                    value: 'MYR',
-                    child: Text('MYR (Ringgit)', overflow: TextOverflow.ellipsis),
-                  ),
-                  DropdownMenuItem(
-                    value: 'SGD',
-                    child: Text('SGD', overflow: TextOverflow.ellipsis),
-                  ),
-                  DropdownMenuItem(
-                    value: 'USD',
-                    child: Text('USD', overflow: TextOverflow.ellipsis),
-                  ),
-                  DropdownMenuItem(
-                    value: 'EUR',
-                    child: Text('EUR', overflow: TextOverflow.ellipsis),
-                  ),
-                ],
-                onChanged: (v) => setState(() => salaryCurrency = v),
-                decoration: _input('Currency (optional)'),
-                isExpanded: true, // Add this line
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: DropdownButtonFormField<String>(
-                value: salaryType,
-                items: const [
-                  DropdownMenuItem(
-                    value: 'Monthly',
-                    child: Text('Monthly', overflow: TextOverflow.ellipsis),
-                  ),
-                  DropdownMenuItem(
-                    value: 'Annual',
-                    child: Text('Annual', overflow: TextOverflow.ellipsis),
-                  ),
-                ],
-                onChanged: (v) => setState(() => salaryType = v ?? 'Monthly'),
-                decoration: _input('Type'),
-                isExpanded: true, // Add this line
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 12),
-
-        _LabeledSlider(
-          label: 'Minimum Salary: ${_symbol(salaryCurrency)}${_fmtMoney(salaryMin)}',
-          min: salaryType == 'Monthly' ? 1000 : 12000,
-          max: salaryType == 'Monthly' ? 50000 : 600000,
-          step: salaryType == 'Monthly' ? 500 : 5000,
-          value: salaryMin.toDouble(),
-          onChanged: (v) {
-            setState(() {
-              salaryMin = v.round();
-              if (salaryMax < salaryMin) salaryMax = salaryMin;
-            });
-          },
-        ),
-        const SizedBox(height: 8),
-        _LabeledSlider(
-          label: 'Preferred Maximum: ${_symbol(salaryCurrency)}${_fmtMoney(salaryMax)}',
-          min: salaryMin.toDouble(),
-          max: salaryType == 'Monthly' ? 100000 : 1200000,
-          step: salaryType == 'Monthly' ? 500 : 5000,
-          value: salaryMax.toDouble(),
-          onChanged: (v) => setState(() => salaryMax = v.round()),
-        ),
-        const SizedBox(height: 8),
-
-        Container(
-          width: double.infinity,
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            color: const Color(0xFFF3F4F6),
-            borderRadius: BorderRadius.circular(10),
-          ),
-          child: Text(
-            'Your Salary Range\n$summarySalary',
-            style: const TextStyle(color: Color(0xFF374151)),
-            softWrap: true,
-          ),
-        ),
-        const SizedBox(height: 16),
-
-        const _Label('Important Benefits'),
-        const SizedBox(height: 6),
-        Wrap(
-          spacing: 10,
-          runSpacing: -4,
-          children: _benefitOptions
-              .map((idLabel) => FilterChip(
-            label: Text(idLabel.$2),
-            selected: benefitsPriority.contains(idLabel.$1),
-            onSelected: (s) => setState(() {
-              if (s) {
-                benefitsPriority.add(idLabel.$1);
-              } else {
-                benefitsPriority.remove(idLabel.$1);
-              }
-            }),
-          ))
-              .toList(),
-        ),
-        const SizedBox(height: 8),
-        Text(
-          'Selected: ${benefitsPriority.length} '
-              '${benefitsPriority.length == 1 ? 'benefit' : 'benefits'}',
-          style: const TextStyle(color: Color(0xFF6B7280), fontSize: 12),
-        ),
-      ],
-    ),
-  );
-
-  // ---- Actions --------------------------------------------------------------
-
-  Widget _saveBtn() => ElevatedButton(
-    onPressed: _saving
-        ? null
-        : () async {
-      if (desiredRoles.isEmpty ||
-          industries.isEmpty ||
-          preferredLocations.isEmpty ||
-          salaryMin <= 0) {
-        if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text(
-              'Please complete roles, industries, locations, and salary.',
-            ),
-          ),
-        );
-        return;
-      }
-
-      final updated = Preferences(
-        desiredJobTitles: desiredRoles,
-        industries: industries,
-        preferredLocations: preferredLocations,
-        willingToRelocate: willingToRelocate,
-        remoteAcceptance: remoteAcceptance,
-        workEnvironment: workEnvironment,
-        companySize: companySize,
-        salary: PrefSalary(
-          min: salaryMin,
-          max: salaryMax,
-          type: salaryType,
-          benefitsPriority: benefitsPriority,
-        ),
-      );
-
-      setState(() => _saving = true);
-      final ok =
-      await context.read<ProfileViewModel>().updatePreferences(updated);
-      if (!mounted) return;
-      setState(() => _saving = false);
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(ok ? 'Preferences saved' : 'Failed to save')),
-      );
-      if (ok) Navigator.pop(context);
-    },
-    style: ElevatedButton.styleFrom(
-      backgroundColor: const Color(0xFF7C4DFF),
-      foregroundColor: Colors.white,
-      padding: const EdgeInsets.symmetric(vertical: 14),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-    ),
-    child: _saving
-        ? const SizedBox(
-      width: 18,
-      height: 18,
-      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-    )
-        : const Text('Save Career Preferences'),
-  );
-
-  Widget _cancelBtn() => OutlinedButton(
-    onPressed: () => Navigator.pop(context),
-    style: OutlinedButton.styleFrom(
-      padding: const EdgeInsets.symmetric(vertical: 14),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-    ),
-    child: const Text('Cancel'),
+  Widget _salaryBenefitsSection(String summarySalary) => _SectionContainer(
+  title: 'Salary & Benefits',
+  child: Column(
+  crossAxisAlignment: CrossAxisAlignment.start,
+  children: [
+  const _Label('Salary Expectations *'),
+  const SizedBox(height: 12),
+  Row(
+  children: [
+  Expanded(
+  child: _StyledDropdown<String>(
+  value: salaryCurrency,
+  hint: 'Currency',
+  items: const ['MYR', 'SGD', 'USD', 'EUR'],
+  onChanged: (v) => setState(() {
+  salaryCurrency = v;
+  debugPrint('💱 Currency changed to: $v');
+  }),
+  ),
+  ),
+  const SizedBox(width: 12),
+  Expanded(
+  child: _StyledDropdown<String>(
+  value: salaryType,
+  hint: 'Type',
+  items: const ['Monthly', 'Annual'],
+  onChanged: (v) => setState(() => salaryType = v ?? 'Monthly'),
+  ),
+  ),
+  ],
+  ),
+  const SizedBox(height: 20),
+  _LabeledSlider(
+  label: 'Minimum Salary',
+  valText: '${_symbol(salaryCurrency)}${_fmtMoney(salaryMin)}',
+  min: salaryType == 'Monthly' ? 1000 : 12000,
+  max: salaryType == 'Monthly' ? 50000 : 600000,
+  value: salaryMin.toDouble(),
+  primaryColor: _primaryColor,
+  onChanged: (v) {
+  setState(() {
+  salaryMin = v.round();
+  if (salaryMax < salaryMin) salaryMax = salaryMin;
+  });
+  },
+  ),
+  const SizedBox(height: 16),
+  _LabeledSlider(
+  label: 'Preferred Maximum',
+  valText: '${_symbol(salaryCurrency)}${_fmtMoney(salaryMax)}',
+  min: salaryMin.toDouble(),
+  max: salaryType == 'Monthly' ? 100000 : 1200000,
+  value: salaryMax.toDouble(),
+  primaryColor: _primaryColor,
+  onChanged: (v) => setState(() => salaryMax = v.round()),
+  ),
+  const SizedBox(height: 20),
+  Container(
+  width: double.infinity,
+  padding: const EdgeInsets.all(16),
+  decoration: BoxDecoration(
+  color: _primaryColor.withOpacity(0.05),
+  borderRadius: BorderRadius.circular(12),
+  border: Border.all(color: _primaryColor.withOpacity(0.1)),
+  ),
+  child: Column(
+  crossAxisAlignment: CrossAxisAlignment.start,
+  children: [
+  Text('Target Range', style: TextStyle(fontSize: 12, color: _primaryColor)),
+  const SizedBox(height: 4),
+  Text(
+  summarySalary,
+  style: TextStyle(color: _textColor, fontSize: 16, fontWeight: FontWeight.bold),
+  ),
+  ],
+  ),
+  ),
+  const SizedBox(height: 24),
+  const _Label('Important Benefits'),
+  const SizedBox(height: 12),
+  Wrap(
+  spacing: 8,
+  runSpacing: 8,
+  children: _benefitOptions.map((idLabel) => ChoiceChip(
+  label: Text(idLabel.$2),
+  selected: benefitsPriority.contains(idLabel.$1),
+  selectedColor: _primaryColor.withOpacity(0.1),
+  labelStyle: TextStyle(
+  color: benefitsPriority.contains(idLabel.$1) ? _primaryColor : Colors.grey[700],
+  fontWeight: benefitsPriority.contains(idLabel.$1) ? FontWeight.bold : FontWeight.normal,
+  ),
+  backgroundColor: Colors.white,
+  shape: RoundedRectangleBorder(
+  borderRadius: BorderRadius.circular(20),
+  side: BorderSide(
+  color: benefitsPriority.contains(idLabel.$1) ? _primaryColor : Colors.grey[300]!
+  ),
+  ),
+  onSelected: (s) => setState(() {
+  if (s) {
+  benefitsPriority.add(idLabel.$1);
+  debugPrint('➕ Added benefit: ${idLabel.$1}');
+  } else {
+  benefitsPriority.remove(idLabel.$1);
+  debugPrint('➖ Removed benefit: ${idLabel.$1}');
+  }
+  }),
+  )).toList(),
+  ),
+  ],
+  ),
   );
 
   // ---- Helpers --------------------------------------------------------------
 
   void _addRole() {
-    final v = _newRoleCtrl.text.trim();
-    if (v.isEmpty) return;
-    if (!desiredRoles.contains(v)) setState(() => desiredRoles.add(v));
-    _newRoleCtrl.clear();
+  final v = _newRoleCtrl.text.trim();
+  if (v.isEmpty) return;
+  if (!desiredRoles.contains(v)) setState(() => desiredRoles.add(v));
+  _newRoleCtrl.clear();
   }
 
   void _addLocation() {
-    final v = _newLocationCtrl.text.trim();
-    if (v.isEmpty) return;
-    if (!preferredLocations.contains(v)) setState(() => preferredLocations.add(v));
-    _newLocationCtrl.clear();
+  final v = _newLocationCtrl.text.trim();
+  if (v.isEmpty) return;
+  if (!preferredLocations.contains(v)) setState(() => preferredLocations.add(v));
+  _newLocationCtrl.clear();
   }
 }
 
-// ===== Small widgets & theme helpers ========================================
+// ===== Common Widgets =====
 
-class _Section extends StatelessWidget {
-  const _Section({required this.icon, required this.title, required this.child});
-  final IconData icon;
+class _SectionContainer extends StatelessWidget {
+  const _SectionContainer({required this.title, required this.child});
   final String title;
   final Widget child;
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      margin: const EdgeInsets.only(bottom: 14),
-      elevation: 0,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(14, 14, 14, 14),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(children: [
-              Icon(icon, size: 18),
-              const SizedBox(width: 8),
-              Flexible(
-                child: Text(
-                  title,
-                  style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 16),
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-            ]),
-            const SizedBox(height: 12),
-            child,
-          ],
-        ),
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFE5E7EB)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
       ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18, color: Color(0xFF1A1A1A))),
+          const SizedBox(height: 16),
+          child,
+        ],
+      ),
+    );
+  }
+}
+
+class _StatItem extends StatelessWidget {
+  const _StatItem({required this.value, required this.label, required this.primaryColor});
+  final String value;
+  final String label;
+  final Color primaryColor;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(value, style: TextStyle(fontSize: 24, fontWeight: FontWeight.w900, color: primaryColor)),
+        Text(label, style: const TextStyle(fontSize: 14, color: Colors.grey, fontWeight: FontWeight.w500)),
+      ],
     );
   }
 }
@@ -663,34 +822,77 @@ class _Label extends StatelessWidget {
   final String text;
   @override
   Widget build(BuildContext context) =>
-      Text(text, style: const TextStyle(fontWeight: FontWeight.w600));
+      Text(text, style: const TextStyle(fontWeight: FontWeight.w500, fontSize: 14, color: Color(0xFF1A1A1A)));
 }
 
-class _StatPill extends StatelessWidget {
-  const _StatPill({required this.title, required this.value});
-  final String title;
-  final String value;
+class _StyledChip extends StatelessWidget {
+  const _StyledChip({required this.label, required this.onDeleted, required this.primaryColor});
+  final String label;
+  final VoidCallback onDeleted;
+  final Color primaryColor;
+
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-      decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.95),
-        borderRadius: BorderRadius.circular(12),
+    return Chip(
+      label: Text(label, style: const TextStyle(fontSize: 13)),
+      backgroundColor: const Color(0xFFEEF2FF),
+      deleteIcon: Icon(Icons.close, size: 16, color: primaryColor),
+      onDeleted: onDeleted,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+      side: BorderSide.none,
+    );
+  }
+}
+
+class _StyledTextField extends StatelessWidget {
+  const _StyledTextField({required this.controller, required this.hint, required this.onSubmitted});
+  final TextEditingController controller;
+  final String hint;
+  final ValueChanged<String> onSubmitted;
+
+  @override
+  Widget build(BuildContext context) {
+    return TextField(
+      controller: controller,
+      style: const TextStyle(fontSize: 16),
+      decoration: InputDecoration(
+        hintText: hint,
+        hintStyle: TextStyle(fontSize: 16, color: Colors.grey[500]),
+        filled: true,
+        fillColor: const Color(0xFFF9FAFB),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFFE5E7EB))),
+        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFFE5E7EB))),
+        focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFF6C63FF), width: 2)),
       ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Text(value,
-              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w900)),
-          const SizedBox(height: 2),
-          Text(
-            title,
-            style: const TextStyle(color: Color(0xFF9CA3AF), fontSize: 12),
-            overflow: TextOverflow.ellipsis,
-          ),
-        ],
+      onSubmitted: onSubmitted,
+    );
+  }
+}
+
+class _StyledDropdown<T> extends StatelessWidget {
+  final T? value;
+  final String hint;
+  final List<T> items;
+  final ValueChanged<T?> onChanged;
+
+  const _StyledDropdown({required this.value, required this.hint, required this.items, required this.onChanged});
+
+  @override
+  Widget build(BuildContext context) {
+    return DropdownButtonFormField<T>(
+      value: value,
+      isExpanded: true,
+      icon: const Icon(Icons.keyboard_arrow_down, color: Colors.grey),
+      decoration: InputDecoration(
+        filled: true,
+        fillColor: const Color(0xFFF9FAFB),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFFE5E7EB))),
+        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFFE5E7EB))),
       ),
+      items: items.map((e) => DropdownMenuItem(value: e, child: Text(e.toString(), overflow: TextOverflow.ellipsis))).toList(),
+      onChanged: onChanged,
     );
   }
 }
@@ -698,52 +900,57 @@ class _StatPill extends StatelessWidget {
 class _LabeledSlider extends StatelessWidget {
   const _LabeledSlider({
     required this.label,
+    required this.valText,
     required this.min,
     required this.max,
-    required this.step,
     required this.value,
     required this.onChanged,
+    required this.primaryColor,
   });
 
   final String label;
+  final String valText;
   final double min;
   final double max;
-  final double step;
   final double value;
   final ValueChanged<double> onChanged;
+  final Color primaryColor;
 
   @override
   Widget build(BuildContext context) {
-    final divs = ((max - min) / step).round().clamp(1, 1000);
+    final safeMin = min;
+    final safeMax = max > min ? max : min + 1000;
+    final divisions = ((safeMax - safeMin) / (safeMax - safeMin > 50000 ? 5000 : 500)).clamp(1, 100).round();
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(label, overflow: TextOverflow.ellipsis),
-        Slider(
-          value: value.clamp(min, max),
-          min: min,
-          max: max,
-          divisions: divs,
-          onChanged: onChanged,
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(label, style: const TextStyle(fontWeight: FontWeight.w500, fontSize: 14)),
+            Text(valText, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: primaryColor)),
+          ],
+        ),
+        SliderTheme(
+          data: SliderTheme.of(context).copyWith(
+            activeTrackColor: primaryColor,
+            inactiveTrackColor: primaryColor.withOpacity(0.2),
+            thumbColor: primaryColor,
+            overlayColor: primaryColor.withOpacity(0.1),
+          ),
+          child: Slider(
+            value: value.clamp(safeMin, safeMax),
+            min: safeMin,
+            max: safeMax,
+            divisions: divisions,
+            onChanged: onChanged,
+          ),
         ),
       ],
     );
   }
 }
-
-InputDecoration _input(String hint) => const InputDecoration(
-  filled: true,
-  fillColor: Color(0xFFF9FAFB),
-  border: OutlineInputBorder(
-    borderSide: BorderSide(color: Color(0xFFE5E7EB)),
-    borderRadius: BorderRadius.all(Radius.circular(10)),
-  ),
-  enabledBorder: OutlineInputBorder(
-    borderSide: BorderSide(color: Color(0xFFE5E7EB)),
-    borderRadius: BorderRadius.all(Radius.circular(10)),
-  ),
-  contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-).copyWith(hintText: hint);
 
 // Options
 final List<(String, String)> _industryOptions = [
@@ -776,19 +983,13 @@ final List<(String, String)> _remoteOptions = [
 final _workTypes = ['Office', 'Remote', 'Hybrid', 'Any'];
 final _companySizes = ['Startup', 'Small', 'Medium', 'Large', 'Any'];
 
-// Money helpers
 String _symbol(String? code) {
   switch (code) {
-    case 'MYR':
-      return 'RM';
-    case 'SGD':
-      return 'S\$';
-    case 'USD':
-      return '\$';
-    case 'EUR':
-      return '€';
-    default:
-      return '';
+    case 'MYR': return 'RM';
+    case 'SGD': return 'SGD';
+    case 'USD': return 'USD' ;
+    case 'EUR': return '€';
+    default: return '';
   }
 }
 
@@ -814,7 +1015,6 @@ String _formatSalaryRange({
   return '$sym${_fmtMoney(min)} - $sym${_fmtMoney(max)} $unit';
 }
 
-// Benefits list
 final List<(String, String)> _benefitOptions = [
   ('health', 'Health Insurance'),
   ('remote', 'Remote Work Support'),

@@ -1,7 +1,7 @@
 // lib/viewmodel/career_view_model.dart
 import 'package:flutter/foundation.dart';
 import 'package:path_wise/model/career_suggestion.dart';
-import 'package:path_wise/services/gemini_service.dart';
+import 'package:path_wise/services/gemini_service2.dart';
 import 'package:path_wise/services/career_service.dart';
 import 'package:path_wise/viewModel/profile_view_model.dart';
 
@@ -138,6 +138,11 @@ class CareerViewModel extends ChangeNotifier {
       debugPrint('❌ Error fetching latest suggestion: $e');
       _setError('Failed to fetch latest suggestion: ${e.toString()}');
     }
+  }
+
+  void setLoading(bool value) {
+    _isLoading = value;
+    notifyListeners();
   }
 
   /// Fetch all career suggestions history

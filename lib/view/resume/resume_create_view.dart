@@ -1,10 +1,22 @@
-// lib/views/resume_builder/template_selection_page.dart
+// lib/view/resume/resume_create_view.dart
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:path_wise/viewModel/profile_view_model.dart';
 import 'package:path_wise/view/resume/resume_customize_view.dart';
 import 'package:path_wise/model/resume_model.dart';
 import 'package:path_wise/model/user_profile.dart';
+
+// Defining KYYAP Design Colors locally
+class _DesignColors {
+  static const Color primary = Color(0xFF6C63FF);
+  static const Color background = Color(0xFFF5F7FA);
+  static const Color textPrimary = Color(0xFF2D3436);
+  static const Color textSecondary = Color(0xFF636E72);
+  static const Color cardBackground = Colors.white;
+  static const Color success = Color(0xFF00B894);
+  static const Color error = Color(0xFFD63031);
+  static Color shadow = Colors.black.withOpacity(0.08);
+}
 
 class TemplateSelectionPage extends StatefulWidget {
   const TemplateSelectionPage({Key? key}) : super(key: key);
@@ -55,85 +67,59 @@ class _TemplateSelectionPageState extends State<TemplateSelectionPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: Container(
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [Color(0xFF7C3AED), Color(0xFF9F7AEA)],
-          ),
+      backgroundColor: _DesignColors.background,
+      appBar: AppBar(
+        backgroundColor: _DesignColors.background,
+        elevation: 0,
+        centerTitle: true,
+        leading: _showPreview
+            ? IconButton(
+          icon: const Icon(Icons.arrow_back, color: _DesignColors.textPrimary),
+          onPressed: () {
+            setState(() {
+              _showPreview = false;
+            });
+          },
+        )
+            : IconButton(
+          icon: const Icon(Icons.close, color: _DesignColors.textPrimary),
+          onPressed: () => Navigator.pop(context),
         ),
-        child: SafeArea(
-          child: Column(
-            children: [
-              _buildHeader(),
-              Expanded(
-                child: Container(
-                  decoration: const BoxDecoration(
-                    color: Color(0xFFF5F5F5),
-                    borderRadius: BorderRadius.only(
-                      topLeft: Radius.circular(30),
-                      topRight: Radius.circular(30),
-                    ),
-                  ),
-                  child: _showPreview && _selectedTemplate != null
-                      ? _buildPreviewSection()
-                      : _buildTemplateGrid(),
-                ),
-              ),
-            ],
+        title: Text(
+          _showPreview ? 'Template Preview' : 'Choose Template',
+          style: const TextStyle(
+            fontSize: 20,
+            fontWeight: FontWeight.bold,
+            color: _DesignColors.textPrimary,
           ),
         ),
       ),
-    );
-  }
+      body: SafeArea(
+        child: Column(
+          children: [
+            // Description Header
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+              child: Text(
+                _showPreview
+                    ? 'Review the template layout before customizing.'
+                    : 'Select a template design to start building your professional resume.',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 14,
+                  color: _DesignColors.textSecondary.withOpacity(0.8),
+                ),
+              ),
+            ),
 
-  Widget _buildHeader() {
-    return Padding(
-      padding: const EdgeInsets.all(20),
-      child: Row(
-        children: [
-          if (_showPreview)
-            IconButton(
-              icon: const Icon(Icons.arrow_back, color: Colors.white),
-              onPressed: () {
-                setState(() {
-                  _showPreview = false;
-                });
-              },
-            )
-          else
-            IconButton(
-              icon: const Icon(Icons.close, color: Colors.white),
-              onPressed: () => Navigator.pop(context),
+            Expanded(
+              child: _showPreview && _selectedTemplate != null
+                  ? _buildPreviewSection()
+                  : _buildTemplateGrid(),
             ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  _showPreview ? 'Template Preview' : 'Choose Template',
-                  style: const TextStyle(
-                    fontSize: 24,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.white,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  _showPreview
-                      ? 'Review the template before customizing'
-                      : 'Select a template that suits your industry',
-                  style: const TextStyle(
-                    fontSize: 13,
-                    color: Colors.white70,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -144,24 +130,29 @@ class _TemplateSelectionPageState extends State<TemplateSelectionPage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const SizedBox(height: 10),
-          const Text(
-            'Popular Templates',
-            style: TextStyle(
-              fontSize: 20,
-              fontWeight: FontWeight.bold,
-              color: Color(0xFF1F2937),
-            ),
+          Row(
+            children: [
+              const Icon(Icons.grid_view_rounded, size: 20, color: _DesignColors.primary),
+              const SizedBox(width: 8),
+              const Text(
+                'Available Templates',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: _DesignColors.textPrimary,
+                ),
+              ),
+              const Spacer(),
+              Text(
+                '${_templates.length} designs',
+                style: const TextStyle(
+                  fontSize: 13,
+                  color: _DesignColors.textSecondary,
+                ),
+              ),
+            ],
           ),
-          const SizedBox(height: 8),
-          Text(
-            '${_templates.length} professional templates available',
-            style: const TextStyle(
-              fontSize: 14,
-              color: Color(0xFF6B7280),
-            ),
-          ),
-          const SizedBox(height: 24),
+          const SizedBox(height: 16),
           GridView.builder(
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
@@ -178,6 +169,7 @@ class _TemplateSelectionPageState extends State<TemplateSelectionPage> {
               return _buildTemplateCard(template, templateData);
             },
           ),
+          const SizedBox(height: 20),
         ],
       ),
     );
@@ -188,20 +180,21 @@ class _TemplateSelectionPageState extends State<TemplateSelectionPage> {
       Map<String, dynamic> data,
       ) {
     final isSelected = _selectedTemplate == template;
+    final templateColor = data['color'] as Color;
 
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: _DesignColors.cardBackground,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
-          color: isSelected ? data['color'] : Colors.transparent,
+          color: isSelected ? templateColor : Colors.transparent,
           width: 2,
         ),
         boxShadow: [
           BoxShadow(
             color: isSelected
-                ? data['color'].withOpacity(0.3)
-                : Colors.black.withOpacity(0.05),
+                ? templateColor.withOpacity(0.2)
+                : _DesignColors.shadow,
             blurRadius: isSelected ? 12 : 8,
             offset: const Offset(0, 4),
           ),
@@ -209,6 +202,7 @@ class _TemplateSelectionPageState extends State<TemplateSelectionPage> {
       ),
       child: Material(
         color: Colors.transparent,
+        borderRadius: BorderRadius.circular(16),
         child: InkWell(
           onTap: () {
             setState(() {
@@ -251,13 +245,13 @@ class _TemplateSelectionPageState extends State<TemplateSelectionPage> {
                           top: 8,
                           right: 8,
                           child: Container(
-                            padding: const EdgeInsets.all(6),
+                            padding: const EdgeInsets.all(4),
                             decoration: BoxDecoration(
                               color: Colors.white,
                               shape: BoxShape.circle,
                               boxShadow: [
                                 BoxShadow(
-                                  color: Colors.black.withOpacity(0.2),
+                                  color: Colors.black.withOpacity(0.1),
                                   blurRadius: 4,
                                 ),
                               ],
@@ -265,7 +259,7 @@ class _TemplateSelectionPageState extends State<TemplateSelectionPage> {
                             child: Icon(
                               Icons.check,
                               size: 16,
-                              color: data['color'],
+                              color: templateColor,
                             ),
                           ),
                         ),
@@ -286,17 +280,17 @@ class _TemplateSelectionPageState extends State<TemplateSelectionPage> {
                         children: [
                           Icon(
                             data['icon'],
-                            size: 18,
-                            color: data['color'],
+                            size: 16,
+                            color: templateColor,
                           ),
                           const SizedBox(width: 6),
                           Expanded(
                             child: Text(
                               data['name'],
                               style: const TextStyle(
-                                fontSize: 14,
+                                fontSize: 13,
                                 fontWeight: FontWeight.bold,
-                                color: Color(0xFF1F2937),
+                                color: _DesignColors.textPrimary,
                               ),
                               overflow: TextOverflow.ellipsis,
                               maxLines: 1,
@@ -310,7 +304,7 @@ class _TemplateSelectionPageState extends State<TemplateSelectionPage> {
                           data['description'],
                           style: const TextStyle(
                             fontSize: 10,
-                            color: Color(0xFF6B7280),
+                            color: _DesignColors.textSecondary,
                             height: 1.3,
                           ),
                           maxLines: 2,
@@ -329,14 +323,14 @@ class _TemplateSelectionPageState extends State<TemplateSelectionPage> {
                             vertical: 2,
                           ),
                           decoration: BoxDecoration(
-                            color: data['color'].withOpacity(0.1),
+                            color: templateColor.withOpacity(0.1),
                             borderRadius: BorderRadius.circular(4),
                           ),
                           child: Text(
                             feature,
                             style: TextStyle(
-                              fontSize: 8,
-                              color: data['color'],
+                              fontSize: 9,
+                              color: templateColor,
                               fontWeight: FontWeight.w600,
                             ),
                           ),
@@ -376,6 +370,8 @@ class _TemplateSelectionPageState extends State<TemplateSelectionPage> {
       ),
     );
   }
+
+  // --- Template Layouts (Keeping original visual logic but cleaned up) ---
 
   Widget _buildTemplateLayout(ResumeTemplateType template) {
     switch (template) {
@@ -464,11 +460,6 @@ class _TemplateSelectionPageState extends State<TemplateSelectionPage> {
           const SizedBox(height: 4),
           Container(height: 1.5, width: 50, color: Colors.grey[300]),
           Container(height: 1.5, width: 45, color: Colors.grey[300]),
-          const SizedBox(height: 6),
-          Container(height: 2, width: 30, color: const Color(0xFF10B981)),
-          const SizedBox(height: 4),
-          Container(height: 1.5, width: 50, color: Colors.grey[300]),
-          Container(height: 1.5, width: 48, color: Colors.grey[300]),
         ],
       ),
     );
@@ -495,8 +486,6 @@ class _TemplateSelectionPageState extends State<TemplateSelectionPage> {
               Container(height: 1, color: Colors.white70),
               const SizedBox(height: 4),
               Container(height: 1, color: Colors.white70),
-              const SizedBox(height: 4),
-              Container(height: 1, color: Colors.white70),
             ],
           ),
         ),
@@ -510,11 +499,6 @@ class _TemplateSelectionPageState extends State<TemplateSelectionPage> {
                 const SizedBox(height: 2),
                 Container(height: 2, width: 25, color: const Color(0xFF8B5CF6)),
                 const SizedBox(height: 6),
-                Container(height: 1.5, width: 45, color: Colors.grey[300]),
-                Container(height: 1.5, width: 40, color: Colors.grey[300]),
-                const SizedBox(height: 6),
-                Container(height: 2, width: 25, color: const Color(0xFF8B5CF6)),
-                const SizedBox(height: 4),
                 Container(height: 1.5, width: 45, color: Colors.grey[300]),
               ],
             ),
@@ -538,21 +522,13 @@ class _TemplateSelectionPageState extends State<TemplateSelectionPage> {
           const SizedBox(height: 6),
           Container(height: 1, color: Colors.grey[300]),
           const SizedBox(height: 6),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 4),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Container(height: 2, width: 30, color: const Color(0xFFF59E0B)),
-                const SizedBox(height: 4),
-                Container(height: 1.5, width: 45, color: Colors.grey[300]),
-                Container(height: 1.5, width: 40, color: Colors.grey[300]),
-                const SizedBox(height: 6),
-                Container(height: 2, width: 30, color: const Color(0xFFF59E0B)),
-                const SizedBox(height: 4),
-                Container(height: 1.5, width: 45, color: Colors.grey[300]),
-              ],
-            ),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(height: 2, width: 30, color: const Color(0xFFF59E0B)),
+              const SizedBox(height: 4),
+              Container(height: 1.5, width: 45, color: Colors.grey[300]),
+            ],
           ),
         ],
       ),
@@ -568,10 +544,11 @@ class _TemplateSelectionPageState extends State<TemplateSelectionPage> {
           child: SingleChildScrollView(
             child: Column(
               children: [
-                const SizedBox(height: 20),
+                const SizedBox(height: 12),
                 _buildFullTemplatePreview(),
                 const SizedBox(height: 20),
                 _buildTemplateDetails(templateData),
+                const SizedBox(height: 20),
               ],
             ),
           ),
@@ -584,17 +561,18 @@ class _TemplateSelectionPageState extends State<TemplateSelectionPage> {
   Widget _buildFullTemplatePreview() {
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 20),
-      height: 500,
+      height: 450,
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.1),
+            color: _DesignColors.shadow,
             blurRadius: 20,
             offset: const Offset(0, 8),
           ),
         ],
+        border: Border.all(color: Colors.grey.withOpacity(0.1)),
       ),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(16),
@@ -614,6 +592,7 @@ class _TemplateSelectionPageState extends State<TemplateSelectionPage> {
       return const Center(child: CircularProgressIndicator());
     }
 
+    // Pass real data to templates
     switch (template) {
       case ResumeTemplateType.tech:
         return _buildFullTechTemplate(profile, skills, experience);
@@ -625,6 +604,8 @@ class _TemplateSelectionPageState extends State<TemplateSelectionPage> {
         return _buildFullAcademicTemplate(profile, education);
     }
   }
+
+  // --- Full Template Implementations (Preserved for logic, styled for content) ---
 
   Widget _buildFullTechTemplate(UserProfile profile, List<Skill> skills, List<Experience> experience) {
     return SingleChildScrollView(
@@ -644,7 +625,7 @@ class _TemplateSelectionPageState extends State<TemplateSelectionPage> {
                 Text(
                   profile.name ?? 'Your Name',
                   style: const TextStyle(
-                    fontSize: 28,
+                    fontSize: 24,
                     fontWeight: FontWeight.bold,
                     color: Colors.white,
                   ),
@@ -653,19 +634,19 @@ class _TemplateSelectionPageState extends State<TemplateSelectionPage> {
                 const Text(
                   'Software Engineer',
                   style: TextStyle(
-                    fontSize: 16,
+                    fontSize: 14,
                     color: Colors.white70,
                   ),
                 ),
                 const SizedBox(height: 12),
                 Row(
                   children: [
-                    const Icon(Icons.email, size: 14, color: Colors.white70),
+                    const Icon(Icons.email, size: 12, color: Colors.white70),
                     const SizedBox(width: 6),
                     Text(
                       profile.email ?? 'email@example.com',
                       style: const TextStyle(
-                        fontSize: 12,
+                        fontSize: 11,
                         color: Colors.white70,
                       ),
                     ),
@@ -687,8 +668,8 @@ class _TemplateSelectionPageState extends State<TemplateSelectionPage> {
                   children: skills.take(6).map((skill) {
                     return Container(
                       padding: const EdgeInsets.symmetric(
-                        horizontal: 12,
-                        vertical: 6,
+                        horizontal: 10,
+                        vertical: 4,
                       ),
                       decoration: BoxDecoration(
                         color: const Color(0xFF3B82F6).withOpacity(0.1),
@@ -700,7 +681,7 @@ class _TemplateSelectionPageState extends State<TemplateSelectionPage> {
                       child: Text(
                         skill.name ?? '',
                         style: const TextStyle(
-                          fontSize: 11,
+                          fontSize: 10,
                           color: Color(0xFF3B82F6),
                           fontWeight: FontWeight.w600,
                         ),
@@ -713,21 +694,21 @@ class _TemplateSelectionPageState extends State<TemplateSelectionPage> {
                 const SizedBox(height: 12),
                 ...experience.take(2).map((exp) {
                   return Padding(
-                    padding: const EdgeInsets.only(bottom: 16),
+                    padding: const EdgeInsets.only(bottom: 12),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
                           exp.jobTitle ?? '',
                           style: const TextStyle(
-                            fontSize: 13,
+                            fontSize: 12,
                             fontWeight: FontWeight.bold,
                           ),
                         ),
                         Text(
                           exp.company ?? '',
                           style: TextStyle(
-                            fontSize: 11,
+                            fontSize: 10,
                             color: Colors.grey[600],
                           ),
                         ),
@@ -752,17 +733,17 @@ class _TemplateSelectionPageState extends State<TemplateSelectionPage> {
             Row(
               children: [
                 Container(
-                  width: 60,
-                  height: 60,
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF10B981),
+                  width: 50,
+                  height: 50,
+                  decoration: const BoxDecoration(
+                    color: Color(0xFF10B981),
                     shape: BoxShape.circle,
                   ),
                   child: Center(
                     child: Text(
                       (profile.name ?? 'U')[0].toUpperCase(),
                       style: const TextStyle(
-                        fontSize: 28,
+                        fontSize: 24,
                         fontWeight: FontWeight.bold,
                         color: Colors.white,
                       ),
@@ -777,14 +758,14 @@ class _TemplateSelectionPageState extends State<TemplateSelectionPage> {
                       Text(
                         profile.name ?? 'Your Name',
                         style: const TextStyle(
-                          fontSize: 24,
+                          fontSize: 20,
                           fontWeight: FontWeight.bold,
                         ),
                       ),
                       Text(
                         'Business Professional',
                         style: TextStyle(
-                          fontSize: 14,
+                          fontSize: 12,
                           color: Colors.grey[600],
                         ),
                       ),
@@ -811,14 +792,14 @@ class _TemplateSelectionPageState extends State<TemplateSelectionPage> {
     return Row(
       children: [
         Container(
-          width: 120,
+          width: 100,
           color: const Color(0xFF8B5CF6),
           padding: const EdgeInsets.all(16),
           child: Column(
             children: [
               Container(
-                width: 70,
-                height: 70,
+                width: 50,
+                height: 50,
                 decoration: const BoxDecoration(
                   color: Colors.white,
                   shape: BoxShape.circle,
@@ -827,7 +808,7 @@ class _TemplateSelectionPageState extends State<TemplateSelectionPage> {
                   child: Text(
                     (profile.name ?? 'U')[0].toUpperCase(),
                     style: const TextStyle(
-                      fontSize: 32,
+                      fontSize: 24,
                       fontWeight: FontWeight.bold,
                       color: Color(0xFF8B5CF6),
                     ),
@@ -838,7 +819,7 @@ class _TemplateSelectionPageState extends State<TemplateSelectionPage> {
               const Text(
                 'CONTACT',
                 style: TextStyle(
-                  fontSize: 11,
+                  fontSize: 10,
                   fontWeight: FontWeight.bold,
                   color: Colors.white,
                   letterSpacing: 1,
@@ -848,7 +829,7 @@ class _TemplateSelectionPageState extends State<TemplateSelectionPage> {
               Text(
                 profile.email ?? '',
                 style: const TextStyle(
-                  fontSize: 9,
+                  fontSize: 8,
                   color: Colors.white70,
                 ),
                 textAlign: TextAlign.center,
@@ -865,14 +846,14 @@ class _TemplateSelectionPageState extends State<TemplateSelectionPage> {
                 Text(
                   profile.name ?? 'Your Name',
                   style: const TextStyle(
-                    fontSize: 26,
+                    fontSize: 22,
                     fontWeight: FontWeight.bold,
                   ),
                 ),
                 const Text(
                   'Creative Professional',
                   style: TextStyle(
-                    fontSize: 14,
+                    fontSize: 12,
                     color: Color(0xFF8B5CF6),
                     fontWeight: FontWeight.w600,
                   ),
@@ -889,14 +870,14 @@ class _TemplateSelectionPageState extends State<TemplateSelectionPage> {
                         Text(
                           exp.jobTitle ?? '',
                           style: const TextStyle(
-                            fontSize: 12,
+                            fontSize: 11,
                             fontWeight: FontWeight.bold,
                           ),
                         ),
                         Text(
                           exp.company ?? '',
                           style: const TextStyle(
-                            fontSize: 10,
+                            fontSize: 9,
                             color: Color(0xFF8B5CF6),
                           ),
                         ),
@@ -914,13 +895,13 @@ class _TemplateSelectionPageState extends State<TemplateSelectionPage> {
 
   Widget _buildFullAcademicTemplate(UserProfile profile, List<Education> education) {
     return SingleChildScrollView(
-      padding: const EdgeInsets.all(28),
+      padding: const EdgeInsets.all(24),
       child: Column(
         children: [
           Text(
             profile.name ?? 'Your Name',
             style: const TextStyle(
-              fontSize: 26,
+              fontSize: 22,
               fontWeight: FontWeight.bold,
             ),
             textAlign: TextAlign.center,
@@ -929,7 +910,7 @@ class _TemplateSelectionPageState extends State<TemplateSelectionPage> {
           Text(
             'Ph.D. Candidate',
             style: TextStyle(
-              fontSize: 13,
+              fontSize: 12,
               color: Colors.grey[600],
             ),
             textAlign: TextAlign.center,
@@ -937,31 +918,31 @@ class _TemplateSelectionPageState extends State<TemplateSelectionPage> {
           const SizedBox(height: 8),
           Text(
             profile.email ?? 'email@university.edu',
-            style: const TextStyle(fontSize: 11),
+            style: const TextStyle(fontSize: 10),
             textAlign: TextAlign.center,
           ),
-          const SizedBox(height: 20),
+          const SizedBox(height: 16),
           const Divider(),
-          const SizedBox(height: 20),
+          const SizedBox(height: 16),
           _buildSectionTitle('Education', const Color(0xFFF59E0B)),
           const SizedBox(height: 12),
           ...education.take(2).map((edu) {
             return Padding(
-              padding: const EdgeInsets.only(bottom: 16),
+              padding: const EdgeInsets.only(bottom: 12),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
                     edu.institution ?? '',
                     style: const TextStyle(
-                      fontSize: 12,
+                      fontSize: 11,
                       fontWeight: FontWeight.bold,
                     ),
                   ),
                   Text(
                     '${edu.degreeLevel ?? ''} in ${edu.fieldOfStudy ?? ''}',
                     style: TextStyle(
-                      fontSize: 11,
+                      fontSize: 10,
                       color: Colors.grey[600],
                     ),
                   ),
@@ -976,14 +957,14 @@ class _TemplateSelectionPageState extends State<TemplateSelectionPage> {
 
   Widget _buildBusinessExperienceItem(Experience exp) {
     return Padding(
-      padding: const EdgeInsets.only(bottom: 16),
+      padding: const EdgeInsets.only(bottom: 12),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
             exp.jobTitle ?? '',
             style: const TextStyle(
-              fontSize: 13,
+              fontSize: 12,
               fontWeight: FontWeight.bold,
             ),
           ),
@@ -991,7 +972,7 @@ class _TemplateSelectionPageState extends State<TemplateSelectionPage> {
           Text(
             exp.company ?? '',
             style: const TextStyle(
-              fontSize: 11,
+              fontSize: 10,
               color: Color(0xFF10B981),
               fontWeight: FontWeight.w600,
             ),
@@ -1001,7 +982,7 @@ class _TemplateSelectionPageState extends State<TemplateSelectionPage> {
             Text(
               exp.description!,
               style: TextStyle(
-                fontSize: 10,
+                fontSize: 9,
                 color: Colors.grey[600],
                 height: 1.4,
               ),
@@ -1018,7 +999,7 @@ class _TemplateSelectionPageState extends State<TemplateSelectionPage> {
     return Text(
       title,
       style: TextStyle(
-        fontSize: 14,
+        fontSize: 12,
         fontWeight: FontWeight.bold,
         color: color,
         letterSpacing: 0.5,
@@ -1027,12 +1008,21 @@ class _TemplateSelectionPageState extends State<TemplateSelectionPage> {
   }
 
   Widget _buildTemplateDetails(Map<String, dynamic> data) {
+    final templateColor = data['color'] as Color;
+
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 20),
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: _DesignColors.cardBackground,
         borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: _DesignColors.shadow,
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1042,13 +1032,13 @@ class _TemplateSelectionPageState extends State<TemplateSelectionPage> {
               Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: data['color'].withOpacity(0.1),
+                  color: templateColor.withOpacity(0.1),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Icon(
                   data['icon'],
-                  color: data['color'],
-                  size: 28,
+                  color: templateColor,
+                  size: 24,
                 ),
               ),
               const SizedBox(width: 16),
@@ -1059,9 +1049,9 @@ class _TemplateSelectionPageState extends State<TemplateSelectionPage> {
                     Text(
                       data['name'],
                       style: const TextStyle(
-                        fontSize: 20,
+                        fontSize: 18,
                         fontWeight: FontWeight.bold,
-                        color: Color(0xFF1F2937),
+                        color: _DesignColors.textPrimary,
                       ),
                     ),
                     const SizedBox(height: 4),
@@ -1069,7 +1059,7 @@ class _TemplateSelectionPageState extends State<TemplateSelectionPage> {
                       data['description'],
                       style: const TextStyle(
                         fontSize: 13,
-                        color: Color(0xFF6B7280),
+                        color: _DesignColors.textSecondary,
                       ),
                     ),
                   ],
@@ -1083,7 +1073,7 @@ class _TemplateSelectionPageState extends State<TemplateSelectionPage> {
             style: TextStyle(
               fontSize: 14,
               fontWeight: FontWeight.bold,
-              color: Color(0xFF1F2937),
+              color: _DesignColors.textPrimary,
             ),
           ),
           const SizedBox(height: 12),
@@ -1094,15 +1084,15 @@ class _TemplateSelectionPageState extends State<TemplateSelectionPage> {
                 children: [
                   Icon(
                     Icons.check_circle,
-                    size: 18,
-                    color: data['color'],
+                    size: 16,
+                    color: templateColor,
                   ),
                   const SizedBox(width: 12),
                   Text(
                     feature,
                     style: const TextStyle(
                       fontSize: 13,
-                      color: Color(0xFF4B5563),
+                      color: _DesignColors.textSecondary,
                     ),
                   ),
                 ],
@@ -1115,15 +1105,13 @@ class _TemplateSelectionPageState extends State<TemplateSelectionPage> {
   }
 
   Widget _buildActionButtons() {
-    final templateData = _templates[_selectedTemplate]!;
-
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: _DesignColors.cardBackground,
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.1),
+            color: _DesignColors.shadow,
             blurRadius: 10,
             offset: const Offset(0, -4),
           ),
@@ -1131,88 +1119,48 @@ class _TemplateSelectionPageState extends State<TemplateSelectionPage> {
       ),
       child: SafeArea(
         top: false,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
+        child: Row(
           children: [
-            Row(
-              children: [
-                Expanded(
-                  child: OutlinedButton(
-                    onPressed: () {
-                      setState(() {
-                        _showPreview = false;
-                      });
-                    },
-                    style: OutlinedButton.styleFrom(
-                      side: BorderSide(color: templateData['color']),
-                      padding: const EdgeInsets.symmetric(vertical: 14),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                    ),
-                    child: FittedBox(
-                      fit: BoxFit.scaleDown,
-                      child: Text(
-                        'Change Template',
-                        style: TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w600,
-                          color: templateData['color'],
-                        ),
-                      ),
-                    ),
+            Expanded(
+              child: OutlinedButton(
+                onPressed: () {
+                  setState(() {
+                    _showPreview = false;
+                  });
+                },
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: _DesignColors.textPrimary,
+                  side: BorderSide(color: _DesignColors.textSecondary.withOpacity(0.3)),
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
                   ),
                 ),
-                const SizedBox(width: 12),
-                Expanded(
-                  flex: 2,
-                  child: Container(
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        colors: templateData['gradient'],
-                      ),
-                      borderRadius: BorderRadius.circular(12),
-                      boxShadow: [
-                        BoxShadow(
-                          color: templateData['color'].withOpacity(0.3),
-                          blurRadius: 8,
-                          offset: const Offset(0, 4),
-                        ),
-                      ],
-                    ),
-                    child: ElevatedButton(
-                      onPressed: _useThisTemplate,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.transparent,
-                        shadowColor: Colors.transparent,
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                      ),
-                      child: const FittedBox(
-                        fit: BoxFit.scaleDown,
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(Icons.check_circle, size: 18),
-                            SizedBox(width: 6),
-                            Text(
-                              'Use Template',
-                              style: TextStyle(
-                                fontSize: 14,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.white
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
+                child: const Text('Change'),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              flex: 2,
+              child: ElevatedButton(
+                onPressed: _useThisTemplate,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: _DesignColors.primary,
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  elevation: 0,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
                   ),
                 ),
-              ],
+                child: const Text(
+                  'Use Template',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
+                  ),
+                ),
+              ),
             ),
           ],
         ),
@@ -1223,7 +1171,6 @@ class _TemplateSelectionPageState extends State<TemplateSelectionPage> {
   void _useThisTemplate() async {
     if (_selectedTemplate == null) return;
 
-    // Show dialog to get resume title
     final titleController = TextEditingController(text: 'My Resume');
 
     final result = await showDialog<bool>(
@@ -1236,8 +1183,8 @@ class _TemplateSelectionPageState extends State<TemplateSelectionPage> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const Text(
-              'Give your resume a title to help you identify it later.',
-              style: TextStyle(fontSize: 13, color: Color(0xFF6B7280)),
+              'Give your resume a name to help you identify it later.',
+              style: TextStyle(fontSize: 14, color: _DesignColors.textSecondary),
             ),
             const SizedBox(height: 16),
             TextField(
@@ -1246,9 +1193,17 @@ class _TemplateSelectionPageState extends State<TemplateSelectionPage> {
                 labelText: 'Resume Title',
                 hintText: 'e.g., Software Engineer Resume',
                 border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8),
+                  borderRadius: BorderRadius.circular(12),
                 ),
-                prefixIcon: const Icon(Icons.title),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide(color: Colors.grey[300]!),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: const BorderSide(color: _DesignColors.primary, width: 2),
+                ),
+                prefixIcon: const Icon(Icons.edit_note, color: _DesignColors.primary),
               ),
               autofocus: true,
             ),
@@ -1257,29 +1212,23 @@ class _TemplateSelectionPageState extends State<TemplateSelectionPage> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
+            child: const Text('Cancel', style: TextStyle(color: _DesignColors.textSecondary)),
           ),
           ElevatedButton(
             onPressed: () => Navigator.pop(context, true),
             style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF7C3AED),
+              backgroundColor: _DesignColors.primary,
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(8),
               ),
             ),
-            child: const Text(
-              'Continue',
-              style: TextStyle(
-              color: Colors.white,
-              ),
-            ),
+            child: const Text('Create', style: TextStyle(color: Colors.white)),
           ),
         ],
       ),
     );
 
     if (result == true && mounted) {
-      // Create initial resume with selected template
       final initialResume = ResumeDoc(
         id: 'temp',
         title: titleController.text.isEmpty ? 'My Resume' : titleController.text,
@@ -1291,7 +1240,6 @@ class _TemplateSelectionPageState extends State<TemplateSelectionPage> {
         references: const [],
       );
 
-      // Navigate to customization page
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(
