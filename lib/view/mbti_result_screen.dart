@@ -694,44 +694,63 @@ class _MBTIResultScreenState extends State<MBTIResultScreen>
     }
   }
 
-  void _saveToProfile(BuildContext context, String mbtiType) {
+  void _saveToProfile(BuildContext context, String mbtiType) async {
+    final viewModel = Provider.of<AIMatchViewModel>(context, listen: false);
+
+    // 1. Show "Saving..." snackbar immediately
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Row(
+          children: [
+            SizedBox(
+                width: 20,
+                height: 20,
+                child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white)
+            ),
+            SizedBox(width: 16),
+            Text('Saving result...'),
+          ],
+        ),
+        duration: Duration(seconds: 2),
+      ),
+    );
+
     try {
-      final aiMatchViewModel = Provider.of<AIMatchViewModel>(
-        context,
-        listen: false,
-      );
+      // 2. Load latest data to prevent overwriting other fields
+      await viewModel.loadProgress();
 
+      // 3. Prepare updated profile
+      final currentProfile = viewModel.personalityProfile ?? PersonalityProfile();
       final baseType = mbtiType.split('-').first;
-      aiMatchViewModel.setPersonalityProfile(
-        PersonalityProfile(mbti: baseType),
+
+      final updatedProfile = PersonalityProfile(
+        mbti: baseType,               // Update MBTI
+        riasec: currentProfile.riasec, // Keep existing
+        ocean: currentProfile.ocean,   // Keep existing
       );
 
+      // 4. Update ViewModel
+      viewModel.setPersonalityProfile(updatedProfile);
+
+      // 5. FORCE SAVE to storage and wait for it to complete
+      await viewModel.saveProgress();
+
+      if (!context.mounted) return;
+
+      // 6. Show Success message
+      ScaffoldMessenger.of(context).hideCurrentSnackBar(); // Hide "Saving..."
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Container(
             padding: const EdgeInsets.symmetric(vertical: 4),
-            child: Row(
-              children: const [
+            child: const Row(
+              children: [
                 Icon(Icons.check_circle_rounded, color: Colors.white, size: 24),
                 SizedBox(width: 16),
                 Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        'Success!',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      SizedBox(height: 2),
-                      Text(
-                        'Personality type saved to your profile',
-                        style: TextStyle(fontSize: 13),
-                      ),
-                    ],
+                  child: Text(
+                    'MBTI result saved successfully!',
+                    style: TextStyle(fontWeight: FontWeight.bold),
                   ),
                 ),
               ],
@@ -739,36 +758,28 @@ class _MBTIResultScreenState extends State<MBTIResultScreen>
           ),
           backgroundColor: const Color(0xFF36B37E),
           behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-          ),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
           margin: const EdgeInsets.all(16),
-          duration: const Duration(seconds: 2),
         ),
       );
 
-      Future.delayed(const Duration(milliseconds: 1500), () {
-        if (context.mounted) {
-          Navigator.of(context).popUntil((route) => route.isFirst);
-        }
-      });
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: const Text('Result saved successfully!'),
-          backgroundColor: const Color(0xFF36B37E),
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-          ),
-        ),
-      );
-
-      Future.delayed(const Duration(milliseconds: 1000), () {
+      // 7. Return to previous screen immediately
+      // The delay ensures the user sees the success flash briefly before leaving
+      Future.delayed(const Duration(milliseconds: 500), () {
         if (context.mounted) {
           Navigator.of(context).pop();
         }
       });
+
+    } catch (e) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).hideCurrentSnackBar();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error saving result: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
     }
   }
 

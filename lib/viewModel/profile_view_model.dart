@@ -225,15 +225,35 @@ class ProfileViewModel extends ChangeNotifier {
   UserProfile? get user => _user; // <= needed by the view
 
   Future<bool> updatePreferences(Preferences prefs) async {
+    _setSavingRoot(true);
+    _setError(null);
+
     try {
       await _service.updatePreferences(uid, prefs.toFirestore());
-      _user = _user?.copyWith(preferences: prefs);
+
+      // Update local cache immediately
+      _profile = (_profile ?? const UserProfile()).copyWith(
+        preferences: prefs,
+        lastUpdated: Timestamp.now(),
+      );
+
+      // Also update _user if it exists
+      if (_user != null) {
+        _user = _user!.copyWith(preferences: prefs);
+      }
+
       notifyListeners();
+
+      debugPrint('✅ Profile preferences updated in Firestore');
+
+      // Don't recalculate completion for preferences alone
       return true;
     } catch (e) {
-      _error = e.toString();
-      notifyListeners();
+      _setError(e);
+      debugPrint('❌ Error updating preferences: $e');
       return false;
+    } finally {
+      _setSavingRoot(false);
     }
   }
 

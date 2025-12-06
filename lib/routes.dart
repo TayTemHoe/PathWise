@@ -5,4 +5,6 @@ class AppRoutes {
   static const editExperience   = '/edit-experience';
   static const editPreferences  = '/edit-preferences';
   static const editPersonality  = '/edit-personality';
+  static const editEducationPreferences = '/edit-education-preferences';
+  static const editLanguagePreferences = '/profile/edit-language-preferences';
 }

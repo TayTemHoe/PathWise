@@ -12,6 +12,8 @@ import 'package:path_wise/view/profile/edit_preferences_view.dart';
 import 'package:path_wise/view/profile/edit_personality_view.dart';
 
 import '../../utils/app_color.dart';
+import 'edit_education_preferences_view.dart';
+import 'edit_language_preferences_view.dart';
 
 // Defining KYYAP Design Colors locally
 class _DesignColors {
@@ -423,9 +425,31 @@ class _ProfileOverviewScreenState extends State<ProfileOverviewScreen> {
           ),
           _buildDivider(),
           _buildMenuItem(
+            icon: Icons.translate_outlined,
+            title: 'Language Proficiency',
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => const EditLanguagePreferencesScreen(),
+              ),
+            ),
+          ),
+          _buildDivider(),
+          _buildMenuItem(
             icon: Icons.tune_outlined,
             title: 'Job Preferences',
             onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const EditPreferencesScreen())),
+          ),
+          _buildDivider(),
+          _buildMenuItem(
+            icon: Icons.school_outlined,
+            title: 'Education Preferences',
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => const EditEducationPreferencesScreen(),
+              ),
+            ),
           ),
           _buildDivider(),
           _buildMenuItem(

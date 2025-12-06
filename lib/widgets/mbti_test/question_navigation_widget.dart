@@ -65,9 +65,11 @@ class QuestionNavigationWidget extends StatelessWidget {
 
             Expanded(
               flex: isFirstQuestion ? 1 : 1,
-              child: isLastQuestion && canSubmit
+              // FIXED: Show Submit button if it's the last question, regardless of canSubmit state
+              // Disable it if canSubmit is false
+              child: isLastQuestion
                   ? ElevatedButton.icon(
-                onPressed: isSubmitting ? null : onSubmit,
+                onPressed: (canSubmit && !isSubmitting) ? onSubmit : null,
                 icon: isSubmitting
                     ? const SizedBox(
                   width: 20,
@@ -82,6 +84,7 @@ class QuestionNavigationWidget extends StatelessWidget {
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Colors.green[600],
                   foregroundColor: Colors.white,
+                  disabledBackgroundColor: Colors.grey[300],
                   padding: const EdgeInsets.symmetric(vertical: 16),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12),
@@ -89,7 +92,7 @@ class QuestionNavigationWidget extends StatelessWidget {
                 ),
               )
                   : ElevatedButton.icon(
-                onPressed: hasAnsweredCurrent && !isLastQuestion ? onNext : null,
+                onPressed: hasAnsweredCurrent ? onNext : null,
                 icon: const Icon(Icons.arrow_forward_rounded, size: 20),
                 label: const Text('Next'),
                 style: ElevatedButton.styleFrom(

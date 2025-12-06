@@ -5,7 +5,12 @@ class UserModel {
   final String phone;
   final String email;
   final String dob;
-  final String address;
+  final String addressLine1;
+  final String addressLine2;
+  final String city;
+  final String state;
+  final String country;
+  final String zipCode;
   final String userRole;
 
   const UserModel({
@@ -15,7 +20,12 @@ class UserModel {
     required this.phone,
     required this.email,
     required this.dob,
-    required this.address,
+    required this.addressLine1,
+    this.addressLine2 = '',
+    required this.city,
+    required this.state,
+    required this.country,
+    required this.zipCode,
     this.userRole = 'education',
   });
 
@@ -27,7 +37,12 @@ class UserModel {
       phone: map['phone'] ?? '',
       email: map['email'] ?? '',
       dob: map['dob'] ?? '',
-      address: map['address'] ?? '',
+      addressLine1: map['address_line1'] ?? map['address'] ?? '', // Backward compatibility
+      addressLine2: map['address_line2'] ?? '',
+      city: map['city'] ?? '',
+      state: map['state'] ?? '',
+      country: map['country'] ?? '',
+      zipCode: map['zip_code'] ?? '',
       userRole: map['user_role'] ?? 'education',
     );
   }
@@ -40,7 +55,12 @@ class UserModel {
       'phone': phone,
       'email': email,
       'dob': dob,
-      'address': address,
+      'address_line1': addressLine1,
+      'address_line2': addressLine2,
+      'city': city,
+      'state': state,
+      'country': country,
+      'zip_code': zipCode,
       'user_role': userRole,
     };
   }
@@ -52,7 +72,12 @@ class UserModel {
     String? phone,
     String? email,
     String? dob,
-    String? address,
+    String? addressLine1,
+    String? addressLine2,
+    String? city,
+    String? state,
+    String? country,
+    String? zipCode,
     String? userRole,
   }) {
     return UserModel(
@@ -62,14 +87,19 @@ class UserModel {
       phone: phone ?? this.phone,
       email: email ?? this.email,
       dob: dob ?? this.dob,
-      address: address ?? this.address,
+      addressLine1: addressLine1 ?? this.addressLine1,
+      addressLine2: addressLine2 ?? this.addressLine2,
+      city: city ?? this.city,
+      state: state ?? this.state,
+      country: country ?? this.country,
+      zipCode: zipCode ?? this.zipCode,
       userRole: userRole ?? this.userRole,
     );
   }
 
   @override
   String toString() {
-    return 'UserModel(userId: $userId, firstName: $firstName, lastName: $lastName, phone: $phone, email: $email, dob: $dob, address: $address, user Role: $userRole)';
+    return 'UserModel(userId: $userId, firstName: $firstName, lastName: $lastName, phone: $phone, email: $email, dob: $dob, addressLine1: $addressLine1, addressLine2: $addressLine2, city: $city, state: $state, country: $country, zipCode: $zipCode, userRole: $userRole)';
   }
 
   @override
@@ -83,11 +113,29 @@ class UserModel {
         other.phone == phone &&
         other.email == email &&
         other.dob == dob &&
-        other.address == address;
+        other.addressLine1 == addressLine1 &&
+        other.addressLine2 == addressLine2 &&
+        other.city == city &&
+        other.state == state &&
+        other.country == country &&
+        other.zipCode == zipCode;
   }
 
   @override
   int get hashCode {
-    return Object.hash(userId, firstName, lastName, phone, email, dob, address);
+    return Object.hash(
+      userId,
+      firstName,
+      lastName,
+      phone,
+      email,
+      dob,
+      addressLine1,
+      addressLine2,
+      city,
+      state,
+      country,
+      zipCode,
+    );
   }
 }

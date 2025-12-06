@@ -1,4 +1,3 @@
-// lib/services/database_helper.dart
 import 'dart:io';
 import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart';
@@ -8,9 +7,8 @@ class DatabaseHelper {
   static final DatabaseHelper instance = DatabaseHelper._init();
   static Database? _database;
 
-  // Optimization: Larger transaction chunks for massive datasets
-  // 1000 is efficient for SQLite while keeping memory usage reasonable
-  static const int _transactionChunkSize = 1000;
+  // Optimization: Keep chunk size reasonable (500-1000)
+  static const int _transactionChunkSize = 500;
 
   DatabaseHelper._init();
 
@@ -27,9 +25,25 @@ class DatabaseHelper {
     return await openDatabase(
       path,
       version: 3,
+      onConfigure: _onConfigure, // <--- IMPORTANT: Register the configuration callback
       onCreate: _createDB,
       onUpgrade: _onUpgrade,
     );
+  }
+
+  /// Configure database settings for performance and concurrency
+  Future<void> _onConfigure(Database db) async {
+    // 1. Enforce foreign key constraints
+    await db.execute('PRAGMA foreign_keys = ON');
+
+    // 2. Enable Write-Ahead Logging (WAL)
+    // FIX: Use rawQuery instead of execute. 'PRAGMA journal_mode' returns a result
+    // (the string "wal"), which causes db.execute() to throw an exception on Android.
+    await db.rawQuery('PRAGMA journal_mode = WAL');
+
+    // 3. Optimize synchronization for performance
+    // NORMAL mode is faster than FULL and safe for most mobile applications.
+    await db.execute('PRAGMA synchronous = NORMAL');
   }
 
   Future<void> _createDB(Database db, int version) async {
@@ -157,21 +171,17 @@ class DatabaseHelper {
   }
 
   Future<void> _createIndexes(Database db) async {
-    debugPrint('🔒 Creating database indexes...');
-
-    // Universities indexes
+    // ... [Same indexes as before] ...
     await db.execute('CREATE INDEX idx_uni_ranking ON universities(min_ranking)');
     await db.execute('CREATE INDEX idx_uni_students ON universities(total_students)');
     await db.execute('CREATE INDEX idx_uni_name ON universities(university_name)');
     await db.execute('CREATE INDEX idx_uni_updated ON universities(updated_at)');
 
-    // Branches indexes
     await db.execute('CREATE INDEX idx_branch_uni ON branches(university_id)');
     await db.execute('CREATE INDEX idx_branch_country ON branches(country)');
     await db.execute('CREATE INDEX idx_branch_city ON branches(city)');
     await db.execute('CREATE INDEX idx_branch_updated ON branches(updated_at)');
 
-    // Programs indexes
     await db.execute('CREATE INDEX idx_prog_branch ON programs(branch_id)');
     await db.execute('CREATE INDEX idx_prog_uni ON programs(university_id)');
     await db.execute('CREATE INDEX idx_prog_subject ON programs(subject_area)');
@@ -181,11 +191,9 @@ class DatabaseHelper {
     await db.execute('CREATE INDEX idx_prog_name ON programs(program_name)');
     await db.execute('CREATE INDEX idx_prog_updated ON programs(updated_at)');
 
-    // Admissions indexes
     await db.execute('CREATE INDEX idx_uni_adm_uni ON university_admissions(university_id)');
     await db.execute('CREATE INDEX idx_prog_adm_prog ON program_admissions(program_id)');
 
-    // Comparison indexes
     await db.execute('CREATE INDEX idx_comp_user ON comparisons(user_id)');
     await db.execute('CREATE INDEX idx_comp_type ON comparisons(item_type)');
     await db.execute('CREATE INDEX idx_comp_user_type ON comparisons(user_id, item_type)');
@@ -198,8 +206,6 @@ class DatabaseHelper {
     await db.execute('CREATE INDEX IF NOT EXISTS idx_universities_tuition_domestic ON universities(domestic_tuition_fee)');
     await db.execute('CREATE INDEX IF NOT EXISTS idx_universities_tuition_international ON universities(international_tuition_fee)');
     await db.execute('CREATE INDEX IF NOT EXISTS idx_branches_university_id ON branches(university_id)');
-
-    debugPrint('✅ Database indexes created successfully');
   }
 
   Future<void> _initializeSyncMetadata(Database db) async {
@@ -233,16 +239,14 @@ class DatabaseHelper {
           UNIQUE(user_id, item_type, item_id)
         )
       ''');
-
       await db.execute('CREATE INDEX idx_comp_user ON comparisons(user_id)');
       await db.execute('CREATE INDEX idx_comp_type ON comparisons(item_type)');
       await db.execute('CREATE INDEX idx_comp_user_type ON comparisons(user_id, item_type)');
     }
   }
 
-  // ==================== BATCH OPERATIONS (OPTIMIZED) ====================
+  // ==================== BATCH OPERATIONS ====================
 
-  /// Batch insert or update records with larger chunks for speed
   Future<void> batchUpsert(
       String tableName,
       List<Map<String, dynamic>> records,
@@ -250,9 +254,6 @@ class DatabaseHelper {
     if (records.isEmpty) return;
 
     final db = await database;
-
-    // OPTIMIZATION: Increased chunk size to reduce transaction overhead
-    // 1000 is safe for modern devices and drastically reduces commit time
     const chunkSize = _transactionChunkSize;
 
     for (int i = 0; i < records.length; i += chunkSize) {
@@ -261,7 +262,6 @@ class DatabaseHelper {
 
       await db.transaction((txn) async {
         final batch = txn.batch();
-
         for (var record in chunk) {
           batch.insert(
             tableName,
@@ -269,21 +269,16 @@ class DatabaseHelper {
             conflictAlgorithm: ConflictAlgorithm.replace,
           );
         }
-
         await batch.commit(noResult: true);
       });
 
-      // Tiny yield to allow UI to breathe if processing massive datasets
-      // Using Duration.zero yields execution to the event loop without actual waiting
+      // Allow UI frame to render to prevent jank
       if (i + chunkSize < records.length) {
         await Future.delayed(Duration.zero);
       }
     }
-
-    debugPrint('✅ Batch upserted ${records.length} records to $tableName');
   }
 
-  /// Batch delete records
   Future<void> batchDelete(
       String tableName,
       List<String> ids,
@@ -300,7 +295,6 @@ class DatabaseHelper {
 
       await db.transaction((txn) async {
         final batch = txn.batch();
-
         for (var id in chunk) {
           batch.update(
             tableName,
@@ -309,15 +303,17 @@ class DatabaseHelper {
             whereArgs: [id],
           );
         }
-
         await batch.commit(noResult: true);
       });
-    }
 
-    debugPrint('✅ Batch deleted ${ids.length} records from $tableName');
+      if (i + chunkSize < ids.length) {
+        await Future.delayed(Duration.zero);
+      }
+    }
   }
 
-  // ==================== SYNC OPERATIONS ====================
+  // ==================== SYNC & QUERY OPERATIONS ====================
+  // (Keep the rest of your methods exactly as they were)
 
   Future<int> getLastSyncTimestamp(String tableName) async {
     final db = await database;
@@ -327,7 +323,6 @@ class DatabaseHelper {
       where: 'table_name = ?',
       whereArgs: [tableName],
     );
-
     if (result.isEmpty) return 0;
     return result.first['last_sync_timestamp'] as int;
   }
@@ -354,7 +349,6 @@ class DatabaseHelper {
   Future<Map<String, dynamic>> getSyncStatus() async {
     final db = await database;
     final result = await db.query('sync_metadata');
-
     return {
       for (var row in result)
         row['table_name'] as String: {
@@ -364,8 +358,6 @@ class DatabaseHelper {
         }
     };
   }
-
-  // ==================== COMPARISON & OTHER OPERATIONS ====================
 
   Future<bool> addComparison({required String userId, required String itemType, required String itemId}) async {
     try {

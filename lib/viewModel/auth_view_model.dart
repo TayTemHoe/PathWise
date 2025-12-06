@@ -27,15 +27,10 @@ class AuthViewModel extends ChangeNotifier {
 
   // Getters
   bool get isLoading => _isLoading;
-
   bool get isLoginMode => _isLoginMode;
-
   String? get errorMessage => _errorMessage;
-
   bool get isFormValid => _isFormValid;
-
   bool get rememberMe => _rememberMe;
-
   UserModel? get currentUser => _currentUser;
 
   // Initialize
@@ -99,7 +94,12 @@ class AuthViewModel extends ChangeNotifier {
     String? lastName,
     String? phone,
     String? dob,
-    String? address,
+    String? addressLine1,
+    String? addressLine2,
+    String? city,
+    String? state,
+    String? country,
+    String? zipCode,
   }) {
     bool newFormValid = false;
 
@@ -108,9 +108,8 @@ class AuthViewModel extends ChangeNotifier {
       // For Login: Enable button if email and password are not empty
       newFormValid = email.trim().isNotEmpty && password.trim().isNotEmpty;
     } else {
-      // For Register: Enable button if all fields have some value
-      newFormValid =
-          email.trim().isNotEmpty &&
+      // For Register: Enable button if all required fields have some value
+      newFormValid = email.trim().isNotEmpty &&
           password.trim().isNotEmpty &&
           confirmPassword != null &&
           confirmPassword.trim().isNotEmpty &&
@@ -122,8 +121,17 @@ class AuthViewModel extends ChangeNotifier {
           phone.trim().isNotEmpty &&
           dob != null &&
           dob.trim().isNotEmpty &&
-          address != null &&
-          address.trim().isNotEmpty;
+          addressLine1 != null &&
+          addressLine1.trim().isNotEmpty &&
+          city != null &&
+          city.trim().isNotEmpty &&
+          state != null &&
+          state.trim().isNotEmpty &&
+          country != null &&
+          country.trim().isNotEmpty &&
+          zipCode != null &&
+          zipCode.trim().isNotEmpty;
+      // Note: addressLine2 is optional, so not included in validation
     }
 
     // Only notify if the state actually changed
@@ -164,7 +172,12 @@ class AuthViewModel extends ChangeNotifier {
     required String lastName,
     required String phone,
     required String dob,
-    required String address,
+    required String addressLine1,
+    String? addressLine2,
+    required String city,
+    required String state,
+    required String country,
+    required String zipCode,
     required String userRole,
   }) async {
     try {
@@ -178,7 +191,12 @@ class AuthViewModel extends ChangeNotifier {
         lastName: lastName,
         phone: phone,
         dob: dob,
-        address: address,
+        addressLine1: addressLine1,
+        addressLine2: addressLine2,
+        city: city,
+        state: state,
+        country: country,
+        zipCode: zipCode,
         userRole: userRole,
       );
 

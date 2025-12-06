@@ -219,8 +219,8 @@ class EnglishTestsPage extends StatelessWidget {
       AIMatchViewModel viewModel, {
         EnglishTest? test,
         int? index,
-      }) {
-    showDialog(
+      }) async {
+    await showDialog(
       context: context,
       barrierDismissible: false,
       builder: (context) => EnglishTestDialog(
@@ -229,6 +229,11 @@ class EnglishTestsPage extends StatelessWidget {
         editingIndex: index,
       ),
     );
+
+    // ✅ Force refresh after dialog closes
+    if (context.mounted) {
+      await viewModel.loadProgress(forceRefresh: true);
+    }
   }
 
   Widget _buildTestsList(AIMatchViewModel viewModel, BuildContext context) {

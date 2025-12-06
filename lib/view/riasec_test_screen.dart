@@ -1,5 +1,3 @@
-// lib/view/riasec_test_screen.dart
-
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../utils/app_color.dart';
@@ -29,14 +27,12 @@ class _RiasecTestScreenState extends State<RiasecTestScreen> {
       await _viewModel.initialize();
 
       if (mounted) {
-        // Schedule this for the NEXT frame to ensure PageView is built and attached
         WidgetsBinding.instance.addPostFrameCallback((_) {
           if (mounted && _viewModel.currentQuestionIndex > 0 && _pageController.hasClients) {
             _pageController.jumpToPage(_viewModel.currentQuestionIndex);
           }
         });
 
-        // Navigate to result if ready (this doesn't need PageController)
         if (_viewModel.result != null) {
           _navigateToResult();
         }
@@ -361,10 +357,9 @@ class _RiasecTestScreenState extends State<RiasecTestScreen> {
         Expanded(
           child: PageView.builder(
             controller: _pageController,
+            // FIX: Disable scrolling to enforce linear progression
+            physics: const NeverScrollableScrollPhysics(),
             itemCount: viewModel.totalQuestions,
-            onPageChanged: (index) {
-              viewModel.goToQuestion(index);
-            },
             itemBuilder: (context, index) {
               return RiasecQuestionCard(
                 question: viewModel.questions[index],
@@ -389,13 +384,17 @@ class _RiasecTestScreenState extends State<RiasecTestScreen> {
           canSubmit: viewModel.canSubmit,
           isSubmitting: viewModel.isSubmitting,
           onPrevious: () {
-            _pageController.previousPage(
+            viewModel.previousQuestion(); // Update VM
+            _pageController.animateToPage(
+              viewModel.currentQuestionIndex,
               duration: const Duration(milliseconds: 300),
               curve: Curves.easeInOut,
             );
           },
           onNext: () {
-            _pageController.nextPage(
+            viewModel.nextQuestion(); // Update VM
+            _pageController.animateToPage(
+              viewModel.currentQuestionIndex,
               duration: const Duration(milliseconds: 300),
               curve: Curves.easeInOut,
             );

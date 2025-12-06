@@ -1,4 +1,3 @@
-// lib/widgets/big_five_test/big_five_navigation_widget.dart
 import 'package:flutter/material.dart';
 import '../../utils/app_color.dart';
 
@@ -66,17 +65,16 @@ class BigFiveNavigationWidget extends StatelessWidget {
 
             Expanded(
               flex: isFirstQuestion ? 1 : 1,
-              child: isLastQuestion && canSubmit
+              child: isLastQuestion
                   ? ElevatedButton.icon(
-                onPressed: isSubmitting ? null : onSubmit,
+                onPressed: (canSubmit && !isSubmitting) ? onSubmit : null,
                 icon: isSubmitting
                     ? const SizedBox(
                   width: 20,
                   height: 20,
                   child: CircularProgressIndicator(
                     strokeWidth: 2,
-                    valueColor:
-                    AlwaysStoppedAnimation<Color>(Colors.white),
+                    valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
                   ),
                 )
                     : const Icon(Icons.check_circle_rounded, size: 20),
@@ -84,6 +82,7 @@ class BigFiveNavigationWidget extends StatelessWidget {
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Colors.green[600],
                   foregroundColor: Colors.white,
+                  disabledBackgroundColor: Colors.grey[300],
                   padding: const EdgeInsets.symmetric(vertical: 16),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12),
@@ -91,8 +90,7 @@ class BigFiveNavigationWidget extends StatelessWidget {
                 ),
               )
                   : ElevatedButton.icon(
-                onPressed:
-                hasAnsweredCurrent && !isLastQuestion ? onNext : null,
+                onPressed: hasAnsweredCurrent ? onNext : null,
                 icon: const Icon(Icons.arrow_forward_rounded, size: 20),
                 label: const Text('Next'),
                 style: ElevatedButton.styleFrom(

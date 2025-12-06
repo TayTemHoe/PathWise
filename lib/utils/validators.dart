@@ -76,4 +76,95 @@ class Validators {
     }
     return phone;
   }
+
+  // Address Line 1 validation
+  static String? validateAddressLine1(String? value) {
+    if (value == null || value.trim().isEmpty) {
+      return 'Address Line 1 is required';
+    }
+
+    if (value.trim().length < 5) {
+      return 'Address must be at least 5 characters';
+    }
+
+    return null;
+  }
+
+  // Address Line 2 validation (optional)
+  static String? validateAddressLine2(String? value) {
+    // Address Line 2 is optional, so only validate if provided
+    if (value != null && value.trim().isNotEmpty && value.trim().length < 3) {
+      return 'Address must be at least 3 characters';
+    }
+    return null;
+  }
+
+  // City validation
+  static String? validateCity(String? value) {
+    if (value == null || value.trim().isEmpty) {
+      return 'City is required';
+    }
+
+    if (value.trim().length < 2) {
+      return 'City must be at least 2 characters';
+    }
+
+    final cityRegex = RegExp(r'^[a-zA-Z\s\-]+$');
+    if (!cityRegex.hasMatch(value.trim())) {
+      return 'City can only contain letters, spaces, and hyphens';
+    }
+
+    return null;
+  }
+
+  // State validation
+  static String? validateState(String? value) {
+    if (value == null || value.trim().isEmpty) {
+      return 'State/Province is required';
+    }
+
+    if (value.trim().length < 2) {
+      return 'State/Province must be at least 2 characters';
+    }
+
+    final stateRegex = RegExp(r'^[a-zA-Z\s\-]+$');
+    if (!stateRegex.hasMatch(value.trim())) {
+      return 'State/Province can only contain letters, spaces, and hyphens';
+    }
+
+    return null;
+  }
+
+  // Country validation
+  static String? validateCountry(String? value) {
+    if (value == null || value.trim().isEmpty) {
+      return 'Country is required';
+    }
+
+    if (value.trim().length < 2) {
+      return 'Country must be at least 2 characters';
+    }
+
+    final countryRegex = RegExp(r'^[a-zA-Z\s\-]+$');
+    if (!countryRegex.hasMatch(value.trim())) {
+      return 'Country can only contain letters, spaces, and hyphens';
+    }
+
+    return null;
+  }
+
+  // Zip Code validation
+  static String? validateZipCode(String? value) {
+    if (value == null || value.trim().isEmpty) {
+      return 'Zip/Postal code is required';
+    }
+
+    // Allow alphanumeric, spaces, and hyphens (covers various postal code formats)
+    final zipRegex = RegExp(r'^[a-zA-Z0-9\s\-]{3,10}$');
+    if (!zipRegex.hasMatch(value.trim())) {
+      return 'Invalid zip/postal code format';
+    }
+
+    return null;
+  }
 }

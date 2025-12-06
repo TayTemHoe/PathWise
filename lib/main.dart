@@ -10,8 +10,10 @@ import 'package:path_wise/view/big_five_test_screen.dart';
 import 'package:path_wise/view/comparison_screen.dart';
 import 'package:path_wise/view/dashboard.dart';
 import 'package:path_wise/view/mbti_test_screen.dart';
+import 'package:path_wise/view/profile/edit_education_preferences_view.dart';
 import 'package:path_wise/view/profile/edit_education_view.dart';
 import 'package:path_wise/view/profile/edit_experience_view.dart';
+import 'package:path_wise/view/profile/edit_language_preferences_view.dart';
 import 'package:path_wise/view/profile/edit_personal_view.dart';
 import 'package:path_wise/view/profile/edit_personality_view.dart';
 import 'package:path_wise/view/profile/edit_preferences_view.dart';
@@ -73,10 +75,10 @@ Future<void> main() async {
     );
     debugPrint('Firebase initialized');
 
-    await Supabase.initialize(
-      url: 'https://ajdaciskaffuvaanizlw.supabase.co',
-      anonKey: 'sb_publishable_Vs82x42CVKx28QIzgQEYNw_zvzJ7yEg',
-    );
+    // await Supabase.initialize(
+    //   url: 'https://ajdaciskaffuvaanizlw.supabase.co',
+    //   anonKey: 'sb_publishable_Vs82x42CVKx28QIzgQEYNw_zvzJ7yEg',
+    // );
 
     // Initialize Supabase
     await Supabase.initialize(
@@ -249,6 +251,8 @@ class _PathWiseAppState extends State<PathWiseApp> with WidgetsBindingObserver {
         AppRoutes.editExperience:   (_) => const EditExperienceScreen(),
         AppRoutes.editPreferences:  (_) => const EditPreferencesScreen(),
         AppRoutes.editPersonality:  (_) => const EditPersonalityScreen(),
+        AppRoutes.editEducationPreferences: (_) => const EditEducationPreferencesScreen(),
+        AppRoutes.editLanguagePreferences: (_) => const EditLanguagePreferencesScreen(),
         '/interview-home': (context) => const InterviewHomePage(),
         '/interview-setup': (context) => const InterviewSetupPage(),
         '/interview-session': (context) => const InterviewSessionPage(),

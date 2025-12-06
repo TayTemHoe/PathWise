@@ -65,9 +65,9 @@ class RiasecNavigationWidget extends StatelessWidget {
 
             Expanded(
               flex: isFirstQuestion ? 1 : 1,
-              child: isLastQuestion && canSubmit
+              child: isLastQuestion
                   ? ElevatedButton.icon(
-                onPressed: isSubmitting ? null : onSubmit,
+                onPressed: (canSubmit && !isSubmitting) ? onSubmit : null,
                 icon: isSubmitting
                     ? const SizedBox(
                   width: 20,
@@ -82,6 +82,7 @@ class RiasecNavigationWidget extends StatelessWidget {
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Colors.green[600],
                   foregroundColor: Colors.white,
+                  disabledBackgroundColor: Colors.grey[300],
                   padding: const EdgeInsets.symmetric(vertical: 16),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12),
@@ -89,7 +90,7 @@ class RiasecNavigationWidget extends StatelessWidget {
                 ),
               )
                   : ElevatedButton.icon(
-                onPressed: hasAnsweredCurrent && !isLastQuestion ? onNext : null,
+                onPressed: hasAnsweredCurrent ? onNext : null,
                 icon: const Icon(Icons.arrow_forward_rounded, size: 20),
                 label: const Text('Next'),
                 style: ElevatedButton.styleFrom(

@@ -426,16 +426,18 @@ class _EnglishTestDialogState extends State<EnglishTestDialog> {
         year: _selectedYear,
       );
 
-      // CHECK: Edit or Add?
       if (widget.initialTest != null && widget.editingIndex != null) {
-        // Call update method
         widget.viewModel.updateEnglishTest(widget.editingIndex!, test);
         _showSuccessSnackbar('Test updated successfully!');
       } else {
-        // Call add method
         widget.viewModel.addEnglishTest(test);
         _showSuccessSnackbar('Test added successfully!');
       }
+
+      // ✅ Force save to SharedPreferences immediately
+      widget.viewModel.saveProgress().then((_) {
+        debugPrint('✅ Language test saved to storage');
+      });
 
       Navigator.pop(context);
     }

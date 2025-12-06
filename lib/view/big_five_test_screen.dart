@@ -1,5 +1,3 @@
-// lib/view/big_five_test_screen.dart
-
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../utils/app_color.dart';
@@ -23,13 +21,12 @@ class _BigFiveTestScreenState extends State<BigFiveTestScreen> {
   @override
   void initState() {
     super.initState();
-    _viewModel = BigFiveTestViewModel(); // or MBTITestViewModel / RiasecTestViewModel
+    _viewModel = BigFiveTestViewModel();
 
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       await _viewModel.initialize();
-      
+
       if (mounted) {
-        // Schedule this for the NEXT frame to ensure PageView is built and attached
         WidgetsBinding.instance.addPostFrameCallback((_) {
           if (mounted && _viewModel.currentQuestionIndex > 0 && _pageController.hasClients) {
             _pageController.jumpToPage(_viewModel.currentQuestionIndex);
@@ -349,21 +346,18 @@ class _BigFiveTestScreenState extends State<BigFiveTestScreen> {
   Widget _buildTestContent(BigFiveTestViewModel viewModel) {
     return Column(
       children: [
-        // Progress indicator
         BigFiveProgressIndicator(
           current: viewModel.answeredCount,
           total: viewModel.totalQuestions,
           progress: viewModel.progress,
         ),
 
-        // Questions
         Expanded(
           child: PageView.builder(
             controller: _pageController,
+            // FIX: Disable scrolling to enforce linear progression
+            physics: const NeverScrollableScrollPhysics(),
             itemCount: viewModel.totalQuestions,
-            onPageChanged: (index) {
-              viewModel.goToQuestion(index);
-            },
             itemBuilder: (context, index) {
               return BigFiveQuestionCard(
                 question: viewModel.questions[index],
@@ -379,7 +373,6 @@ class _BigFiveTestScreenState extends State<BigFiveTestScreen> {
           ),
         ),
 
-        // Navigation
         BigFiveNavigationWidget(
           currentIndex: viewModel.currentQuestionIndex,
           totalQuestions: viewModel.totalQuestions,
@@ -387,13 +380,17 @@ class _BigFiveTestScreenState extends State<BigFiveTestScreen> {
           canSubmit: viewModel.canSubmit,
           isSubmitting: viewModel.isSubmitting,
           onPrevious: () {
-            _pageController.previousPage(
+            viewModel.previousQuestion();
+            _pageController.animateToPage(
+              viewModel.currentQuestionIndex,
               duration: const Duration(milliseconds: 300),
               curve: Curves.easeInOut,
             );
           },
           onNext: () {
-            _pageController.nextPage(
+            viewModel.nextQuestion();
+            _pageController.animateToPage(
+              viewModel.currentQuestionIndex,
               duration: const Duration(milliseconds: 300),
               curve: Curves.easeInOut,
             );

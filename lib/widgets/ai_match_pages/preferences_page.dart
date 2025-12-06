@@ -3,8 +3,10 @@ import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
 import '../../model/ai_match_model.dart';
+import '../../model/user_profile.dart';
 import '../../utils/app_color.dart';
 import '../../viewModel/ai_match_view_model.dart';
+import '../../viewModel/profile_view_model.dart';
 import '../form_components.dart';
 import '../multi_select_dropdown.dart';
 
@@ -44,6 +46,53 @@ class _PreferencesPageState extends State<PreferencesPage> {
         _isInitialized = true;
       }
     });
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (!_isInitialized) {
+      _syncWithProfileViewModel();
+    }
+  }
+
+  Future<void> _syncWithProfileViewModel() async {
+    try {
+      final profileVM = context.read<ProfileViewModel>();
+      final prefs = profileVM.user?.preferences;
+
+      if (prefs != null) {
+        setState(() {
+          // Sync study levels
+          if (prefs.desiredJobTitles != null) {
+            _selectedStudyLevels.clear();
+            _selectedStudyLevels.addAll(prefs.desiredJobTitles!);
+          }
+
+          // Sync locations
+          if (prefs.preferredLocations != null) {
+            _selectedLocations.clear();
+            _selectedLocations.addAll(prefs.preferredLocations!);
+          }
+
+          // Sync modes
+          if (prefs.workEnvironment != null) {
+            _selectedModes.clear();
+            _selectedModes.addAll(prefs.workEnvironment!);
+          }
+
+          // Sync tuition
+          if (prefs.salary?.min != null) {
+            _minTuitionController.text = prefs.salary!.min.toString();
+          }
+          if (prefs.salary?.max != null) {
+            _maxTuitionController.text = prefs.salary!.max.toString();
+          }
+        });
+      }
+    } catch (e) {
+      debugPrint('⚠️ Could not sync with profile: $e');
+    }
   }
 
   void _loadExistingPreferences() {
@@ -632,7 +681,8 @@ class _PreferencesPageState extends State<PreferencesPage> {
       maxTuition = double.tryParse(_maxTuitionController.text);
     }
 
-    final preferences = UserPreferences(
+    // 1. Update AIMatchViewModel (SharedPreferences)
+    final aiPreferences = UserPreferences(
       studyLevel: _selectedStudyLevels,
       tuitionMin: minTuition,
       tuitionMax: maxTuition,
@@ -645,6 +695,48 @@ class _PreferencesPageState extends State<PreferencesPage> {
       specialNeedsDetails: _hasSpecialNeeds ? _specialNeedsController.text : null,
     );
 
-    viewModel.updatePreferences(preferences);
+    viewModel.updatePreferences(aiPreferences);
+
+    // 2. SYNC to ProfileViewModel (Firestore) - Background task
+    _syncToProfileViewModel(
+      minTuition?.toInt(),
+      maxTuition?.toInt(),
+    );
+
+    debugPrint('✅ Preferences saved to SharedPreferences');
+  }
+
+  // NEW: Sync to Firestore in background
+  Future<void> _syncToProfileViewModel(int? minTuition, int? maxTuition) async {
+    try {
+      final profileVM = context.read<ProfileViewModel>();
+
+      // Convert AI Match preferences to Profile preferences
+      final profilePreferences = Preferences(
+        desiredJobTitles: _selectedStudyLevels.isNotEmpty ? _selectedStudyLevels : null,
+        preferredLocations: _selectedLocations.isNotEmpty ? _selectedLocations : null,
+        workEnvironment: _selectedModes.isNotEmpty ? _selectedModes : null,
+        salary: (minTuition != null || maxTuition != null)
+            ? PrefSalary(
+          min: minTuition,
+          max: maxTuition,
+          type: 'Annual',
+        )
+            : null,
+      );
+
+      // Update in background (don't await to keep UI responsive)
+      profileVM.updatePreferences(profilePreferences).then((success) {
+        if (success) {
+          debugPrint('✅ Preferences synced to Firestore');
+        } else {
+          debugPrint('⚠️ Failed to sync preferences to Firestore');
+        }
+      }).catchError((e) {
+        debugPrint('❌ Error syncing to Firestore: $e');
+      });
+    } catch (e) {
+      debugPrint('❌ Error in sync operation: $e');
+    }
   }
 }

@@ -1,5 +1,3 @@
-// lib/view/mbti_test_screen.dart
-
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../utils/app_color.dart';
@@ -31,14 +29,12 @@ class _MBTITestScreenState extends State<MBTITestScreen> {
       await _viewModel.initialize();
 
       if (mounted) {
-        // Schedule this for the NEXT frame to ensure PageView is built and attached
         WidgetsBinding.instance.addPostFrameCallback((_) {
           if (mounted && _viewModel.currentQuestionIndex > 0 && _pageController.hasClients) {
             _pageController.jumpToPage(_viewModel.currentQuestionIndex);
           }
         });
 
-        // Navigate to result if ready (this doesn't need PageController)
         if (_viewModel.result != null) {
           _navigateToResult();
         }
@@ -304,10 +300,10 @@ class _MBTITestScreenState extends State<MBTITestScreen> {
         Expanded(
           child: PageView.builder(
             controller: _pageController,
+            // FIX: Disable scrolling so user MUST use buttons (prevents skipping)
+            physics: const NeverScrollableScrollPhysics(),
             itemCount: viewModel.totalQuestions,
-            onPageChanged: (index) {
-              viewModel.goToQuestion(index);
-            },
+            // onPageChanged logic is handled by Navigation buttons now
             itemBuilder: (context, index) {
               return QuestionCardWidget(
                 question: viewModel.questions[index],
@@ -331,13 +327,17 @@ class _MBTITestScreenState extends State<MBTITestScreen> {
           canSubmit: viewModel.canSubmit,
           isSubmitting: viewModel.isSubmitting,
           onPrevious: () {
-            _pageController.previousPage(
+            viewModel.previousQuestion(); // Update VM state first
+            _pageController.animateToPage(
+              viewModel.currentQuestionIndex,
               duration: const Duration(milliseconds: 300),
               curve: Curves.easeInOut,
             );
           },
           onNext: () {
-            _pageController.nextPage(
+            viewModel.nextQuestion(); // Update VM state first
+            _pageController.animateToPage(
+              viewModel.currentQuestionIndex,
               duration: const Duration(milliseconds: 300),
               curve: Curves.easeInOut,
             );

@@ -733,52 +733,63 @@ class _RiasecResultScreenState extends State<RiasecResultScreen>
     }
   }
 
-  void _saveToProfile(BuildContext context, result) {
+  void _saveToProfile(BuildContext context, result) async {
+    final viewModel = Provider.of<AIMatchViewModel>(context, listen: false);
+
+    // 1. Show "Saving..." snackbar
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Row(
+          children: [
+            SizedBox(
+                width: 20,
+                height: 20,
+                child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white)
+            ),
+            SizedBox(width: 16),
+            Text('Saving result...'),
+          ],
+        ),
+        duration: Duration(seconds: 2),
+      ),
+    );
+
     try {
-      final aiMatchViewModel = Provider.of<AIMatchViewModel>(
-        context,
-        listen: false,
-      );
+      // 2. Load latest data
+      await viewModel.loadProgress();
 
-      // Convert to RIASEC map
+      // 3. Prepare updated profile
       final riasecMap = result.toRiasecMap();
+      final currentProfile = viewModel.personalityProfile ?? PersonalityProfile();
 
-      // Update personality profile
-      final currentProfile = aiMatchViewModel.personalityProfile ?? PersonalityProfile();
       final updatedProfile = PersonalityProfile(
-        mbti: currentProfile.mbti,
-        riasec: riasecMap,
-        ocean: currentProfile.ocean,
+        mbti: currentProfile.mbti,    // Keep existing
+        riasec: riasecMap,            // Update RIASEC
+        ocean: currentProfile.ocean,  // Keep existing
       );
 
-      aiMatchViewModel.setPersonalityProfile(updatedProfile);
+      // 4. Update ViewModel
+      viewModel.setPersonalityProfile(updatedProfile);
 
+      // 5. Force save to storage
+      await viewModel.saveProgress();
+
+      if (!context.mounted) return;
+
+      // 6. Show Success
+      ScaffoldMessenger.of(context).hideCurrentSnackBar();
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Container(
             padding: const EdgeInsets.symmetric(vertical: 4),
-            child: Row(
-              children: const [
+            child: const Row(
+              children: [
                 Icon(Icons.check_circle_rounded, color: Colors.white, size: 24),
                 SizedBox(width: 16),
                 Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        'Success!',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      SizedBox(height: 2),
-                      Text(
-                        'RIASEC results saved to your profile',
-                        style: TextStyle(fontSize: 13),
-                      ),
-                    ],
+                  child: Text(
+                    'RIASEC result saved successfully!',
+                    style: TextStyle(fontWeight: FontWeight.bold),
                   ),
                 ),
               ],
@@ -786,36 +797,27 @@ class _RiasecResultScreenState extends State<RiasecResultScreen>
           ),
           backgroundColor: const Color(0xFF36B37E),
           behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-          ),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
           margin: const EdgeInsets.all(16),
-          duration: const Duration(seconds: 2),
         ),
       );
 
-      Future.delayed(const Duration(milliseconds: 1500), () {
-        if (context.mounted) {
-          Navigator.of(context).popUntil((route) => route.isFirst);
-        }
-      });
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: const Text('Result saved successfully!'),
-          backgroundColor: const Color(0xFF36B37E),
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-          ),
-        ),
-      );
-
-      Future.delayed(const Duration(milliseconds: 1000), () {
+      // 7. Return to previous screen
+      Future.delayed(const Duration(milliseconds: 500), () {
         if (context.mounted) {
           Navigator.of(context).pop();
         }
       });
+
+    } catch (e) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).hideCurrentSnackBar();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error saving result: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
     }
   }
 

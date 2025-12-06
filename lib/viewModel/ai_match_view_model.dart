@@ -63,6 +63,7 @@ class AIMatchViewModel extends ChangeNotifier {
   (double, double) get tuitionRange => _tuitionRange;
 
   String? get _userId => FirebaseAuth.instance.currentUser?.uid;
+  String? get userId => _userId;
   String? _lastLoadedUserId;
 
   bool get canProceed {
@@ -110,6 +111,12 @@ class AIMatchViewModel extends ChangeNotifier {
     _availableCountries = await _repository.getAvailableCountries();
     _tuitionRange = await _repository.getProgramTuitionFeeRange();
     notifyListeners();
+  }
+
+  void updatePersonalityInMemory(PersonalityProfile profile) {
+    _personalityProfile = profile;
+    notifyListeners();
+    debugPrint('✅ Personality updated in memory (no auto-save)');
   }
 
   // UPDATED: Save progress
@@ -171,6 +178,14 @@ class AIMatchViewModel extends ChangeNotifier {
     notifyListeners();
 
     try {
+      // ADDED: Load available options if not loaded
+      if (_availableSubjectAreas.isEmpty ||
+          _availableStudyLevels.isEmpty ||
+          _availableCountries.isEmpty) {
+        debugPrint('📋 Loading available options...');
+        await _loadAvailableOptions();
+      }
+
       if (forceRefresh) {
         debugPrint('🔄 Force refreshing AI match data from storage');
       }
@@ -359,6 +374,7 @@ class AIMatchViewModel extends ChangeNotifier {
     _preferences = preferences;
     notifyListeners();
     _autoSaveProgress();
+    debugPrint('✅ Preferences updated: Levels=${preferences.studyLevel.length}, Locations=${preferences.locations.length}');
   }
 
   bool canChangeEducationLevel() {

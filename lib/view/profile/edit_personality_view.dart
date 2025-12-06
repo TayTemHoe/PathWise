@@ -1,9 +1,15 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:path_wise/viewModel/profile_view_model.dart';
-
-import '../../utils/app_color.dart';
+import 'package:path_wise/viewModel/ai_match_view_model.dart';
+import 'package:path_wise/model/ai_match_model.dart';
+import 'package:path_wise/utils/app_color.dart';
+import 'package:path_wise/view/mbti_test_screen.dart';
+import 'package:path_wise/view/big_five_test_screen.dart';
+import 'package:path_wise/view/riasec_test_screen.dart';
 
 class EditPersonalityScreen extends StatefulWidget {
   const EditPersonalityScreen({super.key});
@@ -12,246 +18,694 @@ class EditPersonalityScreen extends StatefulWidget {
   EditPersonalityScreenState createState() => EditPersonalityScreenState();
 }
 
-// made public to avoid: "Invalid use of a private type in a public API"
 class EditPersonalityScreenState extends State<EditPersonalityScreen> {
-  late TextEditingController _mbtiController;
-  late TextEditingController _riasecController;
+  // MBTI state
+  String? _selectedMBTI;
+  PersonalityProfile? _lastSyncedProfile;
+
+  // RIASEC state
+  final Map<String, double> _riasecScores = {
+    'R': 0.5,
+    'I': 0.5,
+    'A': 0.5,
+    'S': 0.5,
+    'E': 0.5,
+    'C': 0.5,
+  };
+
+  // Big Five (OCEAN) state
+  final Map<String, double> _oceanScores = {
+    'O': 0.5,
+    'C': 0.5,
+    'E': 0.5,
+    'A': 0.5,
+    'N': 0.5,
+  };
+
+  final List<String> _mbtiTypes = [
+    'ISTJ', 'ISFJ', 'INFJ', 'INTJ',
+    'ISTP', 'ISFP', 'INFP', 'INTP',
+    'ESTP', 'ESFP', 'ENFP', 'ENTP',
+    'ESTJ', 'ESFJ', 'ENFJ', 'ENTJ',
+  ];
+
+  bool _isLoading = true;
+  bool _isSaving = false;
+  final Color _textColor = AppColors.textPrimary;
 
   @override
   void initState() {
     super.initState();
-    final vm = context.read<ProfileViewModel>();
-    _mbtiController = TextEditingController(text: vm.profile?.mbti ?? '');
-    _riasecController = TextEditingController(text: vm.profile?.riasec ?? '');
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _loadPersonalityData();
+    });
   }
 
-  @override
-  void dispose() {
-    _mbtiController.dispose();
-    _riasecController.dispose();
-    super.dispose();
+  /// Load personality data from both ProfileViewModel (Firestore) and AIMatchViewModel (SharedPreferences)
+  Future<void> _loadPersonalityData() async {
+    setState(() => _isLoading = true);
+    try {
+      final aiMatchVM = context.read<AIMatchViewModel>();
+      // If VM has no data, try loading from disk. Otherwise, we trust the VM's current state.
+      if (aiMatchVM.personalityProfile == null) {
+        await aiMatchVM.loadProgress();
+      }
+      // The actual UI update will happen via the Consumer in the build method
+    } catch (e) {
+      debugPrint('❌ Error loading personality data: $e');
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  void _syncFromViewModel(PersonalityProfile? profile) {
+    // Only sync if the profile exists and is different from what we last saw
+    if (profile != null && profile != _lastSyncedProfile) {
+      // Use addPostFrameCallback to avoid "setState during build" errors
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          setState(() {
+            _selectedMBTI = profile.mbti;
+
+            if (profile.riasec != null) {
+              _riasecScores.clear();
+              _riasecScores.addAll(profile.riasec!);
+            }
+
+            if (profile.ocean != null) {
+              _oceanScores.clear();
+              _oceanScores.addAll(profile.ocean!);
+            }
+
+            _lastSyncedProfile = profile;
+          });
+        }
+      });
+    }
+  }
+
+  /// Save personality data to BOTH Firestore and SharedPreferences
+  Future<void> _savePersonalityData() async {
+    setState(() => _isSaving = true);
+
+    try {
+      final profileVM = context.read<ProfileViewModel>();
+      final aiMatchVM = context.read<AIMatchViewModel>();
+
+      // 1. Save to Firestore (via ProfileViewModel)
+      debugPrint('💾 Saving to Firestore: MBTI=$_selectedMBTI');
+      await profileVM.updatePersonality(
+        mbti: _selectedMBTI,
+        riasec: null, // We keep this null for now unless serializing map to string
+      );
+
+      // 2. Update AIMatchViewModel (Memory + SharedPrefs)
+      final riasecHasData = _riasecScores.values.any((v) => v != 0.5);
+      final oceanHasData = _oceanScores.values.any((v) => v != 0.5);
+
+      final personalityProfile = PersonalityProfile(
+        mbti: _selectedMBTI,
+        riasec: riasecHasData ? Map.from(_riasecScores) : null,
+        ocean: oceanHasData ? Map.from(_oceanScores) : null,
+      );
+
+      debugPrint('💾 Saving to AI Match ViewModel & SharedPrefs');
+
+      // This updates memory AND triggers auto-save to SharedPreferences
+      aiMatchVM.setPersonalityProfile(personalityProfile);
+
+      // Explicitly force save to disk to ensure sync
+      await aiMatchVM.saveProgress();
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Row(
+              children: [
+                Icon(Icons.check_circle, color: Colors.white),
+                SizedBox(width: 12),
+                Text('Personality data saved successfully'),
+              ],
+            ),
+            backgroundColor: Colors.green[600],
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    } catch (e) {
+      debugPrint('❌ Error saving personality data: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error saving: $e'),
+            backgroundColor: Colors.red[700],
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    } finally {
+      setState(() => _isSaving = false);
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    final vm = context.watch<ProfileViewModel>();
-    final currentMbti = vm.profile?.mbti ?? '';
-    final currentRiasec = vm.profile?.riasec ?? '';
-
     return Scaffold(
-      backgroundColor: const Color(0xFFFFFFFF),
+      backgroundColor: Colors.white,
       appBar: AppBar(
         elevation: 0,
-        backgroundColor: Colors.transparent,
-        flexibleSpace: Container(
-          decoration: const BoxDecoration(
-            gradient: LinearGradient(
-              colors: [Color(0xFF7C4DFF), Color(0xFF6EA8FF)], // same as edit_skills_screen
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-            ),
-          ),
-        ),
+        backgroundColor: Colors.white,
+        centerTitle: true,
         leading: IconButton(
           icon: const Icon(
               Icons.arrow_back_ios, color: AppColors.textPrimary, size: 20),
           onPressed: () => Navigator.pop(context),
         ),
-        title: const Text(
+        title: Text(
           'Personality Tests',
-          style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700),
+          style: TextStyle(
+            color: _textColor,
+            fontWeight: FontWeight.bold,
+            fontSize: 20,
+          ),
         ),
       ),
-      body: ListView(
-        padding: const EdgeInsets.all(16),
+      // MODIFY: Wrap body in Consumer to listen for updates
+      body: Consumer<AIMatchViewModel>(
+        builder: (context, aiMatchVM, child) {
+          // Check for updates every time the ViewModel notifies listeners
+          _syncFromViewModel(aiMatchVM.personalityProfile);
+
+          if (_isLoading) {
+            return const Center(child: CircularProgressIndicator());
+          }
+
+          return ListView(
+            padding: const EdgeInsets.all(16),
+            children: [
+              _buildInfoCard(),
+              const SizedBox(height: 20),
+              _buildMBTISection(),
+              const SizedBox(height: 20),
+              _buildRIASECSection(),
+              const SizedBox(height: 20),
+              _buildBigFiveSection(),
+              const SizedBox(height: 32),
+              _buildSaveButton(),
+            ],
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildInfoCard() {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [
+            AppColors.primary.withOpacity(0.1),
+            AppColors.primary.withOpacity(0.05),
+          ],
+        ),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.primary.withOpacity(0.3)),
+      ),
+      child: Row(
         children: [
-          _SectionCard(
-            title: 'MBTI (16 Personalities)',
-            currentValue: currentMbti.isEmpty ? 'Not set' : currentMbti,
-            controller: _mbtiController,
-            placeholder: 'e.g., INTP, ENFJ...',
-            onUpdate: () async {
-              final ok = await context.read<ProfileViewModel>().updatePersonality(
-                mbti: _mbtiController.text.trim(),
-                riasec: currentRiasec, // keep riasec
-              );
-              if (!mounted) return;
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text(ok ? 'MBTI updated' : 'Failed to update MBTI')),
-              );
-            },
-            // trusted, free MBTI-like test
-            linkLabel: 'Take the MBTI test (16personalities)',
-            linkUrl: Uri.parse('https://www.16personalities.com/free-personality-test'),
-          ),
-          const SizedBox(height: 16),
-          _SectionCard(
-            title: 'RIASEC (Holland Code)',
-            currentValue: currentRiasec.isEmpty ? 'Not set' : currentRiasec,
-            controller: _riasecController,
-            placeholder: 'e.g., RIA, SEC...',
-            onUpdate: () async {
-              final ok = await context.read<ProfileViewModel>().updatePersonality(
-                mbti: currentMbti, // keep mbti
-                riasec: _riasecController.text.trim(),
-              );
-              if (!mounted) return;
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text(ok ? 'RIASEC updated' : 'Failed to update RIASEC')),
-              );
-            },
-            // trusted, free RIASEC test
-            linkLabel: 'Take the RIASEC test (Truity)',
-            linkUrl: Uri.parse('https://www.truity.com/test/holland-code-career-test'),
+          Icon(Icons.info_outline, color: AppColors.primary, size: 24),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              'Complete personality tests to get better program recommendations. All tests are optional.',
+              style: TextStyle(
+                fontSize: 13,
+                color: AppColors.textPrimary,
+                height: 1.4,
+              ),
+            ),
           ),
         ],
       ),
     );
   }
-}
 
-class _SectionCard extends StatelessWidget {
-  const _SectionCard({
-    required this.title,
-    required this.currentValue,
-    required this.controller,
-    required this.onUpdate,
-    required this.linkLabel,
-    required this.linkUrl,
-    this.placeholder,
-  });
-
-  final String title;
-  final String currentValue;
-  final TextEditingController controller;
-  final VoidCallback onUpdate;
-  final String linkLabel;
-  final Uri linkUrl;
-  final String? placeholder;
-
-  @override
-  Widget build(BuildContext context) {
-    return Card(
-      elevation: 0,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-      child: Padding(
-        padding: const EdgeInsets.all(14),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Title
-            Row(
-              children: [
-                const Icon(Icons.psychology_alt_outlined, size: 20),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    title,
-                    style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 16),
-                  ),
+  Widget _buildMBTISection() {
+    return _buildSectionCard(
+      title: 'MBTI Personality Type',
+      icon: Icons.psychology_rounded,
+      color: Colors.purple,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Option 1: Take the test
+          InkWell(
+            onTap: () => _navigateToMBTITest(context),
+            borderRadius: BorderRadius.circular(12),
+            child: Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [Colors.purple[100]!, Colors.purple[50]!],
                 ),
-              ],
-            ),
-            const SizedBox(height: 10),
-
-            // Current value
-            Text(
-              'Current: $currentValue',
-              style: const TextStyle(color: Color(0xFF6B7280), fontSize: 12),
-            ),
-            const SizedBox(height: 10),
-
-            // Input
-            TextField(
-              controller: controller,
-              textCapitalization: TextCapitalization.characters,
-              decoration: InputDecoration(
-                hintText: placeholder ?? 'Enter your result',
-                filled: true,
-                fillColor: const Color(0xFFF9FAFB),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(10),
-                  borderSide: const BorderSide(color: Color(0xFAE5E7EB)),
-                ),
-                enabledBorder: const OutlineInputBorder(
-                  borderSide: BorderSide(color: Color(0xFFE5E7EB)),
-                  borderRadius: BorderRadius.all(Radius.circular(10)),
-                ),
-                contentPadding:
-                const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Colors.purple[300]!, width: 2),
               ),
-            ),
-            const SizedBox(height: 12),
-
-            // Buttons (prevent overflow on small screens)
-            LayoutBuilder(
-              builder: (context, c) {
-                final narrow = c.maxWidth < 380;
-                final saveBtn = ElevatedButton(
-                  onPressed: onUpdate,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF7C4DFF),
-                    foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(
+              child: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Colors.purple[600],
                       borderRadius: BorderRadius.circular(10),
                     ),
+                    child: const Icon(Icons.psychology_rounded, color: Colors.white, size: 28),
                   ),
-                  child: const Text('Update Result'),
-                );
-
-                final linkBtn = TextButton.icon(
-                  onPressed: () async {
-                    final ok = await _openExternal(linkUrl);
-                    if (!ok && context.mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('Could not open the link.'),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Take 16 Personalities Test',
+                          style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.purple[900]),
                         ),
-                      );
-                    }
-                  },
-                  icon: const Icon(Icons.open_in_new),
-                  label: Text(linkLabel),
-                );
+                        const SizedBox(height: 4),
+                        Text(
+                          'Discover your personality type • 10-15 min',
+                          style: TextStyle(fontSize: 13, color: Colors.purple[700]),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Icon(Icons.arrow_forward_ios_rounded, color: Colors.purple[600], size: 20),
+                ],
+              ),
+            ),
+          ),
 
-                if (narrow) {
-                  return Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      saveBtn,
-                      const SizedBox(height: 8),
-                      linkBtn,
-                    ],
-                  );
-                }
-                return Row(
-                  children: [
-                    saveBtn,
-                    const SizedBox(width: 12),
-                    Flexible(child: Align(alignment: Alignment.centerLeft, child: linkBtn)),
-                  ],
-                );
-              },
+          const SizedBox(height: 16),
+
+          // Divider
+          Row(
+            children: [
+              Expanded(child: Divider(color: Colors.grey[300])),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                child: Text('OR', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.grey[600])),
+              ),
+              Expanded(child: Divider(color: Colors.grey[300])),
+            ],
+          ),
+
+          const SizedBox(height: 16),
+
+          // Option 2: Manual selection
+          DropdownButtonFormField<String>(
+            value: _selectedMBTI,
+            decoration: InputDecoration(
+              labelText: 'Select Your MBTI Type',
+              hintText: 'Choose if you already know your type',
+              filled: true,
+              fillColor: Colors.white,
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(10),
+                borderSide: BorderSide(color: Colors.grey[300]!),
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(10),
+                borderSide: BorderSide(color: Colors.grey[300]!),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(10),
+                borderSide: BorderSide(color: AppColors.primary, width: 2),
+              ),
+            ),
+            items: _mbtiTypes.map((type) {
+              return DropdownMenuItem(value: type, child: Text(type));
+            }).toList(),
+            onChanged: (value) {
+              setState(() => _selectedMBTI = value);
+            },
+          ),
+
+          if (_selectedMBTI != null) ...[
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.purple[50],
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Row(
+                children: [
+                  Icon(Icons.check_circle, color: Colors.purple[700], size: 16),
+                  const SizedBox(width: 8),
+                  Text(
+                    'Selected: $_selectedMBTI',
+                    style: TextStyle(color: Colors.purple[900], fontWeight: FontWeight.w500, fontSize: 13),
+                  ),
+                ],
+              ),
             ),
           ],
-        ),
+        ],
       ),
     );
   }
-}
 
-/// Uses the modern url_launcher API (no deprecations).
-Future<bool> _openExternal(Uri uri) async {
-  try {
-    // Prefer launching into an external browser/app
-    final can = await canLaunchUrl(uri);
-    if (!can) return false;
-    final ok = await launchUrl(
-      uri,
-      mode: LaunchMode.externalApplication
+  Widget _buildRIASECSection() {
+    final labels = {
+      'R': 'Realistic',
+      'I': 'Investigative',
+      'A': 'Artistic',
+      'S': 'Social',
+      'E': 'Enterprising',
+      'C': 'Conventional',
+    };
+
+    return _buildSectionCard(
+      title: 'RIASEC / Holland Code',
+      icon: Icons.work_outline,
+      color: Colors.blue,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Option 1: Take the test
+          InkWell(
+            onTap: () => _navigateToRiasecTest(context),
+            borderRadius: BorderRadius.circular(12),
+            child: Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(colors: [Colors.blue[100]!, Colors.blue[50]!]),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Colors.blue[300]!, width: 2),
+              ),
+              child: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(color: Colors.blue[600], borderRadius: BorderRadius.circular(10)),
+                    child: const Icon(Icons.work_outline_rounded, color: Colors.white, size: 28),
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('Take RIASEC Test', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.blue[900])),
+                        const SizedBox(height: 4),
+                        Text('Discover your career interests • 10-15 min', style: TextStyle(fontSize: 13, color: Colors.blue[700])),
+                      ],
+                    ),
+                  ),
+                  Icon(Icons.arrow_forward_ios_rounded, color: Colors.blue[600], size: 20),
+                ],
+              ),
+            ),
+          ),
+
+          const SizedBox(height: 16),
+
+          Row(
+            children: [
+              Expanded(child: Divider(color: Colors.grey[300])),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                child: Text('OR', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.grey[600])),
+              ),
+              Expanded(child: Divider(color: Colors.grey[300])),
+            ],
+          ),
+
+          const SizedBox(height: 16),
+
+          Text('Adjust sliders manually (0.0 - 1.0)', style: TextStyle(fontSize: 12, color: Colors.grey[600])),
+          const SizedBox(height: 20),
+
+          ...labels.entries.map((entry) {
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 20),
+              child: _buildSliderItem(
+                key: entry.key,
+                label: entry.value,
+                value: _riasecScores[entry.key]!,
+                color: Colors.blue,
+                onChanged: (value) => setState(() => _riasecScores[entry.key] = value),
+              ),
+            );
+          }),
+        ],
+      ),
     );
-    return ok;
-  } catch (_) {
-    return false;
+  }
+
+  Widget _buildBigFiveSection() {
+    return _buildSectionCard(
+      title: 'Big Five (OCEAN)',
+      icon: Icons.favorite_rounded,
+      color: Colors.teal,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          InkWell(
+            onTap: () => _navigateToBigFiveTest(context),
+            borderRadius: BorderRadius.circular(12),
+            child: Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(colors: [Colors.teal[100]!, Colors.teal[50]!]),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Colors.teal[300]!, width: 2),
+              ),
+              child: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(color: Colors.teal[600], borderRadius: BorderRadius.circular(10)),
+                    child: const Icon(Icons.psychology_rounded, color: Colors.white, size: 28),
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('Take Big Five Test', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.teal[900])),
+                        const SizedBox(height: 4),
+                        Text('Comprehensive personality assessment • 15-20 min', style: TextStyle(fontSize: 13, color: Colors.teal[700])),
+                      ],
+                    ),
+                  ),
+                  Icon(Icons.arrow_forward_ios_rounded, color: Colors.teal[600], size: 20),
+                ],
+              ),
+            ),
+          ),
+
+          const SizedBox(height: 16),
+
+          Row(
+            children: [
+              Expanded(child: Divider(color: Colors.grey[300])),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                child: Text('OR', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.grey[600])),
+              ),
+              Expanded(child: Divider(color: Colors.grey[300])),
+            ],
+          ),
+
+          const SizedBox(height: 16),
+
+          Text('Adjust sliders manually (0.0 - 1.0)', style: TextStyle(fontSize: 12, color: Colors.grey[600])),
+          const SizedBox(height: 20),
+
+          ...{
+            'O': 'Openness',
+            'C': 'Conscientiousness',
+            'E': 'Extraversion',
+            'A': 'Agreeableness',
+            'N': 'Neuroticism',
+          }.entries.map((entry) {
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 20),
+              child: _buildSliderItem(
+                key: entry.key,
+                label: entry.value,
+                value: _oceanScores[entry.key]!,
+                color: Colors.teal,
+                onChanged: (value) => setState(() => _oceanScores[entry.key] = value),
+              ),
+            );
+          }),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSectionCard({
+    required String title,
+    required IconData icon,
+    required Color color,
+    required Widget child,
+  }) {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.grey[300]!),
+        boxShadow: [
+          BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 8, offset: const Offset(0, 2)),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(color: color.withOpacity(0.1), borderRadius: BorderRadius.circular(10)),
+                child: Icon(icon, color: color, size: 24),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  title,
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: color),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 20),
+          child,
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSliderItem({
+    required String key,
+    required String label,
+    required double value,
+    required Color color,
+    required ValueChanged<double> onChanged,
+  }) {
+    final formattedValue = value.toStringAsFixed(2);
+    final percentage = '${(value * 100).toStringAsFixed(0)}%';
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Expanded(
+              child: Row(
+                children: [
+                  Container(
+                    width: 32,
+                    height: 32,
+                    decoration: BoxDecoration(color: color.withOpacity(0.1), borderRadius: BorderRadius.circular(8)),
+                    child: Center(
+                      child: Text(key, style: TextStyle(fontWeight: FontWeight.bold, color: color, fontSize: 14)),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      label,
+                      style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500, color: AppColors.textPrimary),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              decoration: BoxDecoration(color: color.withOpacity(0.1), borderRadius: BorderRadius.circular(8)),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(formattedValue, style: TextStyle(fontWeight: FontWeight.bold, color: color, fontSize: 14)),
+                  const SizedBox(width: 4),
+                  Text('($percentage)', style: TextStyle(fontSize: 11, color: color)),
+                ],
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        SliderTheme(
+          data: SliderTheme.of(context).copyWith(
+            activeTrackColor: color,
+            inactiveTrackColor: color.withOpacity(0.2),
+            thumbColor: color,
+            overlayColor: color.withOpacity(0.2),
+            trackHeight: 6,
+          ),
+          child: Slider(value: value, min: 0.0, max: 1.0, divisions: 100, onChanged: onChanged),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildSaveButton() {
+    return SizedBox(
+      width: double.infinity,
+      child: ElevatedButton(
+        onPressed: _isSaving ? null : _savePersonalityData,
+        style: ElevatedButton.styleFrom(
+          backgroundColor: AppColors.primary,
+          foregroundColor: Colors.white,
+          padding: const EdgeInsets.symmetric(vertical: 16),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          elevation: 2,
+        ),
+        child: _isSaving
+            ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+            : const Text('Save Personality Data', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+      ),
+    );
+  }
+
+  Future<void> _navigateToMBTITest(BuildContext context) async {
+    await Navigator.of(context).push(
+        MaterialPageRoute(builder: (context) => const MBTITestScreen())
+    );
+
+    if (mounted) {
+      _lastSyncedProfile = null; // Force UI refresh
+      final vm = context.read<AIMatchViewModel>();
+      _syncFromViewModel(vm.personalityProfile);
+    }
+  }
+
+  Future<void> _navigateToRiasecTest(BuildContext context) async {
+    await Navigator.of(context).push(
+        MaterialPageRoute(builder: (context) => const RiasecTestScreen())
+    );
+
+    if (mounted) {
+      _lastSyncedProfile = null;
+      final vm = context.read<AIMatchViewModel>();
+      _syncFromViewModel(vm.personalityProfile);
+    }
+  }
+
+  Future<void> _navigateToBigFiveTest(BuildContext context) async {
+    await Navigator.of(context).push(
+        MaterialPageRoute(builder: (context) => const BigFiveTestScreen())
+    );
+
+    if (mounted) {
+      _lastSyncedProfile = null;
+      final vm = context.read<AIMatchViewModel>();
+      _syncFromViewModel(vm.personalityProfile);
+    }
   }
 }

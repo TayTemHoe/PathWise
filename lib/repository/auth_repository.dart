@@ -16,7 +16,12 @@ class AuthRepository {
     required String lastName,
     required String phone,
     required String dob,
-    required String address,
+    required String addressLine1,
+    String? addressLine2,
+    required String city,
+    required String state,
+    required String country,
+    required String zipCode,
     required String userRole,
   }) async {
     try {
@@ -30,15 +35,20 @@ class AuthRepository {
         throw Exception('Failed to create user account');
       }
 
-      // 3. Create the user model with Firebase UID and custom ID
+      // 3. Create the user model with Firebase UID and address details
       final UserModel user = UserModel(
-        userId: firebaseUser.uid, // Use Firebase UID for the main userId
+        userId: firebaseUser.uid,
         firstName: firstName.trim(),
         lastName: lastName.trim(),
         phone: phone.trim(),
         email: email.trim().toLowerCase(),
         dob: dob.trim(),
-        address: address.trim(),
+        addressLine1: addressLine1.trim(),
+        addressLine2: addressLine2?.trim() ?? '',
+        city: city.trim(),
+        state: state.trim(),
+        country: country.trim(),
+        zipCode: zipCode.trim(),
         userRole: userRole,
       );
 
@@ -201,7 +211,7 @@ class AuthRepository {
     try {
       final formattedEmail = email.trim().toLowerCase();
 
-      // ✅ Check if email exists in Firebase Auth
+      // Check if email exists in Firebase Auth
       final querySnapshot = await FirebaseFirestore.instance
           .collection('users')
           .where("email", isEqualTo: formattedEmail)
@@ -212,7 +222,7 @@ class AuthRepository {
         throw Exception('No user found for this email');
       }
 
-      // ✅ Email exists, proceed to send reset link
+      // Email exists, proceed to send reset link
       await _auth.sendPasswordResetEmail(email: formattedEmail);
 
     } on FirebaseAuthException catch (e) {
@@ -231,7 +241,6 @@ class AuthRepository {
       throw Exception(e.toString());
     }
   }
-
 
   // Update user profile
   Future<UserModel> updateUserProfile({
