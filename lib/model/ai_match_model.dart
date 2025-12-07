@@ -1,5 +1,5 @@
 // lib/model/ai_match_models.dart
-import 'package:flutter/foundation.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 /// Education levels enum
 enum EducationLevel {
@@ -19,30 +19,37 @@ enum EducationLevel {
 
 /// Academic record model - ENHANCED VERSION
 class AcademicRecord {
+  final String id;
+  final int? order;
   final String level;
   final List<SubjectGrade> subjects;
   final String? programName;
   final String? institution;
   final double? cgpa;
   final String? major;
-  final int? graduationYear;
-  final String? examType;           // For SPM/STPM: SPM, IGCSE, STPM, A-Level, etc.
-  final String? stream;             // For SPM/STPM: Science, Arts, Commerce, etc.
-  final String? classOfAward;       // For Diploma: High Distinction, Distinction, etc.
-  final String? honors;             // For Bachelor: First Class, Second Upper, etc.
-  final String? classification;     // For Master: Distinction, Merit, Pass
-  final String? researchArea;       // For Master/PhD
-  final String? thesisTitle;        // For Master/PhD
-  final double? totalScore;         // For IB/UEC scores
+  final String? examType; // For SPM/STPM: SPM, IGCSE, STPM, A-Level, etc.
+  final String? stream; // For SPM/STPM: Science, Arts, Commerce, etc.
+  final String? classOfAward; // For Diploma: High Distinction, Distinction, etc.
+  final String? honors; // For Bachelor: First Class, Second Upper, etc.
+  final String? classification; // For Master: Distinction, Merit, Pass
+  final String? researchArea; // For Master/PhD
+  final String? thesisTitle; // For Master/PhD
+  final double? totalScore; // For IB/UEC scores
+  final Timestamp? startDate;
+  final Timestamp? endDate; // date only
+  final bool? isCurrent;
+  final Timestamp? createdAt;
+  final Timestamp? updatedAt;
 
   AcademicRecord({
+    this.id = '',
+    this.order,
     required this.level,
     this.subjects = const [],
     this.programName,
     this.institution,
     this.cgpa,
     this.major,
-    this.graduationYear,
     this.examType,
     this.stream,
     this.classOfAward,
@@ -51,17 +58,54 @@ class AcademicRecord {
     this.researchArea,
     this.thesisTitle,
     this.totalScore,
+    this.startDate,
+    this.endDate,
+    this.isCurrent,
+    this.createdAt,
+    this.updatedAt,
   });
+
+  factory AcademicRecord.fromFirestore(
+      DocumentSnapshot<Map<String, dynamic>> doc) {
+    final data = doc.data() ?? {};
+
+    return AcademicRecord(
+      id: doc.id,
+      level: data['level'],
+      order: data['order'] as int?,
+      subjects: (data['subjects'] as List<dynamic>? ?? [])
+          .map((e) => SubjectGrade.fromMap(e as Map<String, dynamic>))
+          .toList(),
+      programName: data['program_name'],
+      institution: data['institution'],
+      cgpa: (data['cgpa'] as num?)?.toDouble(),
+      major: data['major'],
+      examType: data['exam_type'],
+      stream: data['stream'],
+      classOfAward: data['class_of_award'],
+      honors: data['honors'],
+      classification: data['classification'],
+      researchArea: data['research_area'],
+      thesisTitle: data['thesis_title'],
+      totalScore: (data['total_score'] as num?)?.toDouble(),
+      startDate: data['startDate'] as Timestamp?,
+      endDate: data['endDate'] as Timestamp?,
+      isCurrent: data['is_current'] as bool?,
+      createdAt: data['createdAt'] as Timestamp?,
+      updatedAt: data['updatedAt'] as Timestamp?,
+    );
+  }
 
   Map<String, dynamic> toJson() {
     return {
+      if (id.isNotEmpty) 'id': id,
       'level': level,
+      if (order != null) 'order': order,
       'subjects': subjects.map((s) => s.toJson()).toList(),
       if (programName != null) 'program_name': programName,
       if (institution != null) 'institution': institution,
       if (cgpa != null) 'cgpa': cgpa,
       if (major != null) 'major': major,
-      if (graduationYear != null) 'graduation_year': graduationYear,
       if (examType != null) 'exam_type': examType,
       if (stream != null) 'stream': stream,
       if (classOfAward != null) 'class_of_award': classOfAward,
@@ -70,14 +114,57 @@ class AcademicRecord {
       if (researchArea != null) 'research_area': researchArea,
       if (thesisTitle != null) 'thesis_title': thesisTitle,
       if (totalScore != null) 'total_score': totalScore,
+      // ✅ Convert Timestamp to milliseconds for JSON serialization
+      if (startDate != null) 'start_date': startDate!.millisecondsSinceEpoch,
+      if (endDate != null) 'end_date': endDate!.millisecondsSinceEpoch,
+      if (isCurrent != null) 'is_current': isCurrent,
+      if (createdAt != null) 'createdAt': createdAt!.millisecondsSinceEpoch,
+      if (updatedAt != null) 'updatedAt': updatedAt!.millisecondsSinceEpoch,
+    };
+  }
+
+  Map<String, dynamic> toFirestore() {
+    return {
+      if (id.isNotEmpty) 'id': id,
+      'level': level,
+      if (order != null) 'order': order,
+      'subjects': subjects.map((s) => s.toJson()).toList(),
+
+      // ✅ USE CAMELCASE FOR FIRESTORE (not snake_case like toJson)
+      if (programName != null) 'program_name': programName,
+      if (institution != null) 'institution': institution,
+      if (cgpa != null) 'cgpa': cgpa,
+      if (major != null) 'major': major,
+      if (examType != null) 'exam_type': examType,
+      if (stream != null) 'stream': stream,
+      if (classOfAward != null) 'class_of_award': classOfAward,
+      if (honors != null) 'honors': honors,
+      if (classification != null) 'classification': classification,
+      if (researchArea != null) 'research_area': researchArea,
+      if (thesisTitle != null) 'thesis_title': thesisTitle,
+      if (totalScore != null) 'total_score': totalScore,
+      if (startDate != null) 'startDate': startDate,
+      if (endDate != null) 'endDate': endDate,
+      if (isCurrent != null) 'is_current': isCurrent,
+      if (createdAt != null) 'createdAt': createdAt,
+      if (updatedAt != null) 'updatedAt': updatedAt,
     };
   }
 
   factory AcademicRecord.fromJson(Map<String, dynamic> json) {
+    // Helper to parse Timestamp from either milliseconds (int) or Timestamp object
+    Timestamp? parseTimestamp(dynamic value) {
+      if (value == null) return null;
+      if (value is Timestamp) return value;
+      if (value is int) return Timestamp.fromMillisecondsSinceEpoch(value);
+      return null;
+    }
+
     return AcademicRecord(
+      id: json['id'] as String? ?? '',
       level: json['level'] as String,
-      subjects:
-      (json['subjects'] as List<dynamic>?)
+      order: json['order'] as int?,
+      subjects: (json['subjects'] as List<dynamic>?)
           ?.map((s) => SubjectGrade.fromJson(s as Map<String, dynamic>))
           .toList() ??
           [],
@@ -85,7 +172,6 @@ class AcademicRecord {
       institution: json['institution'] as String?,
       cgpa: (json['cgpa'] as num?)?.toDouble(),
       major: json['major'] as String?,
-      graduationYear: json['graduation_year'] as int?,
       examType: json['exam_type'] as String?,
       stream: json['stream'] as String?,
       classOfAward: json['class_of_award'] as String?,
@@ -94,17 +180,24 @@ class AcademicRecord {
       researchArea: json['research_area'] as String?,
       thesisTitle: json['thesis_title'] as String?,
       totalScore: (json['total_score'] as num?)?.toDouble(),
+      // ✅ Handle both int (milliseconds) and Timestamp
+      startDate: parseTimestamp(json['start_date']),
+      endDate: parseTimestamp(json['end_date']),
+      isCurrent: json['is_current'] as bool?,
+      createdAt: parseTimestamp(json['createdAt']),
+      updatedAt: parseTimestamp(json['updatedAt']),
     );
   }
 
   AcademicRecord copyWith({
+    String? id,
     String? level,
+    int? order,
     List<SubjectGrade>? subjects,
     String? programName,
     String? institution,
     double? cgpa,
     String? major,
-    int? graduationYear,
     String? examType,
     String? stream,
     String? classOfAward,
@@ -113,15 +206,21 @@ class AcademicRecord {
     String? researchArea,
     String? thesisTitle,
     double? totalScore,
+    Timestamp? startDate,
+    Timestamp? endDate,
+    bool? isCurrent,
+    Timestamp? createdAt,
+    Timestamp? updatedAt,
   }) {
     return AcademicRecord(
+      id: id ?? this.id,
       level: level ?? this.level,
+      order: order ?? this.order,
       subjects: subjects ?? this.subjects,
       programName: programName ?? this.programName,
       institution: institution ?? this.institution,
       cgpa: cgpa ?? this.cgpa,
       major: major ?? this.major,
-      graduationYear: graduationYear ?? this.graduationYear,
       examType: examType ?? this.examType,
       stream: stream ?? this.stream,
       classOfAward: classOfAward ?? this.classOfAward,
@@ -130,6 +229,11 @@ class AcademicRecord {
       researchArea: researchArea ?? this.researchArea,
       thesisTitle: thesisTitle ?? this.thesisTitle,
       totalScore: totalScore ?? this.totalScore,
+      startDate: startDate ?? this.startDate,
+      endDate: endDate ?? this.endDate,
+      isCurrent: isCurrent ?? this.isCurrent,
+      createdAt: createdAt ?? this.createdAt,
+      updatedAt: updatedAt ?? this.updatedAt,
     );
   }
 }
@@ -142,15 +246,27 @@ class SubjectGrade {
 
   SubjectGrade({required this.name, required this.grade, this.year});
 
+  factory SubjectGrade.fromMap(Map<String, dynamic> map) {
+    return SubjectGrade(
+      name: map['name'] ?? '',
+      grade: map['grade'] ?? '',
+      year: map['year'] as int?,
+    );
+  }
+
   Map<String, dynamic> toJson() {
-    return {'name': name, 'grade': grade, if (year != null) 'assessment_year': year};
+    return {
+      'name': name,
+      'grade': grade,
+      if (year != null) 'assessment_year': year,
+    };
   }
 
   factory SubjectGrade.fromJson(Map<String, dynamic> json) {
     return SubjectGrade(
       name: json['name'] as String,
       grade: json['grade'] as String,
-      year: json['year'] as int?,
+      year: json['assessment_year'] as int?,
     );
   }
 }
@@ -162,7 +278,12 @@ class EnglishTest {
   final Map<String, dynamic>? bands;
   final int? year;
 
-  EnglishTest({required this.type, required this.result, this.bands, this.year});
+  EnglishTest({
+    required this.type,
+    required this.result,
+    this.bands,
+    this.year,
+  });
 
   Map<String, dynamic> toJson() {
     return {
@@ -245,13 +366,13 @@ class UserPreferences {
   Map<String, dynamic> toJson() {
     return {
       'study_level': studyLevel,
-      if (tuitionMin != null) 'tuition_min': tuitionMin, 
+      if (tuitionMin != null) 'tuition_min': tuitionMin,
       if (tuitionMax != null) 'tuition_max': tuitionMax,
       'locations': locations,
       'mode': mode,
       'scholarship_required': scholarshipRequired,
       if (minRanking != null) 'min_ranking': minRanking,
-      if (maxRanking != null) 'max_ranking': maxRanking, 
+      if (maxRanking != null) 'max_ranking': maxRanking,
       'work_study_important': workStudyImportant,
       'has_special_needs': hasSpecialNeeds,
       if (specialNeedsDetails != null)
@@ -265,19 +386,17 @@ class UserPreferences {
           ?.map((e) => e as String)
           .toList() ??
           [],
-      tuitionMin: (json['tuition_min'] as num?)?.toDouble(), 
+      tuitionMin: (json['tuition_min'] as num?)?.toDouble(),
       tuitionMax: (json['tuition_max'] as num?)?.toDouble(),
       locations: (json['locations'] as List<dynamic>?)
           ?.map((e) => e as String)
           .toList() ??
           [],
-      mode: (json['mode'] as List<dynamic>?)
-          ?.map((e) => e as String)
-          .toList() ??
+      mode: (json['mode'] as List<dynamic>?)?.map((e) => e as String).toList() ??
           [],
       scholarshipRequired: json['scholarship_required'] as bool? ?? false,
       minRanking: json['min_ranking'] as int?,
-      maxRanking: json['max_ranking'] as int?, 
+      maxRanking: json['max_ranking'] as int?,
       workStudyImportant: json['work_study_important'] as bool? ?? false,
       hasSpecialNeeds: json['has_special_needs'] as bool? ?? false,
       specialNeedsDetails: json['special_needs_details'] as String?,
@@ -324,9 +443,8 @@ class AIMatchRequest {
         json['personality'] as Map<String, dynamic>,
       )
           : null,
-      interests: (json['interests'] as List<dynamic>)
-          .map((i) => i as String)
-          .toList(),
+      interests:
+      (json['interests'] as List<dynamic>).map((i) => i as String).toList(),
       preferences: UserPreferences.fromJson(
         json['preferences'] as Map<String, dynamic>,
       ),
@@ -407,8 +525,7 @@ class AIMatchResponse {
 
   factory AIMatchResponse.fromJson(Map<String, dynamic> json) {
     return AIMatchResponse(
-      recommendedSubjectAreas:
-      (json['recommended_subject_areas'] as List<dynamic>)
+      recommendedSubjectAreas: (json['recommended_subject_areas'] as List<dynamic>)
           .map(
             (area) => RecommendedSubjectArea.fromJson(
           area as Map<String, dynamic>,
@@ -420,9 +537,8 @@ class AIMatchResponse {
 
   Map<String, dynamic> toJson() {
     return {
-      'recommended_subject_areas': recommendedSubjectAreas
-          .map((area) => area.toJson())
-          .toList(),
+      'recommended_subject_areas':
+      recommendedSubjectAreas.map((area) => area.toJson()).toList(),
     };
   }
 }
@@ -437,8 +553,8 @@ class AIMatchProgressData {
   final List<String> interests;
   final UserPreferences preferences;
   final AIMatchResponse? matchResponse;
-  final List<String>? matchedProgramIds; // NEW
-  final DateTime? matchTimestamp; // NEW
+  final List<String>? matchedProgramIds;
+  final DateTime? matchTimestamp;
 
   AIMatchProgressData({
     this.educationLevel,
@@ -449,7 +565,7 @@ class AIMatchProgressData {
     required this.interests,
     required this.preferences,
     this.matchResponse,
-    this.matchedProgramIds, // NEW
-    this.matchTimestamp, // NEW
+    this.matchedProgramIds,
+    this.matchTimestamp,
   });
 }

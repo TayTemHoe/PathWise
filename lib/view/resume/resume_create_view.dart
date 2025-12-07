@@ -1,5 +1,6 @@
 // lib/view/resume/resume_create_view.dart
 import 'package:flutter/material.dart';
+import 'package:path_wise/model/ai_match_model.dart';
 import 'package:provider/provider.dart';
 import 'package:path_wise/viewModel/profile_view_model.dart';
 import 'package:path_wise/view/resume/resume_customize_view.dart';
@@ -895,7 +896,7 @@ class _TemplateSelectionPageState extends State<TemplateSelectionPage> {
     );
   }
 
-  Widget _buildFullAcademicTemplate(UserProfile profile, List<Education> education) {
+  Widget _buildFullAcademicTemplate(UserProfile profile, List<AcademicRecord> education) {
     return SingleChildScrollView(
       padding: const EdgeInsets.all(24),
       child: Column(
@@ -942,7 +943,7 @@ class _TemplateSelectionPageState extends State<TemplateSelectionPage> {
                     ),
                   ),
                   Text(
-                    '${edu.degreeLevel ?? ''} in ${edu.fieldOfStudy ?? ''}',
+                    '${edu.level ?? ''} in ${edu.major ?? ''}',
                     style: TextStyle(
                       fontSize: 10,
                       color: Colors.grey[600],

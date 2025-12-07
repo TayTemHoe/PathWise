@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import '../model/ai_match_model.dart';
 import '../model/program.dart';
 import '../model/program_filter.dart';
+import '../model/user_profile.dart';
 import '../repository/ai_match_repository.dart';
 import '../services/shared_preference_services.dart';
 
@@ -258,7 +259,54 @@ class AIMatchViewModel extends ChangeNotifier {
     });
   }
 
-  // ... [Keep Navigation, _updateProgress, Data modification methods exactly as they are] ...
+  // Around line 185, replace the existing syncFromUserProfile method
+  Future<void> syncFromUserProfile(UserProfile? profile) async {
+    if (profile == null) return;
+
+    debugPrint('🔄 Syncing AI Match state from User Profile...');
+
+    final currentEdu = profile.education?.where((e) => e.isCurrent == true).firstOrNull;
+
+    if (currentEdu != null) {
+      try {
+        _educationLevel = EducationLevel.values.firstWhere(
+              (e) => e.label.toLowerCase() == currentEdu.level.toLowerCase(),
+          orElse: () => EducationLevel.other,
+        );
+
+        // ✅ MODIFIED: Store the actual level string for "Other"
+        if (_educationLevel == EducationLevel.other) {
+          _otherEducationLevelText = currentEdu.level; // This will be the custom text from the dialog
+        } else {
+          _otherEducationLevelText = null;
+        }
+      } catch (e) {
+        _educationLevel = EducationLevel.other;
+        _otherEducationLevelText = currentEdu.level;
+      }
+
+      _academicRecords.clear();
+      _academicRecords.add(currentEdu);
+
+      debugPrint('✅ Synced current education: ${currentEdu.level} (${currentEdu.institution})');
+      debugPrint('   - Other Level Text: $_otherEducationLevelText');
+    } else {
+      debugPrint('ℹ️ No current education found in profile - clearing match state');
+      _educationLevel = null;
+      _otherEducationLevelText = null;
+      _academicRecords.clear();
+    }
+
+    notifyListeners();
+
+    debugPrint('💾 Saving synced state to SharedPreferences...');
+    try {
+      await saveProgress();
+      debugPrint('✅ Sync complete - SharedPreferences updated successfully');
+    } catch (e) {
+      debugPrint('❌ Error saving after sync: $e');
+    }
+  }
 
   // Navigation
   void nextPage() {

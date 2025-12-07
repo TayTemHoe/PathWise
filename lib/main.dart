@@ -75,11 +75,6 @@ Future<void> main() async {
     );
     debugPrint('Firebase initialized');
 
-    // await Supabase.initialize(
-    //   url: 'https://ajdaciskaffuvaanizlw.supabase.co',
-    //   anonKey: 'sb_publishable_Vs82x42CVKx28QIzgQEYNw_zvzJ7yEg',
-    // );
-
     // Initialize Supabase
     await Supabase.initialize(
       url: SupabaseConfig.supabaseUrl,

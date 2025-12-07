@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:path_wise/model/ai_match_model.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:flutter/foundation.dart';
 import 'package:path_wise/model/user_profile.dart';
@@ -99,7 +100,7 @@ class ProfileService {
         }),
         listEducation(uid: uid).catchError((e) {
           debugPrint('❌ Error loading education: $e');
-          return <Education>[];
+          return <AcademicRecord>[];
         }),
         listExperience(uid: uid).catchError((e) {
           debugPrint('❌ Error loading experience: $e');
@@ -108,7 +109,7 @@ class ProfileService {
       ]);
 
       final skills = results[0].cast<Skill>();
-      final education = results[1].cast<Education>();
+      final education = results[1].cast<AcademicRecord>();
       final experience = results[2].cast<Experience>();
 
       debugPrint('📊 ProfileService: Loaded Skills=${skills.length}, Education=${education.length}, Experience=${experience.length}');
@@ -399,7 +400,7 @@ class ProfileService {
   // Education CRUD
   // =============================
 
-  Future<List<Education>> listEducation({required String uid, int limit = 100}) async {
+  Future<List<AcademicRecord>> listEducation({required String uid, int limit = 100}) async {
     try {
       debugPrint('🔍 ProfileService: Listing education for uid=$uid');
 
@@ -408,15 +409,15 @@ class ProfileService {
       debugPrint('📊 ProfileService: Found ${snap.docs.length} education documents');
 
       final education = snap.docs
-          .map((d) => Education.fromFirestore(d as DocumentSnapshot<Map<String, dynamic>>))
+          .map((d) => AcademicRecord.fromFirestore(d as DocumentSnapshot<Map<String, dynamic>>))
           .toList();
 
       // Sort in-memory
-      education.sort((a, b) {
-        final orderA = a.order ?? 9999;
-        final orderB = b.order ?? 9999;
-        return orderA.compareTo(orderB);
-      });
+      // education.sort((a, b) {
+      //   final orderA = a.order ?? 9999;
+      //   final orderB = b.order ?? 9999;
+      //   return orderA.compareTo(orderB);
+      // });
 
       return education;
     } catch (e, st) {
@@ -426,24 +427,40 @@ class ProfileService {
     }
   }
 
-  Future<Education> createEducation({required String uid, required Education education}) async {
+  Future<AcademicRecord> createEducation({
+    required String uid,
+    required AcademicRecord education
+  }) async {
     try {
       debugPrint('➕ ProfileService: Creating education: ${education.institution}');
       final id = await _nextId(_educationCol(uid), 'ED');
 
-      // ✅ Ensure order is set
-      final orderValue = education.order ?? await _getNextEducationOrder(uid);
+      final order = education.order ?? await _getNextEducationOrder(uid);
 
+      // ✅ USE toFirestore() instead of toJson()
       final data = education.copyWith(
         id: id,
+        order: order,
+        createdAt: _dateOnly(),
         updatedAt: _dateOnly(),
-        order: orderValue,
-      ).toMap();
+      ).toFirestore();
+
+      debugPrint('📝 Education data to save: $data');
 
       await _educationCol(uid).doc(id).set(data, SetOptions(merge: true));
+
       final doc = await _educationCol(uid).doc(id).get();
+      final created = AcademicRecord.fromFirestore(
+          doc as DocumentSnapshot<Map<String, dynamic>>
+      );
+
       debugPrint('✅ ProfileService: Education created with ID: $id');
-      return Education.fromFirestore(doc as DocumentSnapshot<Map<String, dynamic>>);
+      debugPrint('   - Level: ${created.level}');
+      debugPrint('   - Program: ${created.programName}');
+      debugPrint('   - Major: ${created.major}');
+      debugPrint('   - Class of Award: ${created.classOfAward}');
+
+      return created;
     } catch (e, st) {
       debugPrint('❌ ProfileService: createEducation error: $e');
       debugPrint('Stack trace: $st');
@@ -465,13 +482,27 @@ class ProfileService {
     }
   }
 
-  Future<void> updateEducation({required String uid, required Education education}) async {
+  Future<void> updateEducation({
+    required String uid,
+    required AcademicRecord education
+  }) async {
     try {
-      debugPrint('💾 ProfileService: Updating education: ${education.institution}, ID: ${education.id}');
-      final orderValue = education.order ?? await _getNextEducationOrder(uid);
-      final data = education.copyWith(updatedAt: _dateOnly(), order: orderValue).toMap();
+      debugPrint('💾 ProfileService: Updating education: ${education.institution}');
+
+      // ✅ USE toFirestore() instead of toJson()
+      final data = education.copyWith(
+        updatedAt: _dateOnly(),
+      ).toFirestore();
+
+      debugPrint('📝 Education data to update: $data');
+
       await _educationCol(uid).doc(education.id).set(data, SetOptions(merge: true));
+
       debugPrint('✅ ProfileService: Education updated successfully');
+      debugPrint('   - ID: ${education.id}');
+      debugPrint('   - Level: ${education.level}');
+      debugPrint('   - Program: ${education.programName}');
+      debugPrint('   - Class of Award: ${education.classOfAward}');
     } catch (e, st) {
       debugPrint('❌ ProfileService: updateEducation error: $e');
       debugPrint('Stack trace: $st');
@@ -491,6 +522,69 @@ class ProfileService {
     }
   }
 
+  // ✅ NEW: Set education as current and unset others
+  Future<void> setCurrentEducation({
+    required String uid,
+    required String eduId,
+  }) async {
+    try {
+      debugPrint('⭐ Setting education $eduId as current');
+
+      // Get all education records
+      final snap = await _educationCol(uid).get();
+      final batch = _db.batch();
+
+      for (var doc in snap.docs) {
+        final ref = _educationCol(uid).doc(doc.id);
+        if (doc.id == eduId) {
+          batch.update(ref, {
+            'is_current': true,
+            'updatedAt': _dateOnly(),
+          });
+        } else {
+          // Unset any other record that might be marked as current
+          batch.update(ref, {
+            'is_current': false,
+            'updatedAt': _dateOnly(),
+          });
+        }
+      }
+
+      await batch.commit();
+      debugPrint('✅ ProfileService: Current education updated successfully');
+    } catch (e, st) {
+      debugPrint('❌ ProfileService: setCurrentEducation error: $e');
+      debugPrint('Stack trace: $st');
+      rethrow;
+    }
+  }
+
+  Future<AcademicRecord?> getCurrentEducation({required String uid}) async {
+    try {
+      debugPrint('🔍 ProfileService: Getting current education for uid=$uid');
+
+      final snap = await _educationCol(uid)
+          .where('is_current', isEqualTo: true)
+          .limit(1)
+          .get();
+
+      if (snap.docs.isEmpty) {
+        debugPrint('⚠️ No current education found');
+        return null;
+      }
+
+      final current = AcademicRecord.fromFirestore(
+          snap.docs.first as DocumentSnapshot<Map<String, dynamic>>
+      );
+
+      debugPrint('✅ Found current education: ${current.level}');
+      return current;
+    } catch (e, st) {
+      debugPrint('❌ ProfileService: getCurrentEducation error: $e');
+      debugPrint('Stack trace: $st');
+      rethrow;
+    }
+  }
   // =============================
   // Experience CRUD
   // =============================

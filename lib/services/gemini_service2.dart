@@ -287,9 +287,9 @@ class AiService {
       },
       "education": userProfile.education?.map((edu) {
         return {
-          "degreeLevel": edu.degreeLevel ?? "Unknown",
-          "fieldOfStudy": edu.fieldOfStudy ?? "Unknown",
-          "gpa": edu.gpa ?? "",
+          "degreeLevel": edu.level ?? "Unknown",
+          "fieldOfStudy": edu.major ?? "Unknown",
+          "gpa": edu.cgpa ?? "",
           "isCurrent": edu.isCurrent ?? false,
         };
       }).toList() ?? [],

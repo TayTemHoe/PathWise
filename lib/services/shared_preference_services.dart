@@ -58,6 +58,29 @@ class SharedPreferenceService {
       final stopwatch = Stopwatch()..start();
       final sp = await prefs;
 
+      // ✅ Filter to save only current education records
+      final currentRecords = academicRecords.where((r) => r.isCurrent == true).toList();
+
+      debugPrint('💾 Saving ${currentRecords.length} current education record(s) to AI Match storage');
+
+      // ✅ Debug: Print what we're about to save
+      if (currentRecords.isNotEmpty) {
+        for (var record in currentRecords) {
+          debugPrint('  📝 Record: ${record.level}');
+          debugPrint('     - ID: ${record.id}');
+          debugPrint('     - Institution: ${record.institution}');
+          debugPrint('     - Program: ${record.programName}');
+          debugPrint('     - Major: ${record.major}');
+          debugPrint('     - isCurrent: ${record.isCurrent}');
+        }
+      } else {
+        debugPrint('  ⚠️ No current records to save!');
+      }
+
+      // ✅ Convert to JSON and log
+      final recordsJson = jsonEncode(currentRecords.map((r) => r.toJson()).toList());
+      debugPrint('📊 JSON to save: $recordsJson');
+
       final futures = <Future>[
         if (educationLevel != null)
           sp.setString(_getUserKey(_keyEducationLevel, userId), educationLevel.name)
@@ -69,9 +92,10 @@ class SharedPreferenceService {
         else
           sp.remove(_getUserKey(_keyOtherEducation, userId)),
 
+        // ✅ Save current records
         sp.setString(
           _getUserKey(_keyAcademicRecords, userId),
-          jsonEncode(academicRecords.map((r) => r.toJson()).toList()),
+          recordsJson,
         ),
 
         sp.setString(
@@ -103,6 +127,10 @@ class SharedPreferenceService {
       ];
 
       await Future.wait(futures);
+
+      // ✅ Verify save
+      final verifyRecords = sp.getString(_getUserKey(_keyAcademicRecords, userId));
+      debugPrint('🔍 Verification - Saved to SharedPrefs: $verifyRecords');
 
       _isCacheValid = false;
       _cache.clear();

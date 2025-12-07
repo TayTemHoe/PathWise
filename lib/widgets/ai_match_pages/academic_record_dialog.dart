@@ -1,21 +1,26 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import 'package:path_wise/utils/formatters.dart';
 import '../../model/ai_match_model.dart';
 import '../../utils/app_color.dart';
-import '../../viewModel/ai_match_view_model.dart';
 import '../form_components.dart';
 
 class AcademicRecordDialog extends StatefulWidget {
-  final AIMatchViewModel viewModel;
   final AcademicRecord? existingRecord;
-  final int? recordIndex;
+  final bool showLevelDropdown;
+  final EducationLevel? preselectedLevel;
+  final Function(AcademicRecord) onSave;
+  final bool isEditMode;
 
   const AcademicRecordDialog({
     Key? key,
-    required this.viewModel,
     this.existingRecord,
-    this.recordIndex,
-  }) : super(key: key);
+    this.showLevelDropdown = false,
+    this.preselectedLevel,
+    required this.onSave,
+  }) : isEditMode = existingRecord != null,
+       super(key: key);
 
   @override
   State<AcademicRecordDialog> createState() => _AcademicRecordDialogState();
@@ -23,12 +28,19 @@ class AcademicRecordDialog extends StatefulWidget {
 
 class _AcademicRecordDialogState extends State<AcademicRecordDialog> {
   final _formKey = GlobalKey<FormState>();
+
+  // Controllers
   final _institutionController = TextEditingController();
   final _majorController = TextEditingController();
   final _streamController = TextEditingController();
   final _researchAreaController = TextEditingController();
   final _thesisTitleController = TextEditingController();
+  final _otherLevelController = TextEditingController();
+  final _startDateController = TextEditingController();
+  final _endDateController = TextEditingController();
 
+  // State variables
+  late EducationLevel _currentLevel;
   int? _selectedYear;
   String? _selectedExamType;
   String? _selectedStream;
@@ -36,38 +48,73 @@ class _AcademicRecordDialogState extends State<AcademicRecordDialog> {
   String? _selectedHonors;
   String? _selectedClassification;
   double _cgpaValue = 0.0;
-
   final List<SubjectGrade> _currentSubjects = [];
-  String? _formError;
 
-  bool get isEditMode => widget.existingRecord != null;
+  Timestamp? _selectedStartDate;
+  Timestamp? _selectedEndDate;
+
+  String? _formError;
+  bool _isSaving = false;
 
   @override
   void initState() {
     super.initState();
-    if (isEditMode) {
-      _loadExistingRecord();
-    }
+    _initializeState();
   }
 
-  void _loadExistingRecord() {
-    final record = widget.existingRecord!;
+  void _initializeState() {
+    if (widget.isEditMode) {
+      final record = widget.existingRecord!;
+      // Try to match string level to enum
+      try {
+        _currentLevel = EducationLevel.values.firstWhere(
+          (e) => e.label.toLowerCase() == record.level.toLowerCase(),
+          orElse: () => EducationLevel.other,
+        );
+      } catch (_) {
+        _currentLevel = EducationLevel.other;
+      }
 
-    _institutionController.text = record.institution ?? '';
-    _majorController.text = record.major ?? '';
-    _streamController.text = record.programName ?? '';
-    _researchAreaController.text = record.researchArea ?? '';
-    _thesisTitleController.text = record.thesisTitle ?? '';
+      // ✅ NEW: Initialize "other" level text if applicable
+      if (_currentLevel == EducationLevel.other) {
+        _otherLevelController.text = record.level;
+      }
 
-    _selectedYear = record.graduationYear;
-    _selectedExamType = record.examType;
-    _selectedStream = record.stream;
-    _selectedClassOfAward = record.classOfAward;
-    _selectedHonors = record.honors;
-    _selectedClassification = record.classification;
-    _cgpaValue = record.cgpa ?? record.totalScore ?? 0.0;
+      _institutionController.text = record.institution ?? '';
+      _majorController.text = record.major ?? '';
+      _streamController.text = record.programName ?? '';
+      _researchAreaController.text = record.researchArea ?? '';
+      _thesisTitleController.text = record.thesisTitle ?? '';
 
-    _currentSubjects.addAll(record.subjects);
+      _selectedStartDate = record.startDate;
+      _selectedEndDate = record.endDate;
+
+      if (record.startDate != null) {
+        _startDateController.text = DateFormat(
+          'MMM yyyy',
+        ).format(record.startDate!.toDate());
+      }
+      if (record.endDate != null) {
+        _endDateController.text = DateFormat(
+          'MMM yyyy',
+        ).format(record.endDate!.toDate());
+      }
+
+      _selectedExamType = record.examType;
+      _selectedStream = record.stream;
+      _selectedClassOfAward = record.classOfAward;
+      _selectedHonors = record.honors;
+      _selectedClassification = record.classification;
+      _cgpaValue = record.cgpa ?? record.totalScore ?? 0.0;
+
+      _currentSubjects.addAll(record.subjects);
+    } else {
+      // Default level logic
+      _currentLevel = widget.preselectedLevel ?? EducationLevel.spm;
+      if (_currentLevel == EducationLevel.spm) {
+        _selectedExamType = 'SPM';
+      }
+    }
   }
 
   @override
@@ -77,6 +124,9 @@ class _AcademicRecordDialogState extends State<AcademicRecordDialog> {
     _streamController.dispose();
     _researchAreaController.dispose();
     _thesisTitleController.dispose();
+    _otherLevelController.dispose(); // ✅ NEW
+    _startDateController.dispose();
+    _endDateController.dispose();
     super.dispose();
   }
 
@@ -96,16 +146,16 @@ class _AcademicRecordDialogState extends State<AcademicRecordDialog> {
         ),
         constraints: BoxConstraints(
           maxHeight: MediaQuery.of(context).size.height * 0.95,
-          maxWidth: MediaQuery.of(context).size.width * 0.95,
+          maxWidth: 600,
         ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             DialogHeader(
-              title: isEditMode
-                  ? 'Edit ${widget.viewModel.educationLevel?.label ?? "Academic"} Record'
-                  : 'Add ${widget.viewModel.educationLevel?.label ?? "Academic"} Record',
-              icon: isEditMode ? Icons.edit_rounded : Icons.school_rounded,
+              title: widget.isEditMode ? 'Edit Record' : 'Add Record',
+              icon: widget.isEditMode
+                  ? Icons.edit_rounded
+                  : Icons.school_rounded,
               onClose: () => Navigator.pop(context),
             ),
             if (_formError != null) _buildErrorBanner(),
@@ -114,14 +164,39 @@ class _AcademicRecordDialogState extends State<AcademicRecordDialog> {
                 key: _formKey,
                 child: SingleChildScrollView(
                   padding: const EdgeInsets.all(24.0),
-                  child: _buildFormContent(),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Only show dropdown if requested (Edit Education View)
+                      if (widget.showLevelDropdown) ...[
+                        _buildLevelDropdown(),
+                        const SizedBox(height: 20),
+                        const Divider(),
+                        const SizedBox(height: 20),
+                      ] else ...[
+                        // If dropdown is hidden, show the fixed level title
+                        Text(
+                          _currentLevel.label,
+                          style: const TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            color: AppColors.textPrimary,
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                      ],
+
+                      _buildFormContent(),
+                    ],
+                  ),
                 ),
               ),
             ),
             DialogFooter(
               onCancel: () => Navigator.pop(context),
-              onSave: _saveRecord,
-              saveLabel: isEditMode ? 'Update Record' : 'Save Record',
+              onSave: _handleSave,
+              saveLabel: widget.isEditMode ? 'Update' : 'Save',
+              isLoading: _isSaving,
             ),
           ],
         ),
@@ -129,65 +204,145 @@ class _AcademicRecordDialogState extends State<AcademicRecordDialog> {
     );
   }
 
+  Widget _buildLevelDropdown() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'Education Level',
+          style: TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.w600,
+            color: AppColors.textPrimary,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12),
+          decoration: BoxDecoration(
+            color: Colors.grey[50],
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: Colors.grey[300]!),
+          ),
+          child: DropdownButtonHideUnderline(
+            child: DropdownButton<EducationLevel>(
+              value: _currentLevel,
+              isExpanded: true,
+              items: EducationLevel.values.map((level) {
+                return DropdownMenuItem(
+                  value: level,
+                  child: Text(
+                    level.label,
+                    style: const TextStyle(fontSize: 15),
+                  ),
+                );
+              }).toList(),
+              onChanged: (value) {
+                if (value != null) {
+                  setState(() {
+                    _currentLevel = value;
+                    // Reset type dependent fields
+                    _selectedExamType = value == EducationLevel.spm
+                        ? 'SPM'
+                        : null;
+                    _cgpaValue = 0.0;
+                    _currentSubjects.clear();
+
+                    // ✅ NEW: Clear "other" level text when switching away from "Other"
+                    if (value != EducationLevel.other) {
+                      _otherLevelController.clear();
+                    }
+                  });
+                }
+              },
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
   Widget _buildErrorBanner() {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-      decoration: BoxDecoration(
-        color: Colors.red[50],
-        border: Border(
-          bottom: BorderSide(color: Colors.red[200]!, width: 1),
-        ),
-      ),
+      color: Colors.red[50],
       child: Row(
         children: [
           Icon(Icons.error_outline, color: Colors.red[700], size: 20),
           const SizedBox(width: 12),
           Expanded(
-            child: Text(
-              _formError!,
-              style: TextStyle(
-                color: Colors.red[900],
-                fontSize: 13,
-                fontWeight: FontWeight.w500,
-              ),
-            ),
+            child: Text(_formError!, style: TextStyle(color: Colors.red[900])),
           ),
           IconButton(
             icon: Icon(Icons.close, size: 18, color: Colors.red[700]),
             onPressed: () => setState(() => _formError = null),
-            padding: EdgeInsets.zero,
-            constraints: const BoxConstraints(),
           ),
         ],
       ),
     );
   }
 
-  void _showError(String message) {
-    setState(() => _formError = message);
+  // --- Dynamic Form Builder ---
+  Widget _buildFormContent() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // ✅ NEW: Show "Specify Education Level" field if "Other" is selected
+        if (_currentLevel == EducationLevel.other) ...[
+          const SectionHeader(
+            title: 'Specify Your Education Level',
+            icon: Icons.edit_outlined,
+          ),
+          const SizedBox(height: 12),
+          CustomTextField(
+            label: 'Education Level Name',
+            controller: _otherLevelController,
+            // You'll add this controller
+            hint: 'e.g., Certificate, Professional Course, Diploma',
+            prefixIcon: Icons.school_outlined,
+            isRequired: true,
+            validator: (value) {
+              if (value == null || value.trim().isEmpty) {
+                return 'Please specify your education level';
+              }
+              return null;
+            },
+          ),
+          const SizedBox(height: 24),
+          const Divider(),
+          const SizedBox(height: 24),
+        ],
+
+        // Then continue with the existing form content
+        ..._buildLevelSpecificForm(),
+      ],
+    );
   }
 
-  Widget _buildFormContent() {
-    switch (widget.viewModel.educationLevel) {
+  // Helper method to organize the form
+  List<Widget> _buildLevelSpecificForm() {
+    switch (_currentLevel) {
       case EducationLevel.spm:
-        return _buildSPMForm();
+        return [_buildSPMForm()];
       case EducationLevel.stpm:
-        return _buildSTPMForm();
+        return [_buildSTPMForm()];
       case EducationLevel.foundation:
-        return _buildFoundationForm();
+        return [_buildFoundationForm()];
       case EducationLevel.diploma:
-        return _buildDiplomaForm();
+        return [_buildDiplomaForm()];
       case EducationLevel.bachelor:
-        return _buildBachelorForm();
+        return [_buildBachelorForm()];
       case EducationLevel.master:
-        return _buildMasterForm();
+        return [_buildMasterForm()];
       case EducationLevel.phd:
-        return _buildPhDForm();
+        return [_buildPhDForm()];
       default:
-        return _buildGenericForm();
+        return [_buildGenericForm()];
     }
   }
+
+  // --- Specific Forms ---
 
   Widget _buildSPMForm() {
     return Column(
@@ -233,12 +388,7 @@ class _AcademicRecordDialogState extends State<AcademicRecordDialog> {
           prefixIcon: Icons.business_rounded,
         ),
         const SizedBox(height: 16),
-        CustomYearPicker(
-          label: 'Year of Completion',
-          selectedYear: _selectedYear,
-          onYearSelected: (year) => setState(() => _selectedYear = year),
-          validator: Formatters.validateYear,
-        ),
+        _buildSideBySideDatePickers(),
         const SizedBox(height: 24),
         const SectionHeader(
           title: 'Subjects & Grades',
@@ -268,7 +418,6 @@ class _AcademicRecordDialogState extends State<AcademicRecordDialog> {
         : _selectedExamType == 'IB'
         ? 45.0
         : 100.0;
-
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -281,13 +430,10 @@ class _AcademicRecordDialogState extends State<AcademicRecordDialog> {
           label: 'Qualification Type',
           value: _selectedExamType,
           items: const ['STPM', 'A-Level', 'IB', 'UEC'],
-          onChanged: (value) {
-            setState(() {
-              _selectedExamType = value;
-              _selectedStream = null;
-              _cgpaValue = 0;
-            });
-          },
+          onChanged: (value) => setState(() {
+            _selectedExamType = value;
+            _cgpaValue = 0;
+          }),
           isRequired: true,
         ),
         const SizedBox(height: 16),
@@ -299,9 +445,7 @@ class _AcademicRecordDialogState extends State<AcademicRecordDialog> {
           isRequired: true,
         ),
         const SizedBox(height: 16),
-        if (_selectedExamType == 'STPM' ||
-            _selectedExamType == 'IB' ||
-            _selectedExamType == 'UEC') ...[
+        if (['STPM', 'IB', 'UEC'].contains(_selectedExamType)) ...[
           CustomSlider(
             label: _selectedExamType == 'STPM'
                 ? 'CGPA'
@@ -313,9 +457,8 @@ class _AcademicRecordDialogState extends State<AcademicRecordDialog> {
             max: max,
             onChanged: (value) => setState(() => _cgpaValue = value),
             isRequired: true,
-            validator: (value) {
-              return Formatters.validateCGPA(value ?? 0.0, min, max);
-            },
+            validator: (value) =>
+                Formatters.validateCGPA(value ?? 0.0, min, max),
           ),
           const SizedBox(height: 16),
         ],
@@ -326,13 +469,8 @@ class _AcademicRecordDialogState extends State<AcademicRecordDialog> {
           prefixIcon: Icons.business_rounded,
         ),
         const SizedBox(height: 16),
-        CustomYearPicker(
-          label: 'Year of Completion',
-          selectedYear: _selectedYear,
-          onYearSelected: (year) => setState(() => _selectedYear = year),
-          validator: Formatters.validateYear,
-        ),
-        const SizedBox(height: 16),
+        _buildSideBySideDatePickers(),
+        const SizedBox(height: 24),
         const SectionHeader(
           title: 'Subjects & Grades',
           icon: Icons.library_books_rounded,
@@ -382,9 +520,7 @@ class _AcademicRecordDialogState extends State<AcademicRecordDialog> {
           max: 4.0,
           onChanged: (value) => setState(() => _cgpaValue = value),
           isRequired: true,
-          validator: (value) {
-            return Formatters.validateCGPA(value ?? 0.0, 0.0, 4.0);
-          },
+          validator: (value) => Formatters.validateCGPA(value ?? 0.0, 0.0, 4.0),
         ),
         const SizedBox(height: 16),
         CustomTextField(
@@ -394,12 +530,7 @@ class _AcademicRecordDialogState extends State<AcademicRecordDialog> {
           prefixIcon: Icons.business_rounded,
         ),
         const SizedBox(height: 16),
-        CustomYearPicker(
-          label: 'Year of Completion',
-          selectedYear: _selectedYear,
-          onYearSelected: (year) => setState(() => _selectedYear = year),
-          validator: Formatters.validateYear,
-        ),
+        _buildSideBySideDatePickers(),
       ],
     );
   }
@@ -429,9 +560,7 @@ class _AcademicRecordDialogState extends State<AcademicRecordDialog> {
           max: 4.0,
           onChanged: (value) => setState(() => _cgpaValue = value),
           isRequired: true,
-          validator: (value) {
-            return Formatters.validateCGPA(value ?? 0.0, 0.0, 4.0);
-          },
+          validator: (value) => Formatters.validateCGPA(value ?? 0.0, 0.0, 4.0),
         ),
         const SizedBox(height: 16),
         CustomTextField(
@@ -455,13 +584,7 @@ class _AcademicRecordDialogState extends State<AcademicRecordDialog> {
           onChanged: (value) => setState(() => _selectedClassOfAward = value),
         ),
         const SizedBox(height: 16),
-        CustomYearPicker(
-          label: 'Year of Completion',
-          selectedYear: _selectedYear,
-          onYearSelected: (year) => setState(() => _selectedYear = year),
-          validator: Formatters.validateYear,
-          isRequired: false,
-        ),
+        _buildSideBySideDatePickers(),
       ],
     );
   }
@@ -491,9 +614,7 @@ class _AcademicRecordDialogState extends State<AcademicRecordDialog> {
           max: 4.0,
           onChanged: (value) => setState(() => _cgpaValue = value),
           isRequired: true,
-          validator: (value) {
-            return Formatters.validateCGPA(value ?? 0.0, 0.0, 4.0);
-          },
+          validator: (value) => Formatters.validateCGPA(value ?? 0.0, 0.0, 4.0),
         ),
         const SizedBox(height: 16),
         CustomTextField(
@@ -516,12 +637,7 @@ class _AcademicRecordDialogState extends State<AcademicRecordDialog> {
           onChanged: (value) => setState(() => _selectedHonors = value),
         ),
         const SizedBox(height: 16),
-        CustomYearPicker(
-          label: 'Year of Completion',
-          selectedYear: _selectedYear,
-          onYearSelected: (year) => setState(() => _selectedYear = year),
-          validator: Formatters.validateYear,
-        ),
+        _buildSideBySideDatePickers(),
       ],
     );
   }
@@ -552,9 +668,7 @@ class _AcademicRecordDialogState extends State<AcademicRecordDialog> {
           max: 4.0,
           onChanged: (value) => setState(() => _cgpaValue = value),
           isRequired: true,
-          validator: (value) {
-            return Formatters.validateCGPA(value ?? 0.0, 0.0, 4.0);
-          },
+          validator: (value) => Formatters.validateCGPA(value ?? 0.0, 0.0, 4.0),
         ),
         const SizedBox(height: 16),
         CustomTextField(
@@ -571,12 +685,7 @@ class _AcademicRecordDialogState extends State<AcademicRecordDialog> {
           onChanged: (value) => setState(() => _selectedClassification = value),
         ),
         const SizedBox(height: 16),
-        CustomYearPicker(
-          label: 'Year of Completion',
-          selectedYear: _selectedYear,
-          onYearSelected: (year) => setState(() => _selectedYear = year),
-          validator: Formatters.validateYear,
-        ),
+        _buildSideBySideDatePickers(),
         const SizedBox(height: 16),
         CustomTextField(
           label: 'Thesis Title',
@@ -626,12 +735,7 @@ class _AcademicRecordDialogState extends State<AcademicRecordDialog> {
           prefixIcon: Icons.business_rounded,
         ),
         const SizedBox(height: 16),
-        CustomYearPicker(
-          label: 'Year of Completion',
-          selectedYear: _selectedYear,
-          onYearSelected: (year) => setState(() => _selectedYear = year),
-          validator: Formatters.validateYear,
-        ),
+        _buildSideBySideDatePickers(),
       ],
     );
   }
@@ -661,9 +765,7 @@ class _AcademicRecordDialogState extends State<AcademicRecordDialog> {
           max: 4.0,
           onChanged: (value) => setState(() => _cgpaValue = value),
           isRequired: true,
-          validator: (value) {
-            return Formatters.validateCGPA(value ?? 0.0, 0.0, 4.0);
-          },
+          validator: (value) => Formatters.validateCGPA(value ?? 0.0, 0.0, 4.0),
         ),
         const SizedBox(height: 16),
         CustomTextField(
@@ -673,14 +775,186 @@ class _AcademicRecordDialogState extends State<AcademicRecordDialog> {
           prefixIcon: Icons.business_rounded,
         ),
         const SizedBox(height: 16),
-        CustomYearPicker(
-          label: 'Year of Completion',
-          selectedYear: _selectedYear,
-          onYearSelected: (year) => setState(() => _selectedYear = year),
-          validator: Formatters.validateYear,
+        _buildSideBySideDatePickers(),
+      ],
+    );
+  }
+
+  Widget _buildSideBySideDatePickers() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            // Start Date
+            Expanded(
+              child: _buildDatePickerField(
+                label: 'Start Date',
+                controller: _startDateController,
+                selectedDate: _selectedStartDate,
+                onDateSelected: (date) {
+                  setState(() {
+                    _selectedStartDate = date;
+                    if (date != null) {
+                      _startDateController.text = DateFormat(
+                        'MMM yyyy',
+                      ).format(date.toDate());
+                    } else {
+                      _startDateController.clear();
+                    }
+                  });
+                },
+              ),
+            ),
+
+            const SizedBox(width: 8),
+
+            // End Date
+            Expanded(
+              child: _buildDatePickerField(
+                label: 'End Date',
+                controller: _endDateController,
+                selectedDate: _selectedEndDate,
+                onDateSelected: (date) {
+                  setState(() {
+                    _selectedEndDate = date;
+                    if (date != null) {
+                      _endDateController.text = DateFormat(
+                        'MMM yyyy',
+                      ).format(date.toDate());
+                    } else {
+                      _endDateController.clear();
+                    }
+                  });
+                },
+              ),
+            ),
+          ],
+        ),
+
+        // Validation message
+        if (_hasDateValidationError())
+          Padding(
+            padding: const EdgeInsets.only(top: 8, left: 4),
+            child: Row(
+              children: [
+                Icon(Icons.info_outline, size: 14, color: Colors.orange[700]),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Text(
+                    'Both dates must be filled together or left empty',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Colors.orange[700],
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+      ],
+    );
+  }
+
+  // ✅ NEW: Individual date picker field (compact version)
+  Widget _buildDatePickerField({
+    required String label,
+    required TextEditingController controller,
+    required Timestamp? selectedDate,
+    required Function(Timestamp?) onDateSelected,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        FieldLabel(label: label, isRequired: false),
+        const SizedBox(height: 6),
+        TextFormField(
+          controller: controller,
+          readOnly: true,
+          decoration: InputDecoration(
+            hintText: 'Select',
+            hintStyle: TextStyle(fontSize: 14, color: Colors.grey[400]),
+            filled: true,
+            fillColor: Colors.grey[50],
+            suffixIcon: controller.text.isNotEmpty
+                ? IconButton(
+                    icon: Icon(Icons.clear, size: 16, color: Colors.grey[600]),
+                    onPressed: () {
+                      controller.clear();
+                      onDateSelected(null);
+                    },
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(),
+                  )
+                : null,
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: 12,
+              vertical: 14,
+            ),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide(color: Colors.grey[300]!),
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide(color: Colors.grey[300]!),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide(color: AppColors.primary, width: 2),
+            ),
+            errorBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide(color: Colors.orange[700]!, width: 1),
+            ),
+            focusedErrorBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide(color: Colors.orange[700]!, width: 2),
+            ),
+          ),
+          style: const TextStyle(
+            fontSize: 15,
+            color: Color(0xFF1A1A1A),
+            fontWeight: FontWeight.w500,
+          ),
+          onTap: () async {
+            final DateTime? picked = await showDatePicker(
+              context: context,
+              initialDate: selectedDate?.toDate() ?? DateTime.now(),
+              firstDate: DateTime(1950),
+              lastDate: DateTime.now().add(const Duration(days: 365 * 10)),
+              builder: (context, child) {
+                return Theme(
+                  data: Theme.of(context).copyWith(
+                    colorScheme: ColorScheme.light(
+                      primary: AppColors.primary,
+                      onPrimary: Colors.white,
+                      surface: Colors.white,
+                      onSurface: AppColors.textPrimary,
+                    ),
+                  ),
+                  child: child!,
+                );
+              },
+            );
+
+            if (picked != null) {
+              onDateSelected(Timestamp.fromDate(picked));
+            }
+          },
         ),
       ],
     );
+  }
+
+  // ✅ NEW: Validation helper
+  bool _hasDateValidationError() {
+    final hasStart = _selectedStartDate != null;
+    final hasEnd = _selectedEndDate != null;
+
+    // Error if only one is filled
+    return (hasStart && !hasEnd) || (!hasStart && hasEnd);
   }
 
   Widget _buildSubjectsSection(List<String> gradeOptions) {
@@ -746,8 +1020,7 @@ class _AcademicRecordDialogState extends State<AcademicRecordDialog> {
           Column(
             children: [
               ..._currentSubjects.asMap().entries.map((entry) {
-                final index = entry.key;
-                return _buildSubjectRow(index, gradeOptions);
+                return _buildSubjectRow(entry.key, gradeOptions);
               }),
             ],
           ),
@@ -872,6 +1145,198 @@ class _AcademicRecordDialogState extends State<AcademicRecordDialog> {
     );
   }
 
+  void _handleSave() {
+    setState(() {
+      _formError = null;
+      _isSaving = true;
+    });
+
+    // 1. Validate main form fields (Level, Institution, etc.)
+    if (!_formKey.currentState!.validate()) {
+      setState(() {
+        _formError = 'Please fill in all required fields';
+        _isSaving = false;
+      });
+      return;
+    }
+
+    // 2. Validate that at least one subject exists
+    if (_currentSubjects.isEmpty) {
+      setState(() {
+        _formError = 'Please add at least one subject';
+        _isSaving = false;
+      });
+      return;
+    }
+
+    bool hasIncompleteSubjects = _currentSubjects.any(
+            (s) => s.name.trim().isEmpty || s.grade.trim().isEmpty
+    );
+
+    if (hasIncompleteSubjects) {
+      setState(() {
+        _formError = 'Please enter a name and grade for all subjects';
+        _isSaving = false;
+      });
+      return;
+    }
+
+    // 4. Validate date consistency
+    if (_hasDateValidationError()) {
+      setState(() {
+        _formError =
+        'Both start and end dates must be filled together, or leave both empty';
+        _isSaving = false;
+      });
+      return;
+    }
+
+    // 5. Validate end date is after start date
+    if (_selectedStartDate != null && _selectedEndDate != null) {
+      if (_selectedEndDate!.toDate().isBefore(_selectedStartDate!.toDate())) {
+        setState(() {
+          _formError = 'End date must be after start date';
+          _isSaving = false;
+        });
+        return;
+      }
+    }
+
+    // Proceed to save
+    final record = _buildAcademicRecord();
+    widget.onSave(record);
+  }
+
+  AcademicRecord _buildAcademicRecord() {
+    String? getTrimmed(String text) {
+      final trimmed = text.trim();
+      return trimmed.isEmpty ? null : trimmed;
+    }
+
+    String level;
+    if (_currentLevel == EducationLevel.other) {
+      level = getTrimmed(_otherLevelController.text) ?? 'Other';
+    } else {
+      level = _currentLevel.label;
+    }
+
+    String? institution = getTrimmed(_institutionController.text);
+    // ✅ Use the state variables instead of parsing
+    Timestamp? startDate = _selectedStartDate;
+    Timestamp? endDate = _selectedEndDate;
+    bool isCurrent = false;
+
+    switch (_currentLevel) {
+      case EducationLevel.spm:
+        return AcademicRecord(
+          id: widget.existingRecord?.id ?? '',
+          level: level,
+          subjects: _currentSubjects,
+          examType: _selectedExamType,
+          stream: _selectedStream,
+          institution: institution,
+          startDate: startDate,
+          endDate: endDate,
+          isCurrent: isCurrent,
+        );
+
+      case EducationLevel.stpm:
+        final usesCGPA = _selectedExamType == 'STPM';
+        return AcademicRecord(
+          id: widget.existingRecord?.id ?? '',
+          level: level,
+          subjects: _currentSubjects,
+          examType: _selectedExamType,
+          stream: _selectedStream,
+          institution: institution,
+          startDate: startDate,
+          endDate: endDate,
+          cgpa: usesCGPA && _cgpaValue > 0 ? _cgpaValue : null,
+          totalScore: !usesCGPA && _cgpaValue > 0 ? _cgpaValue : null,
+          isCurrent: isCurrent,
+        );
+
+      case EducationLevel.foundation:
+        return AcademicRecord(
+          id: widget.existingRecord?.id ?? '',
+          level: level,
+          examType: _selectedExamType,
+          programName: getTrimmed(_streamController.text),
+          cgpa: _cgpaValue > 0 ? _cgpaValue : null,
+          institution: institution,
+          startDate: startDate,
+          endDate: endDate,
+          isCurrent: isCurrent,
+        );
+
+      case EducationLevel.diploma:
+        return AcademicRecord(
+          id: widget.existingRecord?.id ?? '',
+          level: level,
+          programName: getTrimmed(_streamController.text),
+          cgpa: _cgpaValue > 0 ? _cgpaValue : null,
+          classOfAward: _selectedClassOfAward,
+          institution: institution,
+          startDate: startDate,
+          endDate: endDate,
+          isCurrent: isCurrent,
+        );
+
+      case EducationLevel.bachelor:
+        return AcademicRecord(
+          id: widget.existingRecord?.id ?? '',
+          level: level,
+          major: getTrimmed(_majorController.text),
+          cgpa: _cgpaValue > 0 ? _cgpaValue : null,
+          honors: _selectedHonors,
+          institution: institution,
+          startDate: startDate,
+          endDate: endDate,
+          isCurrent: isCurrent,
+        );
+
+      case EducationLevel.master:
+        return AcademicRecord(
+          id: widget.existingRecord?.id ?? '',
+          level: level,
+          researchArea: getTrimmed(_researchAreaController.text),
+          cgpa: _cgpaValue > 0 ? _cgpaValue : null,
+          classification: _selectedClassification,
+          thesisTitle: getTrimmed(_thesisTitleController.text),
+          institution: institution,
+          startDate: startDate,
+          endDate: endDate,
+          isCurrent: isCurrent,
+        );
+
+      case EducationLevel.phd:
+        return AcademicRecord(
+          id: widget.existingRecord?.id ?? '',
+          level: level,
+          researchArea: getTrimmed(_researchAreaController.text),
+          thesisTitle: getTrimmed(_thesisTitleController.text),
+          institution: institution,
+          startDate: startDate,
+          endDate: endDate,
+          isCurrent: isCurrent,
+        );
+
+      default:
+        return AcademicRecord(
+          id: widget.existingRecord?.id ?? '',
+          level: level,
+          programName: getTrimmed(_majorController.text),
+          cgpa: _cgpaValue > 0 ? _cgpaValue : null,
+          institution: institution,
+          startDate: startDate,
+          endDate: endDate,
+          isCurrent: isCurrent,
+        );
+    }
+  }
+
+  // --- Helper Methods ---
+
   List<String> _getStreamOptions(String? examType) {
     switch (examType) {
       case 'STPM':
@@ -931,230 +1396,5 @@ class _AcademicRecordDialogState extends State<AcademicRecordDialog> {
       default:
         return [];
     }
-  }
-
-  void _saveRecord() {
-    setState(() => _formError = null);
-
-    if (!_formKey.currentState!.validate()) {
-      _showError('Please fill in all required fields correctly');
-      return;
-    }
-
-    if (widget.viewModel.educationLevel == null) {
-      _showError('Please select an education level first');
-      return;
-    }
-
-    final requiresCGPA = [
-      EducationLevel.stpm,
-      EducationLevel.foundation,
-      EducationLevel.diploma,
-      EducationLevel.bachelor,
-      EducationLevel.master,
-    ].contains(widget.viewModel.educationLevel);
-
-    if (requiresCGPA) {
-      final cgpaError = Formatters.validateCGPA(_cgpaValue, 0, 4.0);
-      if (cgpaError != null) {
-        _showError(cgpaError);
-        return;
-      }
-    }
-
-    final requiresYear = [
-      EducationLevel.spm,
-      EducationLevel.stpm,
-      EducationLevel.phd,
-    ].contains(widget.viewModel.educationLevel);
-
-    if (requiresYear) {
-      final yearError = Formatters.validateYear(_selectedYear);
-      if (yearError != null) {
-        _showError(yearError);
-        return;
-      }
-    }
-
-    final requiresSubjects = [
-      EducationLevel.spm,
-      EducationLevel.stpm,
-    ].contains(widget.viewModel.educationLevel);
-
-    if (requiresSubjects) {
-      final subjectsError = Formatters.validateSubjectsList(_currentSubjects);
-      if (subjectsError != null) {
-        _showError(subjectsError);
-        return;
-      }
-    }
-
-    if (widget.viewModel.educationLevel == EducationLevel.spm ||
-        widget.viewModel.educationLevel == EducationLevel.stpm) {
-      if (_selectedExamType == null) {
-        _showError('Please select exam type');
-        return;
-      }
-    }
-
-    if (widget.viewModel.educationLevel == EducationLevel.stpm) {
-      if (_selectedStream == null) {
-        _showError('Please select stream/field');
-        return;
-      }
-    }
-
-    String? levelLabel;
-    if (widget.viewModel.educationLevel == EducationLevel.other) {
-      levelLabel = widget.viewModel.otherEducationLevelText;
-    } else {
-      levelLabel = _selectedExamType ?? widget.viewModel.educationLevel!.label;
-    }
-
-    String? getTrimmed(String text) {
-      final trimmed = text.trim();
-      return trimmed.isEmpty ? null : trimmed;
-    }
-
-    AcademicRecord record;
-
-    switch (widget.viewModel.educationLevel) {
-      case EducationLevel.spm:
-        record = AcademicRecord(
-          level: levelLabel ?? 'SPM',
-          subjects: _currentSubjects,
-          examType: _selectedExamType,
-          stream: _selectedStream,
-          institution: getTrimmed(_institutionController.text),
-          graduationYear: _selectedYear,
-        );
-        break;
-
-      case EducationLevel.stpm:
-        final usesCGPA = _selectedExamType == 'STPM';
-        record = AcademicRecord(
-          level: levelLabel ?? 'STPM',
-          subjects: _currentSubjects,
-          examType: _selectedExamType,
-          stream: _selectedStream,
-          cgpa: usesCGPA && _cgpaValue > 0 ? _cgpaValue : null,
-          totalScore: !usesCGPA && _cgpaValue > 0 ? _cgpaValue : null,
-          institution: getTrimmed(_institutionController.text),
-          graduationYear: _selectedYear,
-        );
-        break;
-
-      case EducationLevel.foundation:
-        record = AcademicRecord(
-          level: levelLabel ?? 'Foundation',
-          examType: _selectedExamType,
-          programName: getTrimmed(_streamController.text),
-          cgpa: _cgpaValue > 0 ? _cgpaValue : null,
-          institution: getTrimmed(_institutionController.text),
-          graduationYear: _selectedYear,
-        );
-        break;
-
-      case EducationLevel.diploma:
-        record = AcademicRecord(
-          level: levelLabel ?? 'Diploma',
-          programName: getTrimmed(_streamController.text),
-          cgpa: _cgpaValue > 0 ? _cgpaValue : null,
-          classOfAward: _selectedClassOfAward,
-          institution: getTrimmed(_institutionController.text),
-          graduationYear: _selectedYear,
-        );
-        break;
-
-      case EducationLevel.bachelor:
-        record = AcademicRecord(
-          level: levelLabel ?? 'Bachelor',
-          major: getTrimmed(_majorController.text),
-          cgpa: _cgpaValue > 0 ? _cgpaValue : null,
-          honors: _selectedHonors,
-          institution: getTrimmed(_institutionController.text),
-          graduationYear: _selectedYear,
-        );
-        break;
-
-      case EducationLevel.master:
-        record = AcademicRecord(
-          level: levelLabel ?? 'Master',
-          researchArea: getTrimmed(_researchAreaController.text),
-          cgpa: _cgpaValue > 0 ? _cgpaValue : null,
-          classification: _selectedClassification,
-          thesisTitle: getTrimmed(_thesisTitleController.text),
-          institution: getTrimmed(_institutionController.text),
-          graduationYear: _selectedYear,
-        );
-        break;
-
-      case EducationLevel.phd:
-        record = AcademicRecord(
-          level: levelLabel ?? 'PhD',
-          researchArea: getTrimmed(_researchAreaController.text),
-          thesisTitle: getTrimmed(_thesisTitleController.text),
-          institution: getTrimmed(_institutionController.text),
-          graduationYear: _selectedYear,
-        );
-        break;
-
-      case EducationLevel.other:
-      default:
-        record = AcademicRecord(
-          level: levelLabel ?? 'Unknown',
-          programName: getTrimmed(_majorController.text),
-          cgpa: _cgpaValue > 0 ? _cgpaValue : null,
-          institution: getTrimmed(_institutionController.text),
-          graduationYear: _selectedYear,
-        );
-        break;
-    }
-
-    if (isEditMode && widget.recordIndex != null) {
-      widget.viewModel.updateAcademicRecord(widget.recordIndex!, record);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Row(
-            children: [
-              Icon(Icons.check_circle_outline_rounded,
-                  color: Colors.white, size: 20),
-              const SizedBox(width: 10),
-              Text('Academic record updated successfully!',
-                  style: const TextStyle(fontSize: 13)),
-            ],
-          ),
-          backgroundColor: Colors.green[600],
-          behavior: SnackBarBehavior.floating,
-          shape:
-          RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-          margin: const EdgeInsets.all(16),
-          duration: const Duration(seconds: 2),
-        ),
-      );
-    } else {
-      widget.viewModel.addAcademicRecord(record);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Row(
-            children: [
-              Icon(Icons.check_circle_outline_rounded,
-                  color: Colors.white, size: 20),
-              const SizedBox(width: 10),
-              Text('Academic record saved successfully!',
-                  style: const TextStyle(fontSize: 13)),
-            ],
-          ),
-          backgroundColor: Colors.green[600],
-          behavior: SnackBarBehavior.floating,
-          shape:
-          RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-          margin: const EdgeInsets.all(16),
-          duration: const Duration(seconds: 2),
-        ),
-      );
-    }
-
-    Navigator.pop(context);
   }
 }

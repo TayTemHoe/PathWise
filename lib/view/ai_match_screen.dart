@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../utils/app_color.dart';
 import '../viewModel/ai_match_view_model.dart';
+import '../viewModel/profile_view_model.dart';
 import '../widgets/ai_match_pages/education_snapshot_page.dart';
 import '../widgets/ai_match_pages/english_tests_page.dart';
 import '../widgets/ai_match_pages/interests_page.dart';
@@ -42,8 +43,25 @@ class _AIMatchScreenState extends State<AIMatchScreen>
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       await _viewModel.initialize();
       if (mounted) {
+        final profileVM = Provider.of<ProfileViewModel>(context, listen: false);
+
+        // ✅ ENHANCED: Always reload profile first, then sync
+        debugPrint('🔄 AI Match Screen: Loading fresh profile data...');
+        await profileVM.loadUserProfile();
+
+        // ✅ Force reload from SharedPrefs first
+        await _viewModel.loadProgress(forceRefresh: true);
+
+        // ✅ If SharedPrefs is empty, sync from Profile
+        if (_viewModel.educationLevel == null && profileVM.profile != null) {
+          debugPrint('⚠️ SharedPrefs empty, syncing from Profile...');
+          _viewModel.syncFromUserProfile(profileVM.profile);
+        }
+
         setState(() => _isLoading = false);
         _fadeController.forward();
+
+        debugPrint('✅ AI Match initialized with education: ${_viewModel.educationLevel?.label}');
       }
     });
   }

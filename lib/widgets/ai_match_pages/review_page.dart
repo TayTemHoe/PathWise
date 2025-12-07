@@ -536,8 +536,8 @@ class ReviewPage extends StatelessWidget {
                     _buildInfoChip(Icons.stars_rounded, 'CGPA ${record.cgpa!.toStringAsFixed(2)}', Colors.green),
                   if (record.totalScore != null && record.totalScore! > 0)
                     _buildInfoChip(Icons.emoji_events_rounded, 'Score ${record.totalScore!.toStringAsFixed(0)}', Colors.amber),
-                  if (record.graduationYear != null)
-                    _buildInfoChip(Icons.event_rounded, '${record.graduationYear}', Colors.blue),
+                  if (record.startDate != null && record.endDate != null)
+                    _buildInfoChip(Icons.event_rounded, '${record.startDate} - ${record.endDate}', Colors.blue),
                   if (record.stream != null && record.stream!.isNotEmpty)
                     _buildInfoChip(Icons.category_rounded, record.stream!, Colors.teal),
                   if (record.honors != null && record.honors!.isNotEmpty)

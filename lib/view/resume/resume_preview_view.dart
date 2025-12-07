@@ -1,6 +1,7 @@
 // lib/view/resume/resume_preview_view.dart
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+import 'package:path_wise/model/ai_match_model.dart';
 import 'package:provider/provider.dart';
 import 'package:path_wise/viewModel/resume_view_model.dart';
 import 'package:path_wise/viewModel/profile_view_model.dart';
@@ -120,7 +121,7 @@ class PreviewResumePage extends StatelessWidget {
 
   Widget _buildTemplateLayout(UserProfile profile,
       List<Skill> skills,
-      List<Education> education,
+      List<AcademicRecord> education,
       List<Experience> experience,) {
     switch (resume.template) {
       case ResumeTemplateType.tech:
@@ -139,7 +140,7 @@ class PreviewResumePage extends StatelessWidget {
   // ========================================
   Widget _buildTechTemplate(UserProfile profile,
       List<Skill> skills,
-      List<Education> education,
+      List<AcademicRecord> education,
       List<Experience> experience,) {
     final primaryColor = _parseColor(resume.theme.primaryColorHex);
     final secondaryColor = _parseColor(resume.theme.secondaryColorHex);
@@ -389,7 +390,7 @@ class PreviewResumePage extends StatelessWidget {
     );
   }
 
-  Widget _buildTechEducation(Education edu, Color color) {
+  Widget _buildTechEducation(AcademicRecord edu, Color color) {
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
       child: Row(
@@ -419,7 +420,7 @@ class PreviewResumePage extends StatelessWidget {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  '${edu.degreeLevel ?? ''} in ${edu.fieldOfStudy ?? ''}',
+                  '${edu.level ?? ''} in ${edu.major ?? ''}',
                   style: TextStyle(
                     fontSize: resume.font.contentFontSize.toDouble(),
                     fontFamily: resume.font.fontFamily,
@@ -492,7 +493,7 @@ class PreviewResumePage extends StatelessWidget {
   // ========================================
   Widget _buildBusinessTemplate(UserProfile profile,
       List<Skill> skills,
-      List<Education> education,
+      List<AcademicRecord> education,
       List<Experience> experience,) {
     final primaryColor = _parseColor(resume.theme.primaryColorHex);
     final secondaryColor = _parseColor(resume.theme.secondaryColorHex);
@@ -727,7 +728,7 @@ class PreviewResumePage extends StatelessWidget {
     );
   }
 
-  Widget _buildBusinessEducation(Education edu, Color color) {
+  Widget _buildBusinessEducation(AcademicRecord edu, Color color) {
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
       child: Column(
@@ -756,7 +757,7 @@ class PreviewResumePage extends StatelessWidget {
             ],
           ),
           Text(
-            '${edu.degreeLevel ?? ''} in ${edu.fieldOfStudy ?? ''}',
+            '${edu.level ?? ''} in ${edu.major ?? ''}',
             style: TextStyle(
               fontSize: resume.font.contentFontSize.toDouble(),
               fontFamily: resume.font.fontFamily,
@@ -773,7 +774,7 @@ class PreviewResumePage extends StatelessWidget {
   // ========================================
   Widget _buildCreativeTemplate(UserProfile profile,
       List<Skill> skills,
-      List<Education> education,
+      List<AcademicRecord> education,
       List<Experience> experience,) {
     final primaryColor = _parseColor(resume.theme.primaryColorHex);
     final secondaryColor = _parseColor(resume.theme.secondaryColorHex);
@@ -974,7 +975,7 @@ class PreviewResumePage extends StatelessWidget {
     );
   }
 
-  Widget _buildCreativeEducation(Education edu, Color color) {
+  Widget _buildCreativeEducation(AcademicRecord edu, Color color) {
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
       child: Column(
@@ -988,7 +989,7 @@ class PreviewResumePage extends StatelessWidget {
             ),
           ),
           Text(
-            '${edu.degreeLevel ?? ''} in ${edu.fieldOfStudy ?? ''}',
+            '${edu.level ?? ''} in ${edu.major ?? ''}',
             style: TextStyle(
               fontSize: resume.font.contentFontSize.toDouble(),
               color: const Color(0xFF374151),
@@ -1004,7 +1005,7 @@ class PreviewResumePage extends StatelessWidget {
   // ========================================
   Widget _buildAcademicTemplate(UserProfile profile,
       List<Skill> skills,
-      List<Education> education,
+      List<AcademicRecord> education,
       List<Experience> experience,) {
     final primaryColor = _parseColor(resume.theme.primaryColorHex);
     final secondaryColor = _parseColor(resume.theme.secondaryColorHex);
@@ -1097,7 +1098,7 @@ class PreviewResumePage extends StatelessWidget {
     );
   }
 
-  Widget _buildAcademicEducation(Education edu) {
+  Widget _buildAcademicEducation(AcademicRecord edu) {
     return Container(
       margin: const EdgeInsets.only(bottom: 20),
       child: Column(
@@ -1111,7 +1112,7 @@ class PreviewResumePage extends StatelessWidget {
             ),
           ),
           Text(
-            '${edu.degreeLevel ?? ''} in ${edu.fieldOfStudy ?? ''}',
+            '${edu.level ?? ''} in ${edu.major ?? ''}',
             style: TextStyle(
               fontSize: resume.font.contentFontSize.toDouble(),
               fontStyle: FontStyle.italic,

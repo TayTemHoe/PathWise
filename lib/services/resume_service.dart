@@ -1,6 +1,7 @@
 // lib/services/resume_service.dart
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:path_wise/model/ai_match_model.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:flutter/services.dart' show rootBundle;
@@ -1335,7 +1336,7 @@ class ResumeService {
 
   // Helper: Build styled education entry
   pw.Widget _buildStyledEducation(
-      Education edu,
+      AcademicRecord edu,
       PdfColor color,
       pw.Font? font,
       ResumeDoc resume,
@@ -1374,7 +1375,7 @@ class ResumeService {
                 pw.SizedBox(height: 4),
                 // Degree
                 pw.Text(
-                  '${edu.degreeLevel ?? ''} in ${edu.fieldOfStudy ?? ''}',
+                  '${edu.level ?? ''} in ${edu.major ?? ''}',
                   style: pw.TextStyle(
                     font: font,
                     fontSize: resume.font.contentFontSize.toDouble(),
@@ -1394,7 +1395,7 @@ class ResumeService {
                   ),
                 ],
                 // CGPA
-                if (edu.gpa != null) ...[
+                if (edu.cgpa != null) ...[
                   pw.SizedBox(height: 4),
                   pw.Container(
                     padding: const pw.EdgeInsets.symmetric(horizontal: 8, vertical: 4),
@@ -1403,7 +1404,7 @@ class ResumeService {
                       borderRadius: pw.BorderRadius.circular(4),
                     ),
                     child: pw.Text(
-                      'CGPA: ${edu.gpa}',
+                      'CGPA: ${edu.cgpa}',
                       style: pw.TextStyle(
                         font: font,
                         fontSize: resume.font.contentFontSize.toDouble() - 1,

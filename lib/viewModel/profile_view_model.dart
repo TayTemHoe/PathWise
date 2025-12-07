@@ -7,6 +7,8 @@ import 'package:flutter/foundation.dart';
 import 'package:path_wise/model/user_profile.dart';
 import 'package:path_wise/services/profile_service.dart';
 
+import '../model/ai_match_model.dart';
+
 class ProfileViewModel extends ChangeNotifier {
   ProfileViewModel({
     ProfileService? service,
@@ -20,7 +22,7 @@ class ProfileViewModel extends ChangeNotifier {
   // ------------- State -------------
   UserProfile? _profile;
   List<Skill> _skills = const [];
-  List<Education> _education = const [];
+  List<AcademicRecord> _education = const [];
   List<Experience> _experience = const [];
 
   bool _isLoading = false;
@@ -34,7 +36,7 @@ class ProfileViewModel extends ChangeNotifier {
   // ------------- Getters -------------
   UserProfile? get profile => _profile;
   List<Skill> get skills => _skills;
-  List<Education> get education => _education;
+  List<AcademicRecord> get education => _education;
   List<Experience> get experience => _experience;
 
   bool get isLoading => _isLoading;
@@ -350,20 +352,26 @@ class ProfileViewModel extends ChangeNotifier {
   }
 
   // ------------- Education CRUD -------------
-  Future<bool> addEducation(Education draft) async {
-    debugPrint('➕ Adding education: ${draft.institution}');
+  Future<bool> addEducation(AcademicRecord draft) async {
     _setSavingEducation(true);
-    _setError(null);
     try {
       final created = await _service.createEducation(uid: uid, education: draft);
-      debugPrint('✅ Education created with ID: ${created.id}');
-      _education = [..._education, created]..sort((a, b) => (a.order ?? 0).compareTo(b.order ?? 0));
-      debugPrint('✅ Total education entries now: ${_education.length}');
+      _education = [..._education, created];
+
+      // If the new record is marked current, enforce exclusivity
+      if (draft.isCurrent == true) {
+        await _service.setCurrentEducation(uid: uid, eduId: created.id);
+
+        // Refresh local list states
+        _education = _education.map((e) {
+          return e.copyWith(isCurrent: e.id == created.id);
+        }).toList();
+      }
+
       notifyListeners();
       await _recalcAndPatchCompletion();
       return true;
     } catch (e) {
-      debugPrint('❌ Error adding education: $e');
       _setError(e);
       return false;
     } finally {
@@ -371,24 +379,59 @@ class ProfileViewModel extends ChangeNotifier {
     }
   }
 
-  Future<bool> saveEducation(Education edu) async {
-    debugPrint('💾 Updating education: ${edu.institution}');
+  Future<bool> saveEducation(AcademicRecord edu) async {
     _setSavingEducation(true);
-    _setError(null);
     try {
       await _service.updateEducation(uid: uid, education: edu);
-      _education = _education.map((e) => e.id == edu.id ? edu : e).toList()
-        ..sort((a, b) => (a.order ?? 0).compareTo(b.order ?? 0));
-      debugPrint('✅ Education updated successfully');
+
+      if (edu.isCurrent == true) {
+        await _service.setCurrentEducation(uid: uid, eduId: edu.id);
+        _education = _education.map((e) {
+          return e.copyWith(isCurrent: e.id == edu.id);
+        }).toList();
+      } else {
+        _education = _education.map((e) => e.id == edu.id ? edu : e).toList();
+      }
+
       notifyListeners();
       await _recalcAndPatchCompletion();
       return true;
     } catch (e) {
-      debugPrint('❌ Error updating education: $e');
       _setError(e);
       return false;
     } finally {
       _setSavingEducation(false);
+    }
+  }
+
+// ✅ NEW: Set specific education record as current
+  Future<bool> setCurrentEducation(String eduId) async {
+    _setSavingEducation(true);
+    _setError(null);
+    try {
+      await _service.setCurrentEducation(uid: uid, eduId: eduId);
+
+      // Reflect change locally immediately for UI responsiveness
+      _education = _education.map((e) {
+        return e.copyWith(isCurrent: e.id == eduId);
+      }).toList();
+
+      notifyListeners();
+      return true;
+    } catch (e) {
+      _setError(e);
+      return false;
+    } finally {
+      _setSavingEducation(false);
+    }
+  }
+
+  // Add this helper to get current education
+  AcademicRecord? get currentEducation {
+    try {
+      return _education.firstWhere((e) => e.isCurrent == true);
+    } catch (e) {
+      return null;
     }
   }
 
@@ -410,6 +453,11 @@ class ProfileViewModel extends ChangeNotifier {
     } finally {
       _setSavingEducation(false);
     }
+  }
+
+  Future<void> loadUserProfile() async {
+    debugPrint('🔄 ProfileViewModel: Reloading user profile');
+    await loadAll();
   }
 
   // ------------- Experience CRUD -------------

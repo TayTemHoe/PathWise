@@ -1,4 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/cupertino.dart';
+import 'package:path_wise/model/ai_match_model.dart';
 
 /// ===============================
 /// Safe parsers (resilient to type drift)
@@ -85,7 +87,7 @@ class UserProfile {
 
   // Subcollections: loaded separately (optional cache)
   final List<Skill>? skills;
-  final List<Education>? education;
+  final List<AcademicRecord>? education;
   final List<Experience>? experience;
 
   const UserProfile({
@@ -119,7 +121,6 @@ class UserProfile {
     this.education,
     this.experience,
   });
-
   /// Robust reader for nested OR legacy-flat docs.
   factory UserProfile.fromFirestore(DocumentSnapshot<Map<String, dynamic>> doc) {
     final data = doc.data() ?? {};
@@ -130,18 +131,35 @@ class UserProfile {
     final prefs = Preferences.fromAny(data);
     final personality = _map(data['personality']) ?? {};
 
+    // Helper to safely cast to Timestamp (handles both Timestamp and String)
+    Timestamp? _timestamp(Object? value) {
+      if (value == null) return null;
+      if (value is Timestamp) return value;
+      if (value is String) {
+        try {
+          // Try parsing ISO 8601 string to DateTime, then convert to Timestamp
+          final dateTime = DateTime.parse(value);
+          return Timestamp.fromDate(dateTime);
+        } catch (e) {
+          debugPrint('⚠️ Could not parse timestamp string: $value');
+          return null;
+        }
+      }
+      return null;
+    }
+
     return UserProfile(
       // meta
       completionPercent: _d(data['completionPercent']),
-      lastUpdated: data['lastUpdated'] as Timestamp?,
-      createdAt: data['createdAt'] as Timestamp?,
+      lastUpdated: _timestamp(data['lastUpdated']),
+      createdAt: _timestamp(data['createdAt']),
       profileFreshnessMonths: _i(data['profileFreshnessMonths']),
 
       // personality
       mbti: _s(personality['mbti']) ?? _s(data['mbti']),
       riasec: _s(personality['riasec']) ?? _s(data['riasec']), // STRING per spec
       personalityUpdatedAt:
-      personality['updatedAt'] as Timestamp? ?? data['personalityUpdatedAt'] as Timestamp?,
+      _timestamp(personality['updatedAt']) ?? _timestamp(data['personalityUpdatedAt']),
 
       // preferences
       preferences: prefs,
@@ -151,7 +169,7 @@ class UserProfile {
       name: _s(personal['name']) ?? _s(data['name']),
       email: _s(personal['email']) ?? _s(data['email']),
       phone: _s(personal['phone']) ?? _s(data['phone']),
-      dob: personal['dob'] as Timestamp? ?? data['dob'] as Timestamp?,
+      dob: _timestamp(personal['dob']) ?? _timestamp(data['dob']),
       gender: _s(personal['gender']) ?? _s(data['gender']),
       city: _s(loc['city']) ?? _s(data['city']),
       state: _s(loc['state']) ?? _s(data['state']),
@@ -221,8 +239,9 @@ class UserProfile {
     String? profilePictureUrl,
 
     List<Skill>? skills,
-    List<Education>? education,
+    List<AcademicRecord>? education,
     List<Experience>? experience,
+    String? currentEducationId,
   }) {
     return UserProfile(
       completionPercent: completionPercent ?? this.completionPercent,
@@ -388,99 +407,99 @@ class Verification {
 /// ===============================
 /// Subcollection: users/{uid}/education/{eduId}
 /// ===============================
-class Education {
-  final String id;
-  final String? institution;
-  final String? degreeLevel;  // HighSchool/Diploma/Bachelor/Master/PhD/Other
-  final String? fieldOfStudy;
-  final Timestamp? startDate; // date only
-  final Timestamp? endDate;   // date only
-  final bool? isCurrent;
-  final String? gpa;          // string per spec
-  final String? city;
-  final String? country;
-  final int? order;           // most recent first
-  final Timestamp? updatedAt; // date only
-
-  const Education({
-    required this.id,
-    this.institution,
-    this.degreeLevel,
-    this.fieldOfStudy,
-    this.startDate,
-    this.endDate,
-    this.isCurrent,
-    this.gpa,
-    this.city,
-    this.country,
-    this.order,
-    this.updatedAt,
-  });
-
-  factory Education.fromFirestore(DocumentSnapshot<Map<String, dynamic>> doc) {
-    final data = doc.data() ?? {};
-    final loc = _map(data['location']) ?? {};
-    return Education(
-      id: doc.id,
-      institution: _s(data['institution']),
-      degreeLevel: _s(data['degreeLevel']),
-      fieldOfStudy: _s(data['fieldOfStudy']),
-      startDate: data['startDate'] as Timestamp?,
-      endDate: data['endDate'] as Timestamp?,
-      isCurrent: _b(data['isCurrent']),
-      gpa: _s(data['gpa']),
-      city: _s(loc['city']),
-      country: _s(loc['country']),
-      order: _i(data['order']),
-      updatedAt: data['updatedAt'] as Timestamp?,
-    );
-  }
-
-  Map<String, dynamic> toMap() => {
-    if (institution != null) 'institution': institution,
-    if (degreeLevel != null) 'degreeLevel': degreeLevel,
-    if (fieldOfStudy != null) 'fieldOfStudy': fieldOfStudy,
-    if (startDate != null) 'startDate': startDate,
-    if (endDate != null) 'endDate': endDate,
-    if (isCurrent != null) 'isCurrent': isCurrent,
-    if (gpa != null) 'gpa': gpa,
-    'location': {
-      if (city != null) 'city': city,
-      if (country != null) 'country': country,
-    },
-    if (order != null) 'order': order,
-    if (updatedAt != null) 'updatedAt': updatedAt,
-  };
-
-  Education copyWith({
-    String? id,
-    String? institution,
-    String? degreeLevel,
-    String? fieldOfStudy,
-    Timestamp? startDate,
-    Timestamp? endDate,
-    bool? isCurrent,
-    String? gpa,
-    String? city,
-    String? country,
-    int? order,
-    Timestamp? updatedAt,
-  }) =>
-      Education(
-        id: id ?? this.id,
-        institution: institution ?? this.institution,
-        degreeLevel: degreeLevel ?? this.degreeLevel,
-        fieldOfStudy: fieldOfStudy ?? this.fieldOfStudy,
-        startDate: startDate ?? this.startDate,
-        endDate: endDate ?? this.endDate,
-        isCurrent: isCurrent ?? this.isCurrent,
-        gpa: gpa ?? this.gpa,
-        city: city ?? this.city,
-        country: country ?? this.country,
-        order: order ?? this.order,
-        updatedAt: updatedAt ?? this.updatedAt,
-      );
-}
+// class Education {
+//   final String id;
+//   final String? institution;
+//   final String? degreeLevel;  // HighSchool/Diploma/Bachelor/Master/PhD/Other
+//   final String? fieldOfStudy;
+//   final Timestamp? startDate; // date only
+//   final Timestamp? endDate;   // date only
+//   final bool? isCurrent;
+//   final String? gpa;          // string per spec
+//   final String? city;
+//   final String? country;
+//   final int? order;           // most recent first
+//   final Timestamp? updatedAt; // date only
+//
+//   const Education({
+//     required this.id,
+//     this.institution,
+//     this.degreeLevel,
+//     this.fieldOfStudy,
+//     this.startDate,
+//     this.endDate,
+//     this.isCurrent,
+//     this.gpa,
+//     this.city,
+//     this.country,
+//     this.order,
+//     this.updatedAt,
+//   });
+//
+//   factory Education.fromFirestore(DocumentSnapshot<Map<String, dynamic>> doc) {
+//     final data = doc.data() ?? {};
+//     final loc = _map(data['location']) ?? {};
+//     return Education(
+//       id: doc.id,
+//       institution: _s(data['institution']),
+//       degreeLevel: _s(data['degreeLevel']),
+//       fieldOfStudy: _s(data['fieldOfStudy']),
+//       startDate: data['startDate'] as Timestamp?,
+//       endDate: data['endDate'] as Timestamp?,
+//       isCurrent: _b(data['isCurrent']),
+//       gpa: _s(data['gpa']),
+//       city: _s(loc['city']),
+//       country: _s(loc['country']),
+//       order: _i(data['order']),
+//       updatedAt: data['updatedAt'] as Timestamp?,
+//     );
+//   }
+//
+//   Map<String, dynamic> toMap() => {
+//     if (institution != null) 'institution': institution,
+//     if (degreeLevel != null) 'degreeLevel': degreeLevel,
+//     if (fieldOfStudy != null) 'fieldOfStudy': fieldOfStudy,
+//     if (startDate != null) 'startDate': startDate,
+//     if (endDate != null) 'endDate': endDate,
+//     if (isCurrent != null) 'isCurrent': isCurrent,
+//     if (gpa != null) 'gpa': gpa,
+//     'location': {
+//       if (city != null) 'city': city,
+//       if (country != null) 'country': country,
+//     },
+//     if (order != null) 'order': order,
+//     if (updatedAt != null) 'updatedAt': updatedAt,
+//   };
+//
+//   Education copyWith({
+//     String? id,
+//     String? institution,
+//     String? degreeLevel,
+//     String? fieldOfStudy,
+//     Timestamp? startDate,
+//     Timestamp? endDate,
+//     bool? isCurrent,
+//     String? gpa,
+//     String? city,
+//     String? country,
+//     int? order,
+//     Timestamp? updatedAt,
+//   }) =>
+//       Education(
+//         id: id ?? this.id,
+//         institution: institution ?? this.institution,
+//         degreeLevel: degreeLevel ?? this.degreeLevel,
+//         fieldOfStudy: fieldOfStudy ?? this.fieldOfStudy,
+//         startDate: startDate ?? this.startDate,
+//         endDate: endDate ?? this.endDate,
+//         isCurrent: isCurrent ?? this.isCurrent,
+//         gpa: gpa ?? this.gpa,
+//         city: city ?? this.city,
+//         country: country ?? this.country,
+//         order: order ?? this.order,
+//         updatedAt: updatedAt ?? this.updatedAt,
+//       );
+// }
 
 /// ===============================
 /// Subcollection: users/{uid}/experience/{expId}
