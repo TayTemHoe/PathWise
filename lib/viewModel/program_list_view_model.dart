@@ -565,8 +565,13 @@ class ProgramListViewModel extends ChangeNotifier {
 
   Future<void> toggleCompare(ProgramModel program) async {
     if (_userId == null) {
-      debugPrint('⚠️ User not logged in');
-      return;
+      final user = FirebaseAuth.instance.currentUser;
+      if (user != null) {
+        _userId = user.uid;
+      } else {
+        debugPrint('⚠️ User not logged in');
+        return;
+      }
     }
 
     final isInList = _compareSet.contains(program.programId);

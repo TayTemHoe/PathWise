@@ -26,19 +26,16 @@ class ComparisonScreen extends StatefulWidget {
   State<ComparisonScreen> createState() => _ComparisonScreenState();
 }
 
-class _ComparisonScreenState extends State<ComparisonScreen>
-    with SingleTickerProviderStateMixin {
+class _ComparisonScreenState extends State<ComparisonScreen> {
   late PageController _pageController;
-  late ComparisonViewModel _viewModel;
   int _currentTabIndex = 0;
-  bool _isInitialized = false;
+  bool _isInitializing = true; // ✅ NEW: Track initialization state
 
   @override
   void initState() {
     super.initState();
-    _viewModel = ComparisonViewModel();
 
-    // FIX: Determine initial tab from initialItems if provided
+    // Determine initial tab from initialItems if provided
     int initialTab = 0;
     if (widget.initialItems.isNotEmpty) {
       final hasPrograms = widget.initialItems
@@ -46,7 +43,6 @@ class _ComparisonScreenState extends State<ComparisonScreen>
       final hasUniversities = widget.initialItems
           .any((item) => item.type == ComparisonType.universities);
 
-      // If ONLY universities, start on Universities tab
       if (hasUniversities && !hasPrograms) {
         initialTab = 1;
       }
@@ -55,58 +51,71 @@ class _ComparisonScreenState extends State<ComparisonScreen>
     _currentTabIndex = initialTab;
     _pageController = PageController(initialPage: initialTab);
 
-    // Initialize view model
-    WidgetsBinding.instance.addPostFrameCallback((_) async {
-      await _initializeViewModel();
+    // ✅ FIXED: Initialize in the next frame to ensure ViewModel is ready
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _initializeViewModel();
     });
   }
 
-  // NEW: Separate initialization method
+  // ✅ FIXED: Proper initialization with error handling
   Future<void> _initializeViewModel() async {
-    if (widget.initialItems.isNotEmpty) {
-      // Scenario 1: Navigation with items
-      await _viewModel.initialize(widget.initialItems);
-      _updateTabIfNeeded();
-    } else {
-      // Scenario 2: Fresh load from SQLite
-      await _viewModel.initialize(null);
-      _updateTabIfNeeded();
+    if (!mounted) return;
+
+    try {
+      final viewModel = context.read<ComparisonViewModel>();
+
+      debugPrint('🔧 Initializing ComparisonScreen with ${widget.initialItems.length} initial items');
+
+      // Initialize the ViewModel
+      await viewModel.initialize(
+        widget.initialItems.isNotEmpty ? widget.initialItems : null,
+      );
+
+      // Update tab if needed
+      if (mounted) {
+        _updateTabIfNeeded();
+      }
+    } catch (e) {
+      debugPrint('❌ Error initializing ComparisonScreen: $e');
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isInitializing = false;
+        });
+      }
     }
   }
 
   void _updateTabIfNeeded() {
-    if (!mounted || _isInitialized) return;
+    final viewModel = context.read<ComparisonViewModel>();
 
-    if (_viewModel.comparisonItems.isNotEmpty) {
-      final hasPrograms = _viewModel.comparisonItems
-          .any((item) => item.type == ComparisonType.programs);
-      final hasUniversities = _viewModel.comparisonItems
-          .any((item) => item.type == ComparisonType.universities);
+    if (viewModel.comparisonItems.isEmpty) return;
 
-      int correctTabIndex = 0;
+    final hasPrograms = viewModel.comparisonItems
+        .any((item) => item.type == ComparisonType.programs);
+    final hasUniversities = viewModel.comparisonItems
+        .any((item) => item.type == ComparisonType.universities);
 
-      // If ONLY universities exist, switch to Universities tab
-      if (hasUniversities && !hasPrograms) {
-        correctTabIndex = 1;
-      }
-      // If programs exist (with or without universities), stay on Programs tab
+    int correctTabIndex = 0;
 
-      if (_currentTabIndex != correctTabIndex && _pageController.hasClients) {
-        setState(() {
-          _currentTabIndex = correctTabIndex;
-        });
-        _pageController.jumpToPage(correctTabIndex);
-        debugPrint('📍 Switched to ${correctTabIndex == 0 ? "Programs" : "Universities"} tab');
-      }
+    // If ONLY universities exist, switch to Universities tab
+    if (hasUniversities && !hasPrograms) {
+      correctTabIndex = 1;
     }
 
-    _isInitialized = true;
+    if (_currentTabIndex != correctTabIndex && _pageController.hasClients) {
+      setState(() {
+        _currentTabIndex = correctTabIndex;
+      });
+      _pageController.jumpToPage(correctTabIndex);
+      debugPrint('📍 Switched to ${correctTabIndex == 0 ? "Programs" : "Universities"} tab');
+    }
   }
 
   @override
   void dispose() {
     _pageController.dispose();
-    _viewModel.dispose();
+    // ✅ REMOVED: Don't dispose the ViewModel here - it's managed by Provider
     super.dispose();
   }
 
@@ -134,42 +143,38 @@ class _ComparisonScreenState extends State<ComparisonScreen>
 
   @override
   Widget build(BuildContext context) {
-    return ChangeNotifierProvider.value(
-      value: _viewModel,
-      child: Scaffold(
-        backgroundColor: AppColors.background,
-        appBar: _buildAppBar(),
-        body: Consumer<ComparisonViewModel>(
-          builder: (context, viewModel, _) {
-            if (viewModel.isLoading) {
-              return const AppLoadingContent(
-                statusText: 'Loading comparison data...',
-              );
-            }
-
-            // Build the comparison view with tabs
-            return Column(
-              children: [
-                _buildCustomTabBar(viewModel),
-                Expanded(
-                  child: PageView(
-                    controller: _pageController,
-                    onPageChanged: _onPageChanged,
-                    children: [
-                      // Page 0: Programs
-                      _buildPageForType(viewModel, ComparisonType.programs),
-                      // Page 1: Universities
-                      _buildPageForType(viewModel, ComparisonType.universities),
-                    ],
-                  ),
-                ),
-              ],
+    return Scaffold(
+      backgroundColor: AppColors.background,
+      appBar: _buildAppBar(),
+      body: Consumer<ComparisonViewModel>(
+        builder: (context, viewModel, _) {
+          // ✅ FIXED: Show loading during initialization
+          if (_isInitializing || viewModel.isLoading) {
+            return const AppLoadingContent(
+              statusText: 'Loading comparison data...',
             );
-          },
-        ),
-        floatingActionButton: _buildFloatingBar(),
-        floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
+          }
+
+          // Build the comparison view with tabs
+          return Column(
+            children: [
+              _buildCustomTabBar(viewModel),
+              Expanded(
+                child: PageView(
+                  controller: _pageController,
+                  onPageChanged: _onPageChanged,
+                  children: [
+                    _buildPageForType(viewModel, ComparisonType.programs),
+                    _buildPageForType(viewModel, ComparisonType.universities),
+                  ],
+                ),
+              ),
+            ],
+          );
+        },
       ),
+      floatingActionButton: _buildFloatingBar(),
+      floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
     );
   }
 
@@ -191,8 +196,6 @@ class _ComparisonScreenState extends State<ComparisonScreen>
   // --- NEW WIDGET ---
   Widget _buildInPageEmptyState(ComparisonType type) {
     bool isProgram = type == ComparisonType.programs;
-
-    debugPrint('📭 Showing empty state for ${isProgram ? "Programs" : "Universities"}');
 
     return Center(
       child: SingleChildScrollView(
@@ -237,29 +240,26 @@ class _ComparisonScreenState extends State<ComparisonScreen>
             ),
             const SizedBox(height: 32),
             ElevatedButton.icon(
-              onPressed: () {
+              onPressed: () async {
                 if (isProgram) {
-                  if (widget.fromProgramList) {
-                    Navigator.pop(context); // Go back to existing list
-                  } else {
-                    // Open fresh list (defaults to Malaysia + Ranking in ViewModel)
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                          builder: (context) => const ProgramListScreen(showOnlyRecommended: false)),
-                    );
-                  }
+                  await Navigator.pushReplacement(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const ProgramListScreen(
+                        showOnlyRecommended: false,
+                        fromComparisonScreen: true,
+                      ),
+                    ),
+                  );
                 } else {
-                  if (widget.fromUniversityList) {
-                    Navigator.pop(context); // Go back to existing list
-                  } else {
-                    // Open fresh list (defaults to Malaysia)
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                          builder: (context) => const UniversityListScreen()),
-                    );
-                  }
+                  await Navigator.pushReplacement(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const UniversityListScreen(
+                        fromComparisonScreen: true,
+                      ),
+                    ),
+                  );
                 }
               },
               icon: const Icon(Icons.add_rounded, size: 20),
@@ -286,8 +286,7 @@ class _ComparisonScreenState extends State<ComparisonScreen>
       elevation: 0,
       centerTitle: true,
       leading: IconButton(
-        icon: const Icon(
-            Icons.arrow_back_ios, color: AppColors.textPrimary, size: 20),
+        icon: const Icon(Icons.arrow_back_ios, color: AppColors.textPrimary, size: 20),
         onPressed: () => Navigator.pop(context),
       ),
       title: const Text(
@@ -343,7 +342,6 @@ class _ComparisonScreenState extends State<ComparisonScreen>
       ),
       child: Stack(
         children: [
-          // Animated indicator
           AnimatedAlign(
             duration: const Duration(milliseconds: 250),
             curve: Curves.easeInOut,
@@ -357,10 +355,7 @@ class _ComparisonScreenState extends State<ComparisonScreen>
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(23),
                   gradient: const LinearGradient(
-                    colors: [
-                      Color(0xFF4285F4),
-                      Color(0xFF6C63FF),
-                    ],
+                    colors: [Color(0xFF4285F4), Color(0xFF6C63FF)],
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
                   ),
@@ -375,10 +370,8 @@ class _ComparisonScreenState extends State<ComparisonScreen>
               ),
             ),
           ),
-          // Tab buttons
           Row(
             children: [
-              // PROGRAM TAB (INDEX 0)
               Expanded(
                 child: GestureDetector(
                   onTap: () => _onTabChanged(0),
@@ -418,7 +411,6 @@ class _ComparisonScreenState extends State<ComparisonScreen>
                   ),
                 ),
               ),
-              // UNIVERSITY TAB (INDEX 1)
               Expanded(
                 child: GestureDetector(
                   onTap: () => _onTabChanged(1),
@@ -471,11 +463,8 @@ class _ComparisonScreenState extends State<ComparisonScreen>
         .toList();
 
     if (items.isEmpty) {
-      debugPrint('⚠️ No items found for ${filterType == ComparisonType.programs ? "programs" : "universities"}');
       return _buildInPageEmptyState(filterType);
     }
-
-    debugPrint('✅ Rendering ${items.length} ${filterType == ComparisonType.programs ? "programs" : "universities"}');
 
     final attributes = filterType == ComparisonType.programs
         ? viewModel.getProgramAttributes()
@@ -495,7 +484,6 @@ class _ComparisonScreenState extends State<ComparisonScreen>
       ),
     );
   }
-
 
   Widget _buildItemHeaders(List<ComparisonItem> items,
       ComparisonViewModel viewModel) {
@@ -970,23 +958,16 @@ class _ComparisonScreenState extends State<ComparisonScreen>
       builder: (context, viewModel, _) {
         if (!viewModel.hasItems) return const SizedBox.shrink();
 
-        // --- FIX START ---
-        // 1. Determine the current type based on the active tab
         final ComparisonType currentType = (_currentTabIndex == 0)
             ? ComparisonType.programs
             : ComparisonType.universities;
-        // --- FIX END ---
 
         return Container(
-          // The margin makes it "full width" with padding
           margin: const EdgeInsets.symmetric(horizontal: 20),
           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 5),
           decoration: BoxDecoration(
             gradient: LinearGradient(
-              colors: [
-                AppColors.primary,
-                AppColors.primary.withOpacity(0.85),
-              ],
+              colors: [AppColors.primary, AppColors.primary.withOpacity(0.85)],
             ),
             borderRadius: BorderRadius.circular(30),
             boxShadow: [
@@ -1006,10 +987,7 @@ class _ComparisonScreenState extends State<ComparisonScreen>
                   shape: BoxShape.circle,
                 ),
                 child: Text(
-                  // --- FIX START ---
-                  // 2. Get item count for the *specific* type
                   '${viewModel.getItemCountByType(currentType)}',
-                  // --- FIX END ---
                   style: const TextStyle(
                     color: Colors.white,
                     fontSize: 18,
@@ -1029,34 +1007,26 @@ class _ComparisonScreenState extends State<ComparisonScreen>
               if (viewModel.canAddMore(currentType)) ...[
                 const Spacer(),
                 InkWell(
-                  onTap: () {
-                    // This logic is correct and matches the new variable
+                  onTap: () async {
                     if (currentType == ComparisonType.programs) {
-                      if (widget.fromProgramList) {
-                        Navigator.pop(context); // Go back to existing list
-                      } else {
-                        // Open fresh list (defaults to Malaysia + Ranking in ViewModel)
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => const ProgramListScreen(showOnlyRecommended: false),
+                      await Navigator.pushReplacement(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const ProgramListScreen(
+                            showOnlyRecommended: false,
+                            fromComparisonScreen: true,
                           ),
-                        );
-                      }
-                      print('Navigating to Program List to add more...');
+                        ),
+                      );
                     } else {
-                      if (widget.fromUniversityList) {
-                        Navigator.pop(context); // Go back to existing list
-                      } else {
-                        // Open fresh list
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => const UniversityListScreen(),
+                      await Navigator.pushReplacement(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const UniversityListScreen(
+                            fromComparisonScreen: true,
                           ),
-                        );
-                      }
-                      print('Navigating to University List to add more...');
+                        ),
+                      );
                     }
                   },
                   borderRadius: BorderRadius.circular(20),
@@ -1068,11 +1038,7 @@ class _ComparisonScreenState extends State<ComparisonScreen>
                         color: Colors.white.withOpacity(0.3),
                       ),
                       const SizedBox(width: 20),
-                      const Icon(
-                        Icons.add_circle_outline,
-                        color: Colors.white,
-                        size: 18,
-                      ),
+                      const Icon(Icons.add_circle_outline, color: Colors.white, size: 18),
                       const SizedBox(width: 8),
                       const Text(
                         'Add more',
@@ -1152,76 +1118,60 @@ class _ComparisonScreenState extends State<ComparisonScreen>
   void _showClearConfirmation(ComparisonViewModel viewModel) {
     showDialog(
       context: context,
-      builder: (context) =>
-          AlertDialog(
-            shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(20)),
-            contentPadding: const EdgeInsets.all(24),
-            title: Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: AppColors.accent.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: const Icon(
-                    Icons.warning_amber_rounded,
-                    color: AppColors.accent,
-                    size: 20,
-                  ),
-                ),
-                const SizedBox(width: 12),
-                const Text(
-                  'Clear All Items?',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ],
-            ),
-            content: const Text(
-              'This will remove all items from the comparison. Are you sure you want to continue?',
-              style: TextStyle(
-                fontSize: 15,
-                height: 1.5,
-                color: AppColors.textSecondary,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        contentPadding: const EdgeInsets.all(24),
+        title: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: AppColors.accent.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: const Icon(
+                Icons.warning_amber_rounded,
+                color: AppColors.accent,
+                size: 20,
               ),
             ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context),
-                style: TextButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 20, vertical: 12),
-                  foregroundColor: AppColors.textSecondary,
-                ),
-                child: const Text('Cancel'),
-              ),
-              const SizedBox(width: 8),
-              ElevatedButton(
-                onPressed: () async {
-                  Navigator.pop(context); // Close dialog only
-
-                  await viewModel.clearAll();
-
-                  // FIX: Don't navigate away - let the screen update to show empty state
-                  // The _buildPageForType logic will handle showing the in-page empty state
-                },
-                style: ElevatedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-                  backgroundColor: AppColors.accent,
-                  foregroundColor: Colors.white,
-                  elevation: 0,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                ),
-                child: const Text('Clear All'),
-              )
-            ],
+            const SizedBox(width: 12),
+            const Text(
+              'Clear All Items?',
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            ),
+          ],
+        ),
+        content: const Text(
+          'This will remove all items from the comparison. Are you sure?',
+          style: TextStyle(fontSize: 15, height: 1.5, color: AppColors.textSecondary),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            style: TextButton.styleFrom(
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+              foregroundColor: AppColors.textSecondary,
+            ),
+            child: const Text('Cancel'),
           ),
+          const SizedBox(width: 8),
+          ElevatedButton(
+            onPressed: () async {
+              Navigator.pop(context);
+              await viewModel.clearAll();
+            },
+            style: ElevatedButton.styleFrom(
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+              backgroundColor: AppColors.accent,
+              foregroundColor: Colors.white,
+              elevation: 0,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            ),
+            child: const Text('Clear All'),
+          ),
+        ],
+      ),
     );
   }
 }

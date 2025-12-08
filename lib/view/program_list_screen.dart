@@ -32,6 +32,7 @@ class ProgramListScreen extends StatefulWidget {
   final List<String>? aiMatchedProgramIds;
   final UserPreferences? aiUserPreferences;
   final bool showOnlyRecommended;
+  final bool fromComparisonScreen;
 
   const ProgramListScreen({
     super.key,
@@ -39,6 +40,7 @@ class ProgramListScreen extends StatefulWidget {
     this.aiMatchedProgramIds,
     this.aiUserPreferences,
     this.showOnlyRecommended = false,
+    this.fromComparisonScreen = false,
   });
 
   @override
@@ -71,6 +73,11 @@ class _ProgramListScreenState extends State<ProgramListScreen> {
       final viewModel = context.read<ProgramListViewModel>();
       final filterVM = context.read<ProgramFilterViewModel>();
       final aiViewModel = context.read<AIMatchViewModel>();
+
+      if (widget.fromComparisonScreen) {
+        debugPrint('🔄 Loading comparison state from ComparisonScreen');
+        await viewModel.loadComparisonState();
+      }
 
       filterVM.loadFilterOptions();
 
@@ -1074,17 +1081,34 @@ class _ProgramListScreenState extends State<ProgramListScreen> {
               viewModel,
             );
 
-            await Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (context) =>
-                    ComparisonScreen(initialItems: comparisonItems, fromProgramList: true),
-              ),
-            );
+            if (widget.fromComparisonScreen) {
+              // Navigate back to comparison screen (replace current screen)
+              await Navigator.pushReplacement(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => ComparisonScreen(
+                    initialItems: comparisonItems,
+                    fromProgramList: true,
+                  ),
+                ),
+              );
+            } else {
+              // Fresh navigation - push new comparison screen
+              await Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) =>
+                      ComparisonScreen(
+                        initialItems: comparisonItems,
+                        fromProgramList: true,
+                      ),
+                ),
+              );
 
-            if (mounted) {
-              await viewModel.loadComparisonState();
-              setState(() {});
+              if (mounted) {
+                await viewModel.loadComparisonState();
+                setState(() {});
+              }
             }
           },
           backgroundColor: AppColors.primary,
@@ -1093,9 +1117,9 @@ class _ProgramListScreenState extends State<ProgramListScreen> {
             label: Text('$compareCount'),
             child: const Icon(Icons.compare_arrows, color: Colors.white),
           ),
-          label: const Text(
-            'Compare',
-            style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
+          label: Text(
+            widget.fromComparisonScreen ? 'Back to Compare' : 'Compare',
+            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
           ),
         );
       },

@@ -19,14 +19,14 @@ class ComparisonViewModel extends ChangeNotifier {
   final Map<String, UniversityModel> _universityCache = {};
   final Map<String, BranchModel> _branchCache = {};
   final Map<String, List<ProgramAdmissionModel>> _programAdmissionsCache = {};
-  final Map<String, List<UniversityAdmissionModel>> _universityAdmissionsCache =
-      {};
+  final Map<String, List<UniversityAdmissionModel>> _universityAdmissionsCache = {};
 
   // State
   List<ComparisonItem> _comparisonItems = [];
   bool _isLoading = false;
   String? _errorMessage;
   String? _userId;
+  bool _isDisposed = false;
 
   // Getters
   List<ComparisonItem> get comparisonItems => _comparisonItems;
@@ -48,107 +48,112 @@ class ComparisonViewModel extends ChangeNotifier {
   ComparisonType? get currentType =>
       _comparisonItems.isEmpty ? null : _comparisonItems.first.type;
 
+  void _safeNotify() {
+    if (!_isDisposed) {
+      notifyListeners();
+    }
+  }
   // ==================== INITIALIZATION ====================
 
   /// Initialize view model with user context
   Future<void> initialize([List<ComparisonItem>? initialItems]) async {
+    // ✅ FIXED: Check if disposed
+    if (_isDisposed) {
+      debugPrint('⚠️ ComparisonViewModel is disposed, skipping initialization');
+      return;
+    }
+
     try {
-      // Get current user ID
       final user = FirebaseAuth.instance.currentUser;
       if (user == null) {
         debugPrint('⚠️ No user logged in');
-        _comparisonItems.clear(); // ✅ ADD THIS
-        notifyListeners(); // ✅ ADD THIS
+        _comparisonItems.clear();
+        _safeNotify();
         return;
       }
 
       _userId = user.uid;
 
+      // Validate user context
       if (_comparisonItems.isNotEmpty) {
-        final oldUserId = _comparisonItems.first.id; // Infer from cached data
-        if (!oldUserId.contains(_userId!)) { // Simple check
+        final oldUserId = _comparisonItems.first.id;
+        if (!oldUserId.contains(_userId!)) {
           _comparisonItems.clear();
           _repository.clearCache();
-          notifyListeners();
+          _safeNotify();
         }
       }
 
-      // DEBUG: Check what's in SQLite FIRST
-      await _repository.debugPrintSQLiteState(_userId!);
+      debugPrint('🔧 Initializing ComparisonViewModel for user: $_userId');
 
       if (initialItems != null && initialItems.isNotEmpty) {
-        // FIX: Don't replace items, MERGE them with existing items
         debugPrint('📋 Received ${initialItems.length} initial items');
 
         // Load existing items from SQLite first
         final existingItems = await _repository.getComparisonItems(
           userId: _userId!,
-          type: null, // Load ALL items
+          type: null,
         );
 
         debugPrint('📦 Loaded ${existingItems.length} items from SQLite');
 
-        // Merge: Combine existing items with new items (avoiding duplicates)
+        // Merge items
         final Map<String, ComparisonItem> itemMap = {};
 
-        // Add existing items first
         for (var item in existingItems) {
           itemMap[item.id] = item;
         }
 
-        // Add/override with new items
         for (var item in initialItems) {
           itemMap[item.id] = item;
         }
 
         _comparisonItems = itemMap.values.toList();
-
         debugPrint('🔄 Merged to ${_comparisonItems.length} total items');
-        printCurrentState();
 
-        notifyListeners();
-        await loadComparisonData();
+        printCurrentState();
+        _safeNotify();
+
+        // ✅ FIXED: Check disposed before loading data
+        if (!_isDisposed) {
+          await loadComparisonData();
+        }
       } else {
-        // Load from SQLite (fresh screen load)
         debugPrint('💾 Loading from SQLite');
         await loadComparisonItems();
       }
     } catch (e) {
       debugPrint('❌ Error initializing comparison: $e');
       _errorMessage = 'Failed to initialize comparison';
-      notifyListeners();
+      _safeNotify();
     }
   }
 
   /// Load comparison items from SQLite
   Future<void> loadComparisonItems({ComparisonType? type}) async {
-    if (_userId == null) return;
+    if (_isDisposed || _userId == null) return;
 
     _isLoading = true;
-    notifyListeners();
+    _safeNotify();
 
     try {
-      // Load ALL comparison items from SQLite
       final allItems = await _repository.getComparisonItems(
         userId: _userId!,
-        type: null, // Load ALL items, don't filter by type
+        type: null,
       );
 
-      // FIX: Only replace if we're doing a fresh load
-      // If items already exist, merge instead
+      if (_isDisposed) return; // ✅ Check after async
+
       if (_comparisonItems.isEmpty) {
         _comparisonItems = allItems;
-        debugPrint('📥 Loaded ${_comparisonItems.length} items from SQLite (fresh load)');
+        debugPrint('🔥 Loaded ${_comparisonItems.length} items from SQLite (fresh load)');
       } else {
-        // Merge with existing items
         final Map<String, ComparisonItem> itemMap = {};
 
-        // Keep existing items
         for (var item in _comparisonItems) {
           itemMap[item.id] = item;
         }
 
-        // Add any new items from SQLite
         for (var item in allItems) {
           itemMap[item.id] = item;
         }
@@ -157,7 +162,6 @@ class ComparisonViewModel extends ChangeNotifier {
         debugPrint('🔄 Merged to ${_comparisonItems.length} items');
       }
 
-      // Log what types were loaded
       if (_comparisonItems.isNotEmpty) {
         final programCount = _comparisonItems
             .where((i) => i.type == ComparisonType.programs)
@@ -168,23 +172,22 @@ class ComparisonViewModel extends ChangeNotifier {
         debugPrint('   - Programs: $programCount, Universities: $uniCount');
       }
 
-      // Load data for ALL items
-      if (_comparisonItems.isNotEmpty) {
+      if (_comparisonItems.isNotEmpty && !_isDisposed) {
         await loadComparisonData();
       }
 
-      printCurrentState(); // Debug output
+      printCurrentState();
     } catch (e) {
       debugPrint('❌ Error loading comparison items: $e');
       _errorMessage = 'Failed to load comparison items';
     } finally {
       _isLoading = false;
-      notifyListeners();
+      _safeNotify();
     }
   }
 
   void printCurrentState() {
-    debugPrint('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+    debugPrint('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
     debugPrint('📊 COMPARISON STATE:');
     debugPrint('   Total Items: ${_comparisonItems.length}');
 
@@ -204,19 +207,18 @@ class ComparisonViewModel extends ChangeNotifier {
     for (var item in universities) {
       debugPrint('      - ${item.name}');
     }
-    debugPrint('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+    debugPrint('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
   }
 
   /// Load all data for comparison (programs or universities)
   Future<void> loadComparisonData() async {
-    if (_comparisonItems.isEmpty || _userId == null) return;
+    if (_isDisposed || _comparisonItems.isEmpty || _userId == null) return;
 
     _isLoading = true;
     _errorMessage = null;
-    notifyListeners();
+    _safeNotify();
 
     try {
-      // FIX: Separate items by type
       final programItems = _comparisonItems
           .where((item) => item.type == ComparisonType.programs)
           .toList();
@@ -224,10 +226,11 @@ class ComparisonViewModel extends ChangeNotifier {
           .where((item) => item.type == ComparisonType.universities)
           .toList();
 
-      // Load data for both types concurrently
       await Future.wait([
-        if (programItems.isNotEmpty) _loadProgramsData(programItems),
-        if (universityItems.isNotEmpty) _loadUniversitiesData(universityItems),
+        if (programItems.isNotEmpty && !_isDisposed)
+          _loadProgramsData(programItems),
+        if (universityItems.isNotEmpty && !_isDisposed)
+          _loadUniversitiesData(universityItems),
       ]);
 
       debugPrint('✅ Loaded comparison data successfully');
@@ -236,30 +239,29 @@ class ComparisonViewModel extends ChangeNotifier {
       _errorMessage = 'Failed to load comparison data';
     } finally {
       _isLoading = false;
-      notifyListeners();
+      _safeNotify();
     }
   }
 
   Future<void> _loadProgramsData(List<ComparisonItem> programItems) async {
+    if (_isDisposed) return;
+
     for (var item in programItems) {
-      // Load program
+      if (_isDisposed) break;
+
       final program = await _repository.getProgramDetails(item.id);
-      if (program != null) {
+      if (program != null && !_isDisposed) {
         _programCache[item.id] = program;
 
-        // Load related data
         final branch = await _repository.getBranchForProgram(program.branchId);
         if (branch != null) _branchCache[program.branchId] = branch;
 
-        final university = await _repository.getUniversityForProgram(
-          program.universityId,
-        );
+        final university = await _repository.getUniversityForProgram(program.universityId);
         if (university != null) {
           _universityCache[program.universityId] = university;
 
-          // Update the item's logoUrl
           final itemIndex = _comparisonItems.indexWhere((item) => item.id == program.programId);
-          if (itemIndex != -1) {
+          if (itemIndex != -1 && !_isDisposed) {
             _comparisonItems[itemIndex] = _comparisonItems[itemIndex].copyWith(
               logoUrl: university.universityLogo,
             );
@@ -273,15 +275,18 @@ class ComparisonViewModel extends ChangeNotifier {
   }
 
   Future<void> _loadUniversitiesData(List<ComparisonItem> universityItems) async {
+    if (_isDisposed) return;
+
     for (var item in universityItems) {
-      // Load university
+      if (_isDisposed) break;
+
       final university = await _repository.getUniversityDetails(item.id);
-      if (university != null) {
+      if (university != null && !_isDisposed) {
         _universityCache[item.id] = university;
 
-        // Load branches and admissions
         final branches = await _repository.getUniversityBranches(item.id);
         for (var branch in branches) {
+          if (_isDisposed) break;
           _branchCache[branch.branchId] = branch;
         }
 
@@ -295,45 +300,33 @@ class ComparisonViewModel extends ChangeNotifier {
 
   /// Add item to comparison
   Future<bool> addItem(ComparisonItem item) async {
-    if (_userId == null) {
-      debugPrint('⚠️ No user logged in');
-      return false;
-    }
+    if (_isDisposed || _userId == null) return false;
 
-    // Check limit for this type
     if (!canAddMore(item.type)) {
       debugPrint('⚠️ Maximum 3 ${item.type} items allowed');
       _errorMessage = 'Maximum 3 items can be compared at once';
-      notifyListeners();
+      _safeNotify();
       return false;
     }
 
-    // Check if item already exists
     if (_comparisonItems.any((i) => i.id == item.id)) {
       debugPrint('⚠️ Item already in comparison');
       return false;
     }
 
-    // Check type consistency (if items exist)
-    if (_comparisonItems.isNotEmpty &&
-        _comparisonItems.first.type != item.type) {
+    if (_comparisonItems.isNotEmpty && _comparisonItems.first.type != item.type) {
       debugPrint('⚠️ Cannot mix programs and universities');
       _errorMessage = 'Cannot mix programs and universities';
-      notifyListeners();
+      _safeNotify();
       return false;
     }
 
-    // Add to SQLite
-    final success = await _repository.addToComparison(
-      userId: _userId!,
-      item: item,
-    );
+    final success = await _repository.addToComparison(userId: _userId!, item: item);
 
-    if (success) {
+    if (success && !_isDisposed) {
       _comparisonItems.add(item);
-      notifyListeners();
+      _safeNotify();
 
-      // Load data for new item in background
       if (item.type == ComparisonType.programs) {
         _repository.getProgramDetails(item.id);
       } else {
@@ -346,65 +339,48 @@ class ComparisonViewModel extends ChangeNotifier {
 
   /// Remove item from comparison
   Future<void> removeItem(String itemId) async {
-    if (_userId == null) return;
+    if (_isDisposed || _userId == null) return;
 
-    // Remove from SQLite
     final success = await _repository.removeFromComparison(
       userId: _userId!,
       itemId: itemId,
     );
 
-    if (success) {
+    if (success && !_isDisposed) {
       _comparisonItems.removeWhere((item) => item.id == itemId);
-      notifyListeners();
-
+      _safeNotify();
       debugPrint('✅ Removed item $itemId from comparison');
     }
   }
 
-  /// Clear all items of current type
   Future<void> clearCurrentType() async {
-    if (_userId == null || _comparisonItems.isEmpty) return;
+    if (_isDisposed || _userId == null || _comparisonItems.isEmpty) return;
 
     final type = _comparisonItems.first.type;
+    final count = await _repository.clearComparisonByType(userId: _userId!, type: type);
 
-    final count = await _repository.clearComparisonByType(
-      userId: _userId!,
-      type: type,
-    );
-
-    if (count > 0) {
+    if (count > 0 && !_isDisposed) {
       _comparisonItems.clear();
-      notifyListeners();
-
+      _safeNotify();
       debugPrint('✅ Cleared $count items from comparison');
     }
   }
 
-  /// Clear all items
   Future<void> clearAll() async {
-    if (_userId == null) return;
+    if (_isDisposed || _userId == null) return;
 
-    // Clear both types
-    await _repository.clearComparisonByType(
-      userId: _userId!,
-      type: ComparisonType.programs,
-    );
-    await _repository.clearComparisonByType(
-      userId: _userId!,
-      type: ComparisonType.universities,
-    );
+    await _repository.clearComparisonByType(userId: _userId!, type: ComparisonType.programs);
+    await _repository.clearComparisonByType(userId: _userId!, type: ComparisonType.universities);
 
-    _comparisonItems.clear();
-    notifyListeners();
-
-    debugPrint('✅ Cleared all comparisons');
+    if (!_isDisposed) {
+      _comparisonItems.clear();
+      _safeNotify();
+      debugPrint('✅ Cleared all comparisons');
+    }
   }
 
-  /// Check if item is in comparison
   Future<bool> isItemInComparison(String itemId) async {
     if (_userId == null) return false;
-
     return await _repository.isInComparison(userId: _userId!, itemId: itemId);
   }
 
@@ -430,7 +406,8 @@ class ComparisonViewModel extends ChangeNotifier {
       ComparisonAttribute(
         label: 'Program Name',
         tooltip: 'Official name of the academic program',
-        values: programItems.map((item) {  // Changed from _comparisonItems
+        values: programItems.map((item) {
+          // Changed from _comparisonItems
           final program = _programCache[item.id];
           if (program == null) return 'Loading...';
           return program.programName;
@@ -442,7 +419,8 @@ class ComparisonViewModel extends ChangeNotifier {
       ComparisonAttribute(
         label: 'University Name',
         tooltip: 'University or institution offering the program',
-        values: programItems.map((item) {  // Changed from _comparisonItems
+        values: programItems.map((item) {
+          // Changed from _comparisonItems
           final program = _programCache[item.id];
           final university = _universityCache[program?.universityId];
           if (program == null || university == null) return 'Loading...';
@@ -456,7 +434,8 @@ class ComparisonViewModel extends ChangeNotifier {
       ComparisonAttribute(
         label: 'Subject Rank Range',
         tooltip: 'QS World University subject ranking for this field',
-        values: programItems.map((item) {  // Changed
+        values: programItems.map((item) {
+          // Changed
           final program = _programCache[item.id];
           if (program == null || !program.hasSubjectRanking) return 'Unranked';
           return program.formattedSubjectRanking;
@@ -468,8 +447,10 @@ class ComparisonViewModel extends ChangeNotifier {
     attributes.add(
       ComparisonAttribute(
         label: 'Study Level',
-        tooltip: 'Academic qualification awarded (e.g., Diploma, Bachelor, Master)',
-        values: programItems.map((item) {  // Changed
+        tooltip:
+            'Academic qualification awarded (e.g., Diploma, Bachelor, Master)',
+        values: programItems.map((item) {
+          // Changed
           final program = _programCache[item.id];
           if (program == null) return 'Loading...';
           final level = program.studyLevel ?? 'N/A';
@@ -482,7 +463,8 @@ class ComparisonViewModel extends ChangeNotifier {
       ComparisonAttribute(
         label: 'Field of Study',
         tooltip: 'Major subject area or academic discipline',
-        values: programItems.map((item) {  // Changed
+        values: programItems.map((item) {
+          // Changed
           final program = _programCache[item.id];
           if (program == null) return 'Loading...';
           final field = program.subjectArea ?? 'N/A';
@@ -496,7 +478,8 @@ class ComparisonViewModel extends ChangeNotifier {
       ComparisonAttribute(
         label: 'Duration',
         tooltip: 'Total duration (years) required to complete the program',
-        values: programItems.map((item) {  // Changed
+        values: programItems.map((item) {
+          // Changed
           final program = _programCache[item.id];
           return program?.formattedDuration ?? 'N/A';
         }).toList(),
@@ -508,7 +491,8 @@ class ComparisonViewModel extends ChangeNotifier {
       ComparisonAttribute(
         label: 'Learning Mode',
         tooltip: 'Mode of study (e.g., On Campus, Blended, Online)',
-        values: programItems.map((item) {  // Changed
+        values: programItems.map((item) {
+          // Changed
           final program = _programCache[item.id];
           return program?.studyMode ?? 'Not Available';
         }).toList(),
@@ -520,7 +504,8 @@ class ComparisonViewModel extends ChangeNotifier {
       ComparisonAttribute(
         label: 'Domestics Tuition Fee',
         tooltip: 'Approximate tuition fees for Malaysian students',
-        values: programItems.map((item) {  // Changed
+        values: programItems.map((item) {
+          // Changed
           final program = _programCache[item.id];
           final branch = _branchCache[program?.branchId];
           if (program == null || branch == null) return 'Loading...';
@@ -539,7 +524,8 @@ class ComparisonViewModel extends ChangeNotifier {
       ComparisonAttribute(
         label: 'International Tuition Fee',
         tooltip: 'Approximate tuition fees for international students',
-        values: programItems.map((item) {  // Changed
+        values: programItems.map((item) {
+          // Changed
           final program = _programCache[item.id];
           final branch = _branchCache[program?.branchId];
           if (program == null || branch == null) return 'Loading...';
@@ -557,8 +543,10 @@ class ComparisonViewModel extends ChangeNotifier {
     attributes.add(
       ComparisonAttribute(
         label: 'Minimum Entry Requirements',
-        tooltip: 'Academic grades, standardized tests, or language proficiency required for admission',
-        values: programItems.map((item) {  // Changed
+        tooltip:
+            'Academic grades, standardized tests, or language proficiency required for admission',
+        values: programItems.map((item) {
+          // Changed
           final admissions = _programAdmissionsCache[item.id] ?? [];
           if (admissions.isEmpty) return 'Not Available';
 
@@ -566,7 +554,7 @@ class ComparisonViewModel extends ChangeNotifier {
               .take(3)
               .map(
                 (adm) => '${adm.progAdmissionLabel}: ${adm.progAdmissionValue}',
-          )
+              )
               .join('\n');
         }).toList(),
       ),
@@ -598,7 +586,7 @@ class ComparisonViewModel extends ChangeNotifier {
       ComparisonAttribute(
         label: 'University Name',
         tooltip: 'Official name of the institution',
-        values: universityItems.map((item) => item.name).toList(),  // Changed
+        values: universityItems.map((item) => item.name).toList(), // Changed
       ),
     );
 
@@ -607,7 +595,8 @@ class ComparisonViewModel extends ChangeNotifier {
       ComparisonAttribute(
         label: 'QS Ranking',
         tooltip: 'QS World University Ranking (global ranking range)',
-        values: universityItems.map((item) {  // Changed
+        values: universityItems.map((item) {
+          // Changed
           final uni = _universityCache[item.id];
           if (uni == null || uni.minRanking == null) return 'Unranked';
           if (uni.maxRanking == null || uni.minRanking == uni.maxRanking) {
@@ -704,7 +693,8 @@ class ComparisonViewModel extends ChangeNotifier {
     attributes.add(
       ComparisonAttribute(
         label: 'Admissions Requirements',
-        tooltip: 'Programs admission requirements and type of admission (e.g., Bachelor, Masters)',
+        tooltip:
+            'Programs admission requirements and type of admission (e.g., Bachelor, Masters)',
         values: universityItems.map((item) {
           final admissions = _universityAdmissionsCache[item.id] ?? [];
           if (admissions.isEmpty) return 'Not Available';
@@ -815,22 +805,32 @@ class ComparisonViewModel extends ChangeNotifier {
     return number.toString();
   }
 
-  /// Refresh comparison data
   Future<void> refresh() async {
-    await loadComparisonItems();
+    if (!_isDisposed) {
+      await loadComparisonItems();
+    }
+  }
+
+  void clearForLogout() {
+    if (_isDisposed) return;
+
+    _comparisonItems.clear();
+    _repository.clearCache();
+    _userId = null;
+    _safeNotify();
+    debugPrint('🧹 Comparison data cleared for logout');
   }
 
   @override
   void dispose() {
+    debugPrint('🗑️ Disposing ComparisonViewModel');
+    _isDisposed = true;
     _comparisonItems.clear();
-    _repository.clearCache();
+    _programCache.clear();
+    _universityCache.clear();
+    _branchCache.clear();
+    _programAdmissionsCache.clear();
+    _universityAdmissionsCache.clear();
     super.dispose();
-  }
-
-  void clearForLogout() {
-    _comparisonItems.clear();
-    _repository.clearCache();
-    notifyListeners();
-    debugPrint('🧹 Comparison data cleared for logout');
   }
 }

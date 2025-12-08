@@ -433,6 +433,7 @@ class _AcademicRecordDialogState extends State<AcademicRecordDialog> {
           onChanged: (value) => setState(() {
             _selectedExamType = value;
             _cgpaValue = 0;
+            _selectedStream = null;
           }),
           isRequired: true,
         ),
@@ -1161,24 +1162,33 @@ class _AcademicRecordDialogState extends State<AcademicRecordDialog> {
     }
 
     // 2. Validate that at least one subject exists
-    if (_currentSubjects.isEmpty) {
-      setState(() {
-        _formError = 'Please add at least one subject';
-        _isSaving = false;
-      });
-      return;
-    }
+    final bool requiresSubjectValidation = [
+      EducationLevel.spm,
+      EducationLevel.stpm,
+    ].contains(_currentLevel);
 
-    bool hasIncompleteSubjects = _currentSubjects.any(
-            (s) => s.name.trim().isEmpty || s.grade.trim().isEmpty
-    );
+    if (requiresSubjectValidation) {
+      // 2. Validate that at least one subject exists
+      if (_currentSubjects.isEmpty) {
+        setState(() {
+          _formError = 'Please add at least one subject';
+          _isSaving = false;
+        });
+        return;
+      }
 
-    if (hasIncompleteSubjects) {
-      setState(() {
-        _formError = 'Please enter a name and grade for all subjects';
-        _isSaving = false;
-      });
-      return;
+      // 3. Validate subject completeness
+      bool hasIncompleteSubjects = _currentSubjects.any(
+              (s) => s.name.trim().isEmpty || s.grade.trim().isEmpty
+      );
+
+      if (hasIncompleteSubjects) {
+        setState(() {
+          _formError = 'Please enter a name and grade for all subjects';
+          _isSaving = false;
+        });
+        return;
+      }
     }
 
     // 4. Validate date consistency
@@ -1357,7 +1367,7 @@ class _AcademicRecordDialogState extends State<AcademicRecordDialog> {
           'Humanities',
           'Social Science',
           'Commerce / Business',
-          'Arts',
+          'Arts (A-Level)',
           'Other',
         ];
       case 'IB':
@@ -1374,7 +1384,7 @@ class _AcademicRecordDialogState extends State<AcademicRecordDialog> {
         return [
           'Science',
           'Commerce',
-          'Arts',
+          'Arts (UEC)',
           'Technical / Vocational',
           'Other',
         ];

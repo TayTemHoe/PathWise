@@ -27,7 +27,12 @@ import 'ai_match_screen.dart';
 import 'comparison_screen.dart';
 
 class UniversityListScreen extends StatefulWidget {
-  const UniversityListScreen({Key? key}) : super(key: key);
+  final bool fromComparisonScreen; // ✅ NEW FLAG
+
+  const UniversityListScreen({
+    Key? key,
+    this.fromComparisonScreen = false, // ✅ NEW FLAG
+  }) : super(key: key);
 
   @override
   State<UniversityListScreen> createState() => _UniversityListScreenState();
@@ -55,6 +60,11 @@ class _UniversityListScreenState extends State<UniversityListScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final viewModel = context.read<UniversityListViewModel>();
       final filterVM = context.read<FilterViewModel>();
+
+      if (widget.fromComparisonScreen) {
+        debugPrint('🔄 Loading comparison state from ComparisonScreen');
+        viewModel.loadComparisonState();
+      }
 
       // Load filter options in background
       filterVM.loadFilterOptions();
@@ -830,20 +840,34 @@ class _UniversityListScreenState extends State<UniversityListScreen> {
           onPressed: () async {
             final comparisonItems = await _getComparisonItemsFromRepo(viewModel);
 
-            await Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (context) => ComparisonScreen(
-                  initialItems: comparisonItems,
-                  fromUniversityList: true,
+            if (widget.fromComparisonScreen) {
+              // Navigate back to comparison screen (replace current screen)
+              await Navigator.pushReplacement(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => ComparisonScreen(
+                    initialItems: comparisonItems,
+                    fromUniversityList: true,
+                  ),
                 ),
-              ),
-            );
+              );
+            } else {
+              // Fresh navigation - push new comparison screen
+              await Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => ComparisonScreen(
+                    initialItems: comparisonItems,
+                    fromUniversityList: true,
+                  ),
+                ),
+              );
 
-            // Reload comparison state when returning
-            if (mounted) {
-              await viewModel.loadComparisonState();
-              setState(() {});
+              // Reload state when returning
+              if (mounted) {
+                await viewModel.loadComparisonState();
+                setState(() {});
+              }
             }
           },
           backgroundColor: AppColors.primary,
@@ -852,12 +876,9 @@ class _UniversityListScreenState extends State<UniversityListScreen> {
             label: Text('$compareCount'), // Shows actual count
             child: const Icon(Icons.compare_arrows, color: Colors.white),
           ),
-          label: const Text(
-            'Compare',
-            style: TextStyle(
-              color: Colors.white,
-              fontWeight: FontWeight.w600,
-            ),
+          label: Text(
+            widget.fromComparisonScreen ? 'Back to Compare' : 'Compare',
+            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
           ),
         );
       },
