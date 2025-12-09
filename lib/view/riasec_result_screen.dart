@@ -1,6 +1,7 @@
 // lib/view/riasec_result_screen.dart
 
 import 'package:flutter/material.dart';
+import 'package:path_wise/view/riasec_test_screen.dart';
 import 'package:provider/provider.dart';
 import '../utils/app_color.dart';
 import '../viewModel/riasec_test_view_model.dart';
@@ -65,46 +66,53 @@ class _RiasecResultScreenState extends State<RiasecResultScreen>
           );
         }
 
-        return Scaffold(
-          backgroundColor: AppColors.background,
-          appBar: AppBar(
-            backgroundColor: Colors.white,
-            elevation: 0,
-            leading: IconButton(
-              icon: const Icon(
-                Icons.arrow_back_rounded,
-                color: AppColors.textPrimary,
+        return WillPopScope(
+          // ✅ FIX: Intercept back button to return true (saved) to personality page
+          onWillPop: () async {
+            Navigator.of(context).pop(true);
+            return false;
+          },
+          child: Scaffold(
+            backgroundColor: AppColors.background,
+            appBar: AppBar(
+              backgroundColor: Colors.white,
+              elevation: 0,
+              leading: IconButton(
+                icon: const Icon(
+                  Icons.arrow_back_rounded,
+                  color: AppColors.textPrimary,
+                ),
+                onPressed: () => Navigator.of(context).pop(true),
               ),
-              onPressed: () => Navigator.of(context).pop(),
-            ),
-            title: const Text(
-              'RIASEC Results',
-              style: TextStyle(
-                color: AppColors.textPrimary,
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
+              title: const Text(
+                'RIASEC Results',
+                style: TextStyle(
+                  color: AppColors.textPrimary,
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                ),
               ),
+              centerTitle: true,
             ),
-            centerTitle: true,
-          ),
-          body: SingleChildScrollView(
-            physics: const BouncingScrollPhysics(),
-            child: FadeTransition(
-              opacity: _fadeAnimation,
-              child: Column(
-                children: [
-                  const SizedBox(height: 24),
-                  _buildHeaderCard(result),
-                  const SizedBox(height: 24),
-                  _buildInterestsList(result),
-                  const SizedBox(height: 24),
-                  if (result.careers.isNotEmpty) ...[
-                    _buildCareersSection(result),
+            body: SingleChildScrollView(
+              physics: const BouncingScrollPhysics(),
+              child: FadeTransition(
+                opacity: _fadeAnimation,
+                child: Column(
+                  children: [
                     const SizedBox(height: 24),
+                    _buildHeaderCard(result),
+                    const SizedBox(height: 24),
+                    _buildInterestsList(result),
+                    const SizedBox(height: 24),
+                    if (result.careers.isNotEmpty) ...[
+                      _buildCareersSection(result),
+                      const SizedBox(height: 24),
+                    ],
+                    _buildActionButtons(context, viewModel, result),
+                    const SizedBox(height: 32),
                   ],
-                  _buildActionButtons(context, viewModel, result),
-                  const SizedBox(height: 32),
-                ],
+                ),
               ),
             ),
           ),
@@ -736,7 +744,6 @@ class _RiasecResultScreenState extends State<RiasecResultScreen>
   void _saveToProfile(BuildContext context, result) async {
     final viewModel = Provider.of<AIMatchViewModel>(context, listen: false);
 
-    // 1. Show "Saving..." snackbar
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
         content: Row(
@@ -755,28 +762,25 @@ class _RiasecResultScreenState extends State<RiasecResultScreen>
     );
 
     try {
-      // 2. Load latest data
       await viewModel.loadProgress();
 
-      // 3. Prepare updated profile
       final riasecMap = result.toRiasecMap();
       final currentProfile = viewModel.personalityProfile ?? PersonalityProfile();
 
       final updatedProfile = PersonalityProfile(
-        mbti: currentProfile.mbti,    // Keep existing
-        riasec: riasecMap,            // Update RIASEC
-        ocean: currentProfile.ocean,  // Keep existing
+        mbti: currentProfile.mbti,
+        riasec: riasecMap,
+        ocean: currentProfile.ocean,
       );
 
-      // 4. Update ViewModel
       viewModel.setPersonalityProfile(updatedProfile);
-
-      // 5. Force save to storage
       await viewModel.saveProgress();
+
+      // ✅ FIXED: Use public method
+      viewModel.forceRefreshUI();
 
       if (!context.mounted) return;
 
-      // 6. Show Success
       ScaffoldMessenger.of(context).hideCurrentSnackBar();
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -802,10 +806,9 @@ class _RiasecResultScreenState extends State<RiasecResultScreen>
         ),
       );
 
-      // 7. Return to previous screen
       Future.delayed(const Duration(milliseconds: 500), () {
         if (context.mounted) {
-          Navigator.of(context).pop();
+          Navigator.of(context).pop(true);
         }
       });
 
@@ -921,7 +924,16 @@ class _RiasecResultScreenState extends State<RiasecResultScreen>
                         Navigator.pop(context);
                         await viewModel.restartTest();
                         if (context.mounted) {
-                          Navigator.of(context).pop();
+                          Navigator.of(context).pop(false);
+                        }
+
+                        // ✅ Now push ONE fresh test screen
+                        if (context.mounted) {
+                          await Navigator.of(context).pushReplacement(
+                            MaterialPageRoute(
+                              builder: (context) => const RiasecTestScreen(),
+                            ),
+                          );
                         }
                       },
                       style: ElevatedButton.styleFrom(

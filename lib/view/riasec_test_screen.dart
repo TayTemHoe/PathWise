@@ -48,14 +48,20 @@ class _RiasecTestScreenState extends State<RiasecTestScreen> {
   }
 
   void _navigateToResult() {
-    Navigator.of(context).pushReplacement(
+    // ✅ CHANGED: Use regular push (not pushReplacement) to allow double pop
+    Navigator.of(context).push(
       MaterialPageRoute(
         builder: (context) => ChangeNotifierProvider.value(
           value: _viewModel,
           child: const RiasecResultScreen(),
         ),
       ),
-    );
+    ).then((result) {
+      // ✅ ADDED: If result screen returned true, pop test screen too
+      if (result == true && mounted) {
+        Navigator.of(context).pop(true);
+      }
+    });
   }
 
   @override

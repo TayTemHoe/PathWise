@@ -123,8 +123,11 @@ class RiasecTestViewModel extends ChangeNotifier {
     if (_currentQuestionIndex >= _questions.length) return;
 
     final question = _questions[_currentQuestionIndex];
+
+    // ✅ FIX: Use _currentQuestionIndex (0-based) instead of question.index (1-based from API)
+    // This ensures the answer is stored and retrieved at the correct index.
     _answers[_currentQuestionIndex] = RiasecAnswer(
-      questionIndex: question.index,
+      questionIndex: _currentQuestionIndex,
       area: question.area,
       value: value,
     );

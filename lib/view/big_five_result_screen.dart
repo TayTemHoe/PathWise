@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:path_wise/view/big_five_test_screen.dart';
 import 'package:provider/provider.dart';
 import '../utils/app_color.dart';
 import '../viewModel/big_five_test_view_model.dart';
@@ -63,42 +64,48 @@ class _BigFiveResultScreenState extends State<BigFiveResultScreen>
           );
         }
 
-        return Scaffold(
-          backgroundColor: AppColors.background,
-          appBar: AppBar(
-            backgroundColor: Colors.white,
-            elevation: 0,
-            leading: IconButton(
-              icon: const Icon(
-                Icons.arrow_back_rounded,
-                color: AppColors.textPrimary,
+        return WillPopScope(
+          onWillPop: () async {
+            Navigator.of(context).pop(true);  // ✅ Always return true to refresh
+            return false;
+          },
+          child: Scaffold(
+            backgroundColor: AppColors.background,
+            appBar: AppBar(
+              backgroundColor: Colors.white,
+              elevation: 0,
+              leading: IconButton(
+                icon: const Icon(
+                  Icons.arrow_back_rounded,
+                  color: AppColors.textPrimary,
+                ),
+                onPressed: () => Navigator.of(context).pop(true),
               ),
-              onPressed: () => Navigator.of(context).pop(),
-            ),
-            title: const Text(
-              'Big Five Results',
-              style: TextStyle(
-                color: AppColors.textPrimary,
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
+              title: const Text(
+                'Big Five Results',
+                style: TextStyle(
+                  color: AppColors.textPrimary,
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                ),
               ),
+              centerTitle: true,
             ),
-            centerTitle: true,
-          ),
-          body: SingleChildScrollView(
-            physics: const BouncingScrollPhysics(),
-            child: FadeTransition(
-              opacity: _fadeAnimation,
-              child: Column(
-                children: [
-                  const SizedBox(height: 24),
-                  _buildHeaderCard(result),
-                  const SizedBox(height: 24),
-                  _buildDomainsList(result),
-                  const SizedBox(height: 24),
-                  _buildActionButtons(context, viewModel, result),
-                  const SizedBox(height: 32),
-                ],
+            body: SingleChildScrollView(
+              physics: const BouncingScrollPhysics(),
+              child: FadeTransition(
+                opacity: _fadeAnimation,
+                child: Column(
+                  children: [
+                    const SizedBox(height: 24),
+                    _buildHeaderCard(result),
+                    const SizedBox(height: 24),
+                    _buildDomainsList(result),
+                    const SizedBox(height: 24),
+                    _buildActionButtons(context, viewModel, result),
+                    const SizedBox(height: 32),
+                  ],
+                ),
               ),
             ),
           ),
@@ -588,7 +595,6 @@ class _BigFiveResultScreenState extends State<BigFiveResultScreen>
   void _saveToProfile(BuildContext context, result) async {
     final viewModel = Provider.of<AIMatchViewModel>(context, listen: false);
 
-    // 1. Show "Saving..." snackbar
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
         content: Row(
@@ -607,28 +613,25 @@ class _BigFiveResultScreenState extends State<BigFiveResultScreen>
     );
 
     try {
-      // 2. Load latest data
       await viewModel.loadProgress();
 
-      // 3. Prepare updated profile
       final oceanMap = result.toOceanMap();
       final currentProfile = viewModel.personalityProfile ?? PersonalityProfile();
 
       final updatedProfile = PersonalityProfile(
-        mbti: currentProfile.mbti,    // Keep existing
-        riasec: currentProfile.riasec,// Keep existing
-        ocean: oceanMap,              // Update OCEAN
+        mbti: currentProfile.mbti,
+        riasec: currentProfile.riasec,
+        ocean: oceanMap,
       );
 
-      // 4. Update ViewModel
       viewModel.setPersonalityProfile(updatedProfile);
-
-      // 5. Force save to storage
       await viewModel.saveProgress();
+
+      // ✅ FIXED: Use public method
+      viewModel.forceRefreshUI();
 
       if (!context.mounted) return;
 
-      // 6. Show Success
       ScaffoldMessenger.of(context).hideCurrentSnackBar();
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -654,10 +657,9 @@ class _BigFiveResultScreenState extends State<BigFiveResultScreen>
         ),
       );
 
-      // 7. Return to previous screen
       Future.delayed(const Duration(milliseconds: 500), () {
         if (context.mounted) {
-          Navigator.of(context).pop();
+          Navigator.of(context).pop(true);  // ✅ Return true to refresh
         }
       });
 
@@ -773,7 +775,16 @@ class _BigFiveResultScreenState extends State<BigFiveResultScreen>
                         Navigator.pop(context);
                         await viewModel.restartTest();
                         if (context.mounted) {
-                          Navigator.of(context).pop();
+                          Navigator.of(context).pop(false);
+                        }
+
+                        // ✅ Now push ONE fresh test screen
+                        if (context.mounted) {
+                          await Navigator.of(context).pushReplacement(
+                            MaterialPageRoute(
+                              builder: (context) => const BigFiveTestScreen(),
+                            ),
+                          );
                         }
                       },
                       style: ElevatedButton.styleFrom(
