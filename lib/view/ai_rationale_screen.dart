@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
 import '../model/ai_match_model.dart';
+import '../services/share_service.dart';
 import '../utils/app_color.dart';
 import '../viewModel/ai_match_view_model.dart';
 import '../widgets/ai_match_pages/ai_recommendation_widgets.dart';
+import '../widgets/share_button_widget.dart';
+import '../widgets/share_card_widgets.dart';
 
 class AIRationaleScreen extends StatefulWidget {
   final AIMatchViewModel viewModel;
@@ -103,6 +106,12 @@ class _AIRationaleScreenState extends State<AIRationaleScreen> {
         backgroundColor: AppColors.background,
         elevation: 0,
         centerTitle: true,
+        actions: [
+          AppBarShareButton(
+            onPressed: _showShareOptions,
+            tooltip: 'Share AI Recommendations',
+          ),
+        ],
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(20),
@@ -166,6 +175,15 @@ class _AIRationaleScreenState extends State<AIRationaleScreen> {
           ],
         ),
       ),
+    );
+  }
+
+  void _showShareOptions() async {
+    final recommendations = widget.viewModel.matchResponse!.recommendedSubjectAreas;
+
+    final result = await ShareService.instance.shareAIMatchResults(
+      recommendations: recommendations,
+      programCount: widget.programCount,
     );
   }
 

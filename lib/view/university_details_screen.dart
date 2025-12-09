@@ -7,6 +7,7 @@ import 'package:path_wise/widgets/branch_card.dart';
 import 'package:path_wise/widgets/admission_card.dart';
 import 'package:provider/provider.dart';
 import '../model/university.dart';
+import '../services/share_service.dart';
 import '../utils/app_color.dart';
 import '../utils/currency_utils.dart';
 import '../widgets/app_loading_screen.dart';
@@ -15,6 +16,8 @@ import '../widgets/info_row.dart';
 import '../widgets/fee_card.dart';
 import '../widgets/random_circle_background.dart';
 import '../widgets/related_programs_card.dart';
+import '../widgets/share_button_widget.dart';
+import '../widgets/share_card_widgets.dart';
 import '../widgets/stat_card.dart';
 
 class UniversityDetailScreen extends StatefulWidget {
@@ -31,6 +34,7 @@ class _UniversityDetailScreenState extends State<UniversityDetailScreen>
   late TabController _tabController;
   int _availableTabCount = 0;
   final List<String> _availableTabs = [];
+  final GlobalKey _shareCardKey = GlobalKey();
 
   @override
   void initState() {
@@ -308,24 +312,27 @@ class _UniversityDetailScreenState extends State<UniversityDetailScreen>
       ),
 
       actions: [
-        Container(
-          margin: const EdgeInsets.all(8),
-          decoration: BoxDecoration(
-            color: Colors.black.withOpacity(0.1),
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: IconButton(
-            icon: const Icon(Icons.share, color: AppColors.textPrimary),
-            onPressed: () {
-              // TODO: Implement share functionality
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Share feature coming soon')),
-              );
-            },
-          ),
+        AppBarShareButton(
+          onPressed: () => _showShareOptions(university),
+          tooltip: 'Share University',
         ),
       ],
     );
+  }
+
+  void _showShareOptions(UniversityModel university) async {
+    final result = await ShareService.instance.shareUniversity(
+      university: university,
+    );
+
+    // if (!result.success && mounted) {
+    //   ScaffoldMessenger.of(context).showSnackBar(
+    //     SnackBar(
+    //       content: Text('Failed to share: ${result.error ?? "Unknown error"}'),
+    //       backgroundColor: Colors.red,
+    //     ),
+    //   );
+    // }
   }
 
   Widget _buildUniversityHeader(UniversityModel university) {

@@ -2,6 +2,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../model/ai_match_model.dart';
+import '../../services/share_service.dart';
 import '../../utils/app_color.dart';
 import '../../view/program_list_screen.dart';
 import '../../viewModel/ai_match_view_model.dart';
@@ -423,30 +424,72 @@ class _ResultsPageState extends State<ResultsPage> {
           ],
           const SizedBox(height: 12),
 
-          SizedBox(
-            width: double.infinity,
-            child: OutlinedButton.icon(
-              onPressed: () {
-                Navigator.popUntil(context, (route) => route.isFirst);
-              },
-              icon: const Icon(Icons.home_rounded, size: 20),
-              label: const Text(
-                'Back to Home',
-                style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
-              ),
-              style: OutlinedButton.styleFrom(
-                foregroundColor: AppColors.primary,
-                side: BorderSide(color: AppColors.primary, width: 2),
-                padding: const EdgeInsets.symmetric(vertical: 16),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(14),
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: () => _shareResults(viewModel),
+                  icon: const Icon(Icons.share_rounded, size: 20),
+                  label: const Text(
+                    'Share',
+                    style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
+                  ),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: Colors.blue,
+                    side: const BorderSide(color: Colors.blue, width: 2),
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                  ),
                 ),
               ),
-            ),
+              const SizedBox(width: 12),
+
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: () {
+                    Navigator.popUntil(context, (route) => route.isFirst);
+                  },
+                  icon: const Icon(Icons.home_rounded, size: 20),
+                  label: const Text(
+                    'Back to Home',
+                    style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
+                  ),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: AppColors.primary,
+                    side: BorderSide(color: AppColors.primary, width: 2),
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                  ),
+                ),
+              ),
+            ],
           ),
         ],
       ),
     );
+  }
+
+  Future<void> _shareResults(AIMatchViewModel viewModel) async {
+    final recommendations = viewModel.matchResponse!.recommendedSubjectAreas;
+    final programCount = viewModel.matchedProgramIds?.length ?? 0;
+
+    final result = await ShareService.instance.shareAIMatchResults(
+      recommendations: recommendations,
+      programCount: programCount,
+    );
+
+    // if (!result.success && mounted) {
+    //   ScaffoldMessenger.of(context).showSnackBar(
+    //     SnackBar(
+    //       content: Text('Failed to share: ${result.error ?? "Unknown error"}'),
+    //       backgroundColor: Colors.red,
+    //     ),
+    //   );
+    // }
   }
 
   Widget _buildSectionTitle(String title, IconData icon) {

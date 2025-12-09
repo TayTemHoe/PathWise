@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:provider/provider.dart';
 import '../model/program.dart';
+import '../services/share_service.dart';
 import '../utils/app_color.dart';
 import '../viewModel/program_detail_view_model.dart';
 import '../widgets/app_loading_screen.dart';
@@ -12,6 +13,8 @@ import '../widgets/fee_card.dart';
 import '../widgets/random_circle_background.dart';
 import '../widgets/program_admission_card.dart';
 import '../widgets/related_programs_card.dart';
+import '../widgets/share_button_widget.dart';
+import '../widgets/share_card_widgets.dart';
 
 class ProgramDetailScreen extends StatefulWidget {
   final String programId;
@@ -294,25 +297,36 @@ class _ProgramDetailScreenState extends State<ProgramDetailScreen>
         ),
       ),
       actions: [
-        Container(
-          margin: const EdgeInsets.all(8),
-          decoration: BoxDecoration(
-            color: Colors.black.withOpacity(0.1),
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: IconButton(
-            icon: const Icon(
-              Icons.share,
-              color: AppColors.textPrimary,
-            ),
-            onPressed: () {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Share feature coming soon')),
-              );
-            },
-          ),
+        Consumer<ProgramDetailViewModel>(
+          builder: (context, viewModel, _) {
+            if (viewModel.program == null) return const SizedBox.shrink();
+
+            return AppBarShareButton(
+              onPressed: () => _showShareOptions(viewModel),
+              tooltip: 'Share Program',
+            );
+          },
         ),
       ],
+    );
+  }
+
+  void _showShareOptions(ProgramDetailViewModel viewModel) async {
+    final program = viewModel.program!;
+    final university = viewModel.university;
+    final branch = viewModel.branch;
+
+    String? branchLocation;
+    if (branch != null) {
+      branchLocation = branch.city.isNotEmpty
+          ? '${branch.city}, ${branch.country}'
+          : branch.country;
+    }
+
+    final result = await ShareService.instance.shareProgram(
+      program: program,
+      universityName: university?.universityName,
+      branchLocation: branchLocation,
     );
   }
 

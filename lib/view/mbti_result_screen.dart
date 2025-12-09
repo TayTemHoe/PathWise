@@ -3,10 +3,13 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import '../services/share_service.dart';
 import '../utils/app_color.dart';
 import '../viewModel/mbti_test_view_model.dart';
 import '../viewModel/ai_match_view_model.dart';
 import '../model/ai_match_model.dart';
+import '../widgets/share_button_widget.dart';
+import '../widgets/share_card_widgets.dart';
 import 'mbti_test_screen.dart';
 import 'dart:math' as math;
 
@@ -789,14 +792,19 @@ class _MBTIResultScreenState extends State<MBTIResultScreen>
     }
   }
 
-  void _shareResult(BuildContext context, result) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('Share ${result.fullCode} - ${result.niceName}'),
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      ),
+  void _shareResult(BuildContext context, result) async {
+    final shareResult = await ShareService.instance.shareMBTIResult(
+      result: result,
     );
+
+    // if (!shareResult.success && mounted) {
+    //   ScaffoldMessenger.of(context).showSnackBar(
+    //     SnackBar(
+    //       content: Text('Failed to share: ${shareResult.error ?? "Unknown error"}'),
+    //       backgroundColor: Colors.red,
+    //     ),
+    //   );
+    // }
   }
 
   void _showRetakeConfirmation(

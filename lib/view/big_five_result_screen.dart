@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:path_wise/view/big_five_test_screen.dart';
 import 'package:provider/provider.dart';
+import '../services/share_service.dart';
 import '../utils/app_color.dart';
 import '../viewModel/big_five_test_view_model.dart';
 import '../viewModel/ai_match_view_model.dart';
 import '../model/ai_match_model.dart';
+import '../widgets/share_button_widget.dart';
+import '../widgets/share_card_widgets.dart';
 
 class BigFiveResultScreen extends StatefulWidget {
   const BigFiveResultScreen({Key? key}) : super(key: key);
@@ -675,13 +678,19 @@ class _BigFiveResultScreenState extends State<BigFiveResultScreen>
     }
   }
 
-  void _shareResult(BuildContext context, result) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Share Big Five Results'),
-        behavior: SnackBarBehavior.floating,
-      ),
+  void _shareResult(BuildContext context, result) async {
+    final shareResult = await ShareService.instance.shareBigFiveResult(
+      result: result,
     );
+
+    // if (!shareResult.success && mounted) {
+    //   ScaffoldMessenger.of(context).showSnackBar(
+    //     SnackBar(
+    //       content: Text('Failed to share: ${shareResult.error ?? "Unknown error"}'),
+    //       backgroundColor: Colors.red,
+    //     ),
+    //   );
+    // }
   }
 
   void _showRetakeConfirmation(
