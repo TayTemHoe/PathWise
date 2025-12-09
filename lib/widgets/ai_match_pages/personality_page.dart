@@ -1,3 +1,4 @@
+// lib/widgets/ai_match_pages/personality_page.dart
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -23,6 +24,8 @@ class PersonalityPage extends StatefulWidget {
 
 class _PersonalityPageState extends State<PersonalityPage> with WidgetsBindingObserver, RouteAware {
   String? _selectedMBTI;
+  // Track last synced profile to avoid unnecessary updates
+  PersonalityProfile? _lastSyncedProfile;
 
   // Local state for sliders
   final Map<String, double> _riasecScores = {
@@ -44,7 +47,7 @@ class _PersonalityPageState extends State<PersonalityPage> with WidgetsBindingOb
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    // Initial load with delay to ensure ViewModel is ready
+    // Initial load from storage
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       await _loadFromViewModelAsync();
     });
@@ -63,53 +66,48 @@ class _PersonalityPageState extends State<PersonalityPage> with WidgetsBindingOb
     }
   }
 
-  // FIXED: Async load with proper error handling
-  Future<void> _loadFromViewModelAsync() async {
-    if (!mounted) return;
+  // --- 1. Consolidated State Update Helper ---
+  void _updateLocalState(PersonalityProfile profile) {
+    debugPrint('🔄 PersonalityPage: Updating local state from profile...');
+    _selectedMBTI = profile.mbti;
+    debugPrint('   - MBTI: $_selectedMBTI');
 
-    try {
-      final vm = context.read<AIMatchViewModel>();
+    if (profile.riasec != null) {
+      _riasecScores.clear();
+      _riasecScores.addAll(profile.riasec!);
+      debugPrint('   - RIASEC scores updated');
+    }
 
-      // CRITICAL: Force reload from storage first
-      await vm.loadProgress(forceRefresh: true);
+    if (profile.ocean != null) {
+      _oceanScores.clear();
+      _oceanScores.addAll(profile.ocean!);
+      debugPrint('   - Ocean scores updated');
+    }
 
-      final profile = vm.personalityProfile;
+    _lastSyncedProfile = profile;
+  }
 
-      debugPrint('🔍 Loading personality data...');
-      debugPrint('   MBTI: ${profile?.mbti}');
-      debugPrint('   RIASEC: ${profile?.riasec}');
-      debugPrint('   OCEAN: ${profile?.ocean}');
-
-      if (profile == null) {
-        debugPrint('⚠️ No personality profile found');
-        return;
-      }
-
-      if (!mounted) return;
-
-      setState(() {
-        _selectedMBTI = profile.mbti;
-
-        if (profile.riasec != null) {
-          _riasecScores.clear();
-          _riasecScores.addAll(profile.riasec!);
-          debugPrint('✅ RIASEC loaded: $_riasecScores');
-        } else {
-          _riasecScores.updateAll((key, value) => 0.5);
-          debugPrint('🔄 RIASEC reset to defaults');
-        }
-
-        if (profile.ocean != null) {
-          _oceanScores.clear();
-          _oceanScores.addAll(profile.ocean!);
-          debugPrint('✅ OCEAN loaded: $_oceanScores');
-        } else {
-          _oceanScores.updateAll((key, value) => 0.5);
-          debugPrint('🔄 OCEAN reset to defaults');
+  // --- 2. Sync Logic ---
+  void _syncFromViewModel(PersonalityProfile? profile) {
+    if (profile != null && profile != _lastSyncedProfile) {
+      debugPrint('⚡ PersonalityPage: ViewModel changed, scheduling sync...');
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          setState(() {
+            _updateLocalState(profile);
+          });
         }
       });
+    }
+  }
 
-      debugPrint('✅ Personality data loaded successfully');
+  Future<void> _loadFromViewModelAsync() async {
+    if (!mounted) return;
+    try {
+      final vm = context.read<AIMatchViewModel>();
+      debugPrint('🔥 PersonalityPage: Loading progress from storage...');
+      // Force reload from storage to ensure we have persisted data
+      await vm.loadProgress(forceRefresh: true);
     } catch (e) {
       debugPrint('❌ Error loading personality data: $e');
     }
@@ -117,27 +115,34 @@ class _PersonalityPageState extends State<PersonalityPage> with WidgetsBindingOb
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          if (widget.showHeader)
-            _buildSectionHeader('Personality Assessment (Optional)', Icons.person),
+    return Consumer<AIMatchViewModel>(
+      builder: (context, viewModel, child) {
+        // Automatically sync local state whenever ViewModel updates
+        _syncFromViewModel(viewModel.personalityProfile);
 
-          if (widget.showHeader)
-            const SizedBox(height: 16),
+        return Padding(
+          padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              if (widget.showHeader)
+                _buildSectionHeader('Personality Assessment (Optional)', Icons.person),
 
-          const SizedBox(height: 16),
-          _buildMBTISection(),
+              if (widget.showHeader)
+                const SizedBox(height: 16),
 
-          const SizedBox(height: 32),
-          _buildUpdatedRIASECSection(),
+              const SizedBox(height: 16),
+              _buildMBTISection(),
 
-          const SizedBox(height: 32),
-          _buildBigFiveSection(),
-        ],
-      ),
+              const SizedBox(height: 32),
+              _buildUpdatedRIASECSection(),
+
+              const SizedBox(height: 32),
+              _buildBigFiveSection(),
+            ],
+          ),
+        );
+      },
     );
   }
 
@@ -206,7 +211,6 @@ class _PersonalityPageState extends State<PersonalityPage> with WidgetsBindingOb
 
           const SizedBox(height: 16),
 
-          // Option 1: Take the test
           InkWell(
             onTap: () => _navigateToMBTITest(context),
             borderRadius: BorderRadius.circular(12),
@@ -285,13 +289,17 @@ class _PersonalityPageState extends State<PersonalityPage> with WidgetsBindingOb
             const SizedBox(height: 12),
             Container(
               padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(color: Colors.purple[50], borderRadius: BorderRadius.circular(8)),
+              decoration: BoxDecoration(
+                color: Colors.purple[50],
+                borderRadius: BorderRadius.circular(8),
+              ),
               child: Row(
                 children: [
                   Icon(Icons.check_circle, color: Colors.purple[700], size: 16),
                   const SizedBox(width: 8),
-                  Flexible(
-                    child: Text('Selected: $_selectedMBTI', style: TextStyle(color: Colors.purple[900], fontWeight: FontWeight.w500, fontSize: 13)),
+                  Text(
+                    'Selected: $_selectedMBTI',
+                    style: TextStyle(color: Colors.purple[900], fontWeight: FontWeight.w500, fontSize: 13),
                   ),
                 ],
               ),
@@ -464,42 +472,73 @@ class _PersonalityPageState extends State<PersonalityPage> with WidgetsBindingOb
     viewModel.setPersonalityProfile(profile);
   }
 
-  Future<void> _navigateToMBTITest(BuildContext context) async {
-    debugPrint('🚀 Navigating to MBTI test...');
+  // --- 3. FIXED: Navigation Methods with Explicit State Reset ---
 
-    await Navigator.of(context).push(
+  Future<void> _navigateToMBTITest(BuildContext context) async {
+    final result = await Navigator.of(context).push(
       MaterialPageRoute(builder: (context) => const MBTITestScreen()),
     );
 
-    // CRITICAL: Wait a moment for save operations to complete, then reload
-    debugPrint('🔙 Returned from MBTI test');
-    await Future.delayed(const Duration(milliseconds: 300));
-    await _loadFromViewModelAsync();
+    if (mounted && result == true) {
+      debugPrint('🔄 Returned from MBTI test with success, forcing refresh...');
+
+      // ✅ FIX: Reset lastSyncedProfile to force update
+      _lastSyncedProfile = null;
+
+      final vm = context.read<AIMatchViewModel>();
+      // Force reload from storage to get the data saved by the result screen
+      await vm.loadProgress(forceRefresh: true);
+
+      // Explicitly update local state
+      if (vm.personalityProfile != null) {
+        setState(() {
+          _updateLocalState(vm.personalityProfile!);
+        });
+      }
+    }
   }
 
   Future<void> _navigateToRiasecTest(BuildContext context) async {
-    debugPrint('🚀 Navigating to RIASEC test...');
-
-    await Navigator.of(context).push(
+    final result = await Navigator.of(context).push(
       MaterialPageRoute(builder: (context) => const RiasecTestScreen()),
     );
 
-    // CRITICAL: Wait a moment for save operations to complete, then reload
-    debugPrint('🔙 Returned from RIASEC test');
-    await Future.delayed(const Duration(milliseconds: 300));
-    await _loadFromViewModelAsync();
+    if (mounted && result == true) {
+      debugPrint('🔄 Returned from RIASEC test with success, forcing refresh...');
+
+      // ✅ FIX: Reset lastSyncedProfile to force update
+      _lastSyncedProfile = null;
+
+      final vm = context.read<AIMatchViewModel>();
+      await vm.loadProgress(forceRefresh: true);
+
+      if (vm.personalityProfile != null) {
+        setState(() {
+          _updateLocalState(vm.personalityProfile!);
+        });
+      }
+    }
   }
 
   Future<void> _navigateToBigFiveTest(BuildContext context) async {
-    debugPrint('🚀 Navigating to Big Five test...');
-
-    await Navigator.of(context).push(
+    final result = await Navigator.of(context).push(
       MaterialPageRoute(builder: (context) => const BigFiveTestScreen()),
     );
 
-    // CRITICAL: Wait a moment for save operations to complete, then reload
-    debugPrint('🔙 Returned from Big Five test');
-    await Future.delayed(const Duration(milliseconds: 300));
-    await _loadFromViewModelAsync();
+    if (mounted && result == true) {
+      debugPrint('🔄 Returned from Big Five test with success, forcing refresh...');
+
+      // ✅ FIX: Reset lastSyncedProfile to force update
+      _lastSyncedProfile = null;
+
+      final vm = context.read<AIMatchViewModel>();
+      await vm.loadProgress(forceRefresh: true);
+
+      if (vm.personalityProfile != null) {
+        setState(() {
+          _updateLocalState(vm.personalityProfile!);
+        });
+      }
+    }
   }
 }

@@ -82,7 +82,7 @@ class _ProgramListScreenState extends State<ProgramListScreen> {
       filterVM.loadFilterOptions();
 
       if (widget.showOnlyRecommended) {
-        // ✅ CRITICAL: Always reset state when showing AI recommendations
+        // ✅ AI Mode: Show AI-matched programs
         debugPrint('🎯 Preparing to show AI-matched programs');
 
         // Load AI data if not already loaded
@@ -90,23 +90,18 @@ class _ProgramListScreenState extends State<ProgramListScreen> {
           await aiViewModel.loadProgress();
         }
 
-        // ✅ FIX: Always reset and reload AI matched programs
+        // Set and load AI matched programs
         if (widget.aiMatchedProgramIds != null && widget.aiMatchedProgramIds!.isNotEmpty) {
-          debugPrint('🔄 Resetting viewModel and loading ${widget.aiMatchedProgramIds!.length} AI-matched programs');
-
-          // Clear existing state first
+          debugPrint('🔄 Loading ${widget.aiMatchedProgramIds!.length} AI-matched programs');
           viewModel.resetToAIMode();
-
-          // Set and load AI matched programs
           viewModel.setAIMatchedPrograms(widget.aiMatchedProgramIds!);
         } else {
           debugPrint('⚠️ No AI matched program IDs available');
         }
       } else {
-        // Normal mode: Load programs with Malaysia + ranking sort
-        if (viewModel.programs.isEmpty && !viewModel.isLoading) {
-          await viewModel.loadPrograms();
-        }
+        // ✅ FIXED: Always reset to Malaysian + ranking default when entering program list
+        debugPrint('🇲🇾 Resetting to default: Malaysian programs with ranking');
+        viewModel.resetToDefaultMalaysianView();
       }
     });
   }
@@ -444,24 +439,36 @@ class _ProgramListScreenState extends State<ProgramListScreen> {
 
             debugPrint('✅ Loaded ${aiViewModel.matchedProgramIds!.length} matched programs');
 
-            await Navigator.push(
+            // ✅ FIXED: Use push instead of pushReplacement to allow back navigation
+            final result = await Navigator.push(
               context,
               MaterialPageRoute(
                 builder: (context) => ProgramListScreen(
-                  aiRecommendations:
-                  aiViewModel.matchResponse!.recommendedSubjectAreas,
+                  aiRecommendations: aiViewModel.matchResponse!.recommendedSubjectAreas,
                   aiMatchedProgramIds: aiViewModel.matchedProgramIds,
                   aiUserPreferences: aiViewModel.preferences,
                   showOnlyRecommended: true,
                 ),
               ),
             );
+
+            // ✅ When returning from AI screen, reset to default Malaysian view
+            if (mounted && result == null) {
+              debugPrint('🔙 Returned from AI screen, resetting to Malaysian view');
+              context.read<ProgramListViewModel>().resetToDefaultMalaysianView();
+            }
           } else {
             // Open AI matching form
-            await Navigator.push(
+            final result = await Navigator.push(
               context,
               MaterialPageRoute(builder: (context) => const AIMatchScreen()),
             );
+
+            // ✅ After completing AI match, reload to ensure we have fresh data
+            if (mounted && result != null) {
+              debugPrint('🔙 Returned from AI match form');
+              context.read<ProgramListViewModel>().resetToDefaultMalaysianView();
+            }
           }
         },
         borderRadius: BorderRadius.circular(12),

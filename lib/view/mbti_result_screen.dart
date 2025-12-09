@@ -76,42 +76,48 @@ class _MBTIResultScreenState extends State<MBTIResultScreen>
           );
         }
 
-        return Scaffold(
-          backgroundColor: AppColors.background,
-          appBar: AppBar(
-            backgroundColor: Colors.white,
-            elevation: 0,
-            leading: IconButton(
-              icon: const Icon(
-                Icons.arrow_back_rounded,
-                color: AppColors.textPrimary,
+        return WillPopScope(
+          onWillPop: () async {
+            Navigator.of(context).pop(true);  // ✅ Always return true to refresh
+            return false;
+          },
+          child: Scaffold(
+            backgroundColor: AppColors.background,
+            appBar: AppBar(
+              backgroundColor: Colors.white,
+              elevation: 0,
+              leading: IconButton(
+                icon: const Icon(
+                  Icons.arrow_back_rounded,
+                  color: AppColors.textPrimary,
+                ),
+                onPressed: () => Navigator.of(context).pop(true),
               ),
-              onPressed: () => Navigator.of(context).pop(),
-            ),
-            title: const Text(
-              'Personality Results',
-              style: TextStyle(
-                color: AppColors.textPrimary,
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
+              title: const Text(
+                'Personality Results',
+                style: TextStyle(
+                  color: AppColors.textPrimary,
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                ),
               ),
+              centerTitle: true,
             ),
-            centerTitle: true,
-          ),
-          body: SingleChildScrollView(
-            physics: const BouncingScrollPhysics(),
-            child: FadeTransition(
-              opacity: _fadeAnimation,
-              child: Column(
-                children: [
-                  const SizedBox(height: 24),
-                  _buildPersonalityTypeCard(result),
-                  const SizedBox(height: 24),
-                  _buildTraitsList(result),
-                  const SizedBox(height: 24),
-                  _buildActionButtons(context, viewModel, result),
-                  const SizedBox(height: 32),
-                ],
+            body: SingleChildScrollView(
+              physics: const BouncingScrollPhysics(),
+              child: FadeTransition(
+                opacity: _fadeAnimation,
+                child: Column(
+                  children: [
+                    const SizedBox(height: 24),
+                    _buildPersonalityTypeCard(result),
+                    const SizedBox(height: 24),
+                    _buildTraitsList(result),
+                    const SizedBox(height: 24),
+                    _buildActionButtons(context, viewModel, result),
+                    const SizedBox(height: 32),
+                  ],
+                ),
               ),
             ),
           ),
@@ -767,7 +773,7 @@ class _MBTIResultScreenState extends State<MBTIResultScreen>
       // The delay ensures the user sees the success flash briefly before leaving
       Future.delayed(const Duration(milliseconds: 500), () {
         if (context.mounted) {
-          Navigator.of(context).pop();
+          Navigator.of(context).pop(true);  // ✅ Return true to refresh
         }
       });
 
@@ -884,7 +890,12 @@ class _MBTIResultScreenState extends State<MBTIResultScreen>
                         Navigator.pop(context);
                         await viewModel.restartTest();
                         if (context.mounted) {
-                          Navigator.of(context).pushReplacement(
+                          Navigator.of(context).pop(false);
+                        }
+
+                        // ✅ Now push ONE fresh test screen
+                        if (context.mounted) {
+                          await Navigator.of(context).pushReplacement(
                             MaterialPageRoute(
                               builder: (context) => const MBTITestScreen(),
                             ),

@@ -8,13 +8,16 @@ import '../model/user_profile.dart';
 import '../repository/ai_match_repository.dart';
 import '../services/shared_preference_services.dart';
 
+
 class AIMatchViewModel extends ChangeNotifier {
   final AIMatchRepository _repository = AIMatchRepository.instance;
   final SharedPreferenceService _storage = SharedPreferenceService.instance;
 
+
   // Progress tracking
   int _currentPage = 0;
   double _progress = 0.0;
+
 
   // Form data
   EducationLevel? _educationLevel;
@@ -25,6 +28,7 @@ class AIMatchViewModel extends ChangeNotifier {
   final List<String> _interests = [];
   UserPreferences _preferences = UserPreferences();
 
+
   // AI match results
   AIMatchResponse? _matchResponse;
   List<ProgramModel>? _matchedPrograms;
@@ -33,12 +37,14 @@ class AIMatchViewModel extends ChangeNotifier {
   bool _isGeneratingMatches = false;
   String? _errorMessage;
 
+
   // Available options (cached)
   List<String> _availableSubjectAreas = [];
   List<String> _availableStudyModes = [];
   List<String> _availableStudyLevels = [];
   List<String> _availableCountries = [];
   (double, double) _tuitionRange = (0, 500000);
+
 
   // Getters
   int get currentPage => _currentPage;
@@ -63,9 +69,11 @@ class AIMatchViewModel extends ChangeNotifier {
   List<String> get availableCountries => _availableCountries;
   (double, double) get tuitionRange => _tuitionRange;
 
+
   String? get _userId => FirebaseAuth.instance.currentUser?.uid;
   String? get userId => _userId;
   String? _lastLoadedUserId;
+
 
   bool get canProceed {
     switch (_currentPage) {
@@ -93,6 +101,7 @@ class AIMatchViewModel extends ChangeNotifier {
     }
   }
 
+
   // Initialize
   Future<void> initialize() async {
     try {
@@ -105,6 +114,7 @@ class AIMatchViewModel extends ChangeNotifier {
     }
   }
 
+
   Future<void> _loadAvailableOptions() async {
     _availableSubjectAreas = await _repository.getAvailableSubjectAreas();
     _availableStudyModes = await _repository.getAvailableStudyModes();
@@ -114,11 +124,13 @@ class AIMatchViewModel extends ChangeNotifier {
     notifyListeners();
   }
 
+
   void updatePersonalityInMemory(PersonalityProfile profile) {
     _personalityProfile = profile;
     notifyListeners();
     debugPrint('✅ Personality updated in memory (no auto-save)');
   }
+
 
   // UPDATED: Save progress
   Future<void> saveProgress() async {
@@ -143,6 +155,7 @@ class AIMatchViewModel extends ChangeNotifier {
     }
   }
 
+
   // Helper to clear ALL memory data
   void _clearInMemoryData() {
     _currentPage = 0;
@@ -161,6 +174,7 @@ class AIMatchViewModel extends ChangeNotifier {
     _errorMessage = null;
   }
 
+
   // UPDATED: Load progress
   Future<void> loadProgress({bool forceRefresh = false}) async {
     if (_userId == null) {
@@ -170,6 +184,7 @@ class AIMatchViewModel extends ChangeNotifier {
       return;
     }
 
+
     if (_lastLoadedUserId != null && _lastLoadedUserId != _userId) {
       debugPrint('🔄 User changed from $_lastLoadedUserId to $_userId');
       _clearInMemoryData();
@@ -177,6 +192,7 @@ class AIMatchViewModel extends ChangeNotifier {
     }
     _lastLoadedUserId = _userId;
     notifyListeners();
+
 
     try {
       // ADDED: Load available options if not loaded
@@ -187,14 +203,17 @@ class AIMatchViewModel extends ChangeNotifier {
         await _loadAvailableOptions();
       }
 
+
       if (forceRefresh) {
         debugPrint('🔄 Force refreshing AI match data from storage');
       }
+
 
       final progressData = await _storage.loadProgressWithPrograms(
         userId: _userId!,
         forceRefresh: forceRefresh,
       );
+
 
       if (progressData == null) {
         debugPrint('ℹ️ No saved progress found for user $_userId. Resetting state.');
@@ -205,38 +224,48 @@ class AIMatchViewModel extends ChangeNotifier {
         return;
       }
 
+
       // Apply loaded data
       _educationLevel = progressData.educationLevel;
       _otherEducationLevelText = progressData.otherEducationText;
 
+
       _academicRecords.clear();
       _academicRecords.addAll(progressData.academicRecords);
+
 
       _englishTests.clear();
       _englishTests.addAll(progressData.englishTests);
 
+
       _personalityProfile = progressData.personality;
+
 
       _interests.clear();
       _interests.addAll(progressData.interests);
+
 
       _preferences = progressData.preferences;
       _matchResponse = progressData.matchResponse;
       _matchedProgramIds = progressData.matchedProgramIds;
       _matchTimestamp = progressData.matchTimestamp;
 
+
       _updateProgress();
       debugPrint('✅ Progress loaded successfully');
+
 
       if (_matchedProgramIds != null) {
         debugPrint('📊 Loaded ${_matchedProgramIds!.length} matched programs');
       }
+
 
       notifyListeners();
     } catch (e) {
       debugPrint('❌ Error loading progress: $e');
     }
   }
+
 
   Future<void> clearSavedProgress() async {
     if (_userId != null) {
@@ -248,10 +277,12 @@ class AIMatchViewModel extends ChangeNotifier {
     }
   }
 
+
   Future<bool> hasSavedProgress() async {
     if (_userId == null) return false;
     return await _storage.hasSavedProgress(_userId!);
   }
+
 
   void _autoSaveProgress() {
     Future.delayed(const Duration(milliseconds: 500), () {
@@ -259,13 +290,17 @@ class AIMatchViewModel extends ChangeNotifier {
     });
   }
 
+
   // Around line 185, replace the existing syncFromUserProfile method
   Future<void> syncFromUserProfile(UserModel? profile) async {
     if (profile == null) return;
 
+
     debugPrint('🔄 Syncing AI Match state from User Profile...');
 
+
     final currentEdu = profile.education?.where((e) => e.isCurrent == true).firstOrNull;
+
 
     if (currentEdu != null) {
       try {
@@ -273,6 +308,7 @@ class AIMatchViewModel extends ChangeNotifier {
               (e) => e.label.toLowerCase() == currentEdu.level.toLowerCase(),
           orElse: () => EducationLevel.other,
         );
+
 
         // ✅ MODIFIED: Store the actual level string for "Other"
         if (_educationLevel == EducationLevel.other) {
@@ -285,8 +321,10 @@ class AIMatchViewModel extends ChangeNotifier {
         _otherEducationLevelText = currentEdu.level;
       }
 
+
       _academicRecords.clear();
       _academicRecords.add(currentEdu);
+
 
       debugPrint('✅ Synced current education: ${currentEdu.level} (${currentEdu.institution})');
       debugPrint('   - Other Level Text: $_otherEducationLevelText');
@@ -297,7 +335,9 @@ class AIMatchViewModel extends ChangeNotifier {
       _academicRecords.clear();
     }
 
+
     notifyListeners();
+
 
     debugPrint('💾 Saving synced state to SharedPreferences...');
     try {
@@ -308,6 +348,7 @@ class AIMatchViewModel extends ChangeNotifier {
     }
   }
 
+
   // Navigation
   void nextPage() {
     if (_currentPage < 6) {
@@ -317,6 +358,7 @@ class AIMatchViewModel extends ChangeNotifier {
     }
   }
 
+
   void previousPage() {
     if (_currentPage > 0) {
       _currentPage--;
@@ -325,6 +367,7 @@ class AIMatchViewModel extends ChangeNotifier {
     }
   }
 
+
   void goToPage(int page) {
     if (page >= 0 && page <= 6) {
       _currentPage = page;
@@ -332,6 +375,7 @@ class AIMatchViewModel extends ChangeNotifier {
       notifyListeners();
     }
   }
+
 
   void _updateProgress() {
     switch (_currentPage) {
@@ -345,6 +389,7 @@ class AIMatchViewModel extends ChangeNotifier {
     }
   }
 
+
   // Data modification methods with auto-save
   void setEducationLevel(EducationLevel level) {
     if (!canChangeEducationLevel()) return;
@@ -353,17 +398,20 @@ class AIMatchViewModel extends ChangeNotifier {
     _autoSaveProgress();
   }
 
+
   void setOtherEducationLevelText(String text) {
     _otherEducationLevelText = text;
     notifyListeners();
     _autoSaveProgress();
   }
 
+
   void addAcademicRecord(AcademicRecord record) {
     _academicRecords.add(record);
     notifyListeners();
     _autoSaveProgress();
   }
+
 
   void updateAcademicRecord(int index, AcademicRecord record) {
     if (index >= 0 && index < _academicRecords.length) {
@@ -373,6 +421,7 @@ class AIMatchViewModel extends ChangeNotifier {
     }
   }
 
+
   void removeAcademicRecord(int index) {
     if (index >= 0 && index < _academicRecords.length) {
       _academicRecords.removeAt(index);
@@ -381,11 +430,13 @@ class AIMatchViewModel extends ChangeNotifier {
     }
   }
 
+
   void addEnglishTest(EnglishTest test) {
     _englishTests.add(test);
     notifyListeners();
     _autoSaveProgress();
   }
+
 
   void removeEnglishTest(int index) {
     if (index >= 0 && index < _englishTests.length) {
@@ -394,6 +445,7 @@ class AIMatchViewModel extends ChangeNotifier {
       _autoSaveProgress();
     }
   }
+
 
   void toggleInterest(String interest) {
     if (_interests.contains(interest)) {
@@ -405,6 +457,7 @@ class AIMatchViewModel extends ChangeNotifier {
     _autoSaveProgress();
   }
 
+
   void setInterests(List<String> interests) {
     _interests.clear();
     _interests.addAll(interests);
@@ -412,11 +465,19 @@ class AIMatchViewModel extends ChangeNotifier {
     _autoSaveProgress();
   }
 
+
   void setPersonalityProfile(PersonalityProfile profile) {
     _personalityProfile = profile;
     notifyListeners();
     _autoSaveProgress();
   }
+
+
+  void forceRefreshUI() {
+    notifyListeners();
+    debugPrint('🔄 UI refresh triggered');
+  }
+
 
   void updatePreferences(UserPreferences preferences) {
     _preferences = preferences;
@@ -425,15 +486,18 @@ class AIMatchViewModel extends ChangeNotifier {
     debugPrint('✅ Preferences updated: Levels=${preferences.studyLevel.length}, Locations=${preferences.locations.length}');
   }
 
+
   bool canChangeEducationLevel() {
     return _academicRecords.isEmpty;
   }
+
 
   void clearAllAcademicRecords() {
     _academicRecords.clear();
     notifyListeners();
     _autoSaveProgress();
   }
+
 
   void updateEnglishTest(int index, EnglishTest newTest) {
     if (index >= 0 && index < englishTests.length) {
@@ -442,15 +506,18 @@ class AIMatchViewModel extends ChangeNotifier {
     }
   }
 
+
   // UPDATED: Generate AI Matches
   Future<void> generateMatches() async {
     _isGeneratingMatches = true;
     _errorMessage = null;
     notifyListeners();
 
+
     try {
       _currentPage = 6;
       debugPrint('🎯 Starting AI match generation...');
+
 
       final request = AIMatchRequest(
         academicRecords: _academicRecords,
@@ -460,9 +527,11 @@ class AIMatchViewModel extends ChangeNotifier {
         preferences: _preferences,
       );
 
+
       // Generate matches
       _matchResponse = await _repository.generateMatches(request);
       debugPrint('✅ AI matches generated: ${_matchResponse!.recommendedSubjectAreas.length}');
+
 
       // Fetch programs
       _matchedPrograms = await _repository.getProgramsForRecommendations(
@@ -471,14 +540,18 @@ class AIMatchViewModel extends ChangeNotifier {
         limit: null,
       );
 
+
       debugPrint('✅ Programs fetched: ${_matchedPrograms!.length}');
+
 
       // Save program IDs
       _matchedProgramIds = _matchedPrograms!.map((p) => p.programId).toList();
       _matchTimestamp = DateTime.now();
 
+
       // Auto-save after successful generation
       await saveProgress();
+
 
       _progress = 1.0;
     } catch (e) {
@@ -490,19 +563,24 @@ class AIMatchViewModel extends ChangeNotifier {
     }
   }
 
+
   // ... [Keep other existing methods] ...
+
 
   Future<ProgramFilterModel?> getAIRecommendationFilter() async {
     if (_matchResponse == null) return null;
+
 
     Set<String>? malaysianBranchIds;
     if (_preferences.locations.any((loc) => loc.toLowerCase().contains('malaysia'))) {
       malaysianBranchIds = await _repository.getMalaysianBranchIds();
     }
 
+
     final subjectAreas = _matchResponse!.recommendedSubjectAreas
         .map((rec) => rec.subjectArea)
         .toList();
+
 
     return ProgramFilterModel(
       subjectArea: subjectAreas,
@@ -517,12 +595,14 @@ class AIMatchViewModel extends ChangeNotifier {
     );
   }
 
+
   String getLoadingStatus() {
     if (_isGeneratingMatches) {
       return 'Analyzing your profile with AI...';
     }
     return 'Loading...';
   }
+
 
   void reset() {
     _clearInMemoryData();
@@ -532,6 +612,7 @@ class AIMatchViewModel extends ChangeNotifier {
     notifyListeners();
     debugPrint('🧹 AIMatch ViewModel reset complete');
   }
+
 
   Future<List<String>> getSubjectAreas() async {
     try {
@@ -543,3 +624,4 @@ class AIMatchViewModel extends ChangeNotifier {
     }
   }
 }
+
