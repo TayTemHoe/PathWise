@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:path_wise/viewModel/career_view_model.dart';
 import 'package:path_wise/viewModel/profile_view_model.dart';
+import '../../viewModel/ai_match_view_model.dart';
 import 'package:path_wise/view/career/job_view.dart';
 import 'package:path_wise/model/career_suggestion.dart';
 
@@ -30,6 +31,9 @@ class CareerDiscoveryView extends StatefulWidget {
 }
 
 class _CareerDiscoveryViewState extends State<CareerDiscoveryView> {
+  // Track expanded state for each card
+  final Map<int, bool> _expandedCards = {};
+
   @override
   void initState() {
     super.initState();
@@ -43,6 +47,7 @@ class _CareerDiscoveryViewState extends State<CareerDiscoveryView> {
     final careerVM = context.read<CareerViewModel>();
     final profileVM = context.read<ProfileViewModel>();
 
+
     // Ensure profile is loaded first as we need UID
     if (profileVM.uid == null) {
       await profileVM.loadAll();
@@ -54,6 +59,12 @@ class _CareerDiscoveryViewState extends State<CareerDiscoveryView> {
         await careerVM.fetchLatestSuggestion(profileVM.uid!);
       }
     }
+  }
+
+  void _toggleCardExpansion(int index) {
+    setState(() {
+      _expandedCards[index] = !(_expandedCards[index] ?? false);
+    });
   }
 
   @override
@@ -77,14 +88,7 @@ class _CareerDiscoveryViewState extends State<CareerDiscoveryView> {
           icon: const Icon(
               Icons.arrow_back_ios, color: AppColors.textPrimary, size: 20),
           onPressed: () => Navigator.pop(context),
-        ),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh, color: _DesignColors.primary),
-            onPressed: () => _confirmRegenerate(context),
-            tooltip: 'Regenerate Analysis',
-          ),
-        ],
+        )
       ),
       body: Consumer<CareerViewModel>(
         builder: (context, careerVM, child) {
@@ -193,7 +197,7 @@ class _CareerDiscoveryViewState extends State<CareerDiscoveryView> {
               width: double.infinity,
               height: 50,
               child: ElevatedButton.icon(
-                onPressed: () => _confirmRegenerate(context), // Trigger generation explicitly
+                onPressed: () => _confirmGenerate(context), // Trigger generation explicitly
                 icon: const Icon(Icons.analytics_outlined, color: Colors.white),
                 label: const Text(
                   'Predict',
@@ -279,7 +283,8 @@ class _CareerDiscoveryViewState extends State<CareerDiscoveryView> {
             itemCount: matches.length,
             itemBuilder: (context, index) {
               final match = matches[index];
-              return _buildCareerCard(context, match, index);
+              final isExpanded = _expandedCards[index] ?? false;
+              return _buildCareerCard(context, match, index, isExpanded);
             },
           ),
         ],
@@ -287,7 +292,7 @@ class _CareerDiscoveryViewState extends State<CareerDiscoveryView> {
     );
   }
 
-  Widget _buildCareerCard(BuildContext context, CareerMatch match, int index) {
+  Widget _buildCareerCard(BuildContext context, CareerMatch match, int index, bool isExpanded) {
     // Determine confidence color based on fit score
     Color scoreColor = _DesignColors.success;
     if (match.fitScore < 80) scoreColor = _DesignColors.warning;
@@ -310,7 +315,7 @@ class _CareerDiscoveryViewState extends State<CareerDiscoveryView> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // 1. Header Section (Title, Score, Badges)
+          // 1. Header Section (Title, Score, Badges) - Always Visible
           Container(
             padding: const EdgeInsets.all(20),
             decoration: BoxDecoration(
@@ -382,171 +387,211 @@ class _CareerDiscoveryViewState extends State<CareerDiscoveryView> {
             ),
           ),
 
-          // 2. Content Sections
-          Padding(
-            padding: const EdgeInsets.all(20),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Job Description (Detailed)
-                if (match.jobsDescription != null && match.jobsDescription!.isNotEmpty) ...[
-                  const Text(
-                    'About this Role',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                      color: _DesignColors.textPrimary,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    match.jobsDescription!,
-                    style: const TextStyle(
-                      fontSize: 14,
-                      color: _DesignColors.textSecondary,
-                      height: 1.5,
-                    ),
-                  ),
-                  const SizedBox(height: 20),
-                ],
-
-                // Why this fits you (Reasons List)
-                if (match.reasons.isNotEmpty) ...[
-                  const Text(
-                    'Why it fits you',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                      color: _DesignColors.textPrimary,
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  ...match.reasons.map((reason) => Padding(
-                    padding: const EdgeInsets.only(bottom: 8),
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text('• ', style: TextStyle(fontWeight: FontWeight.bold, color: _DesignColors.primary, height: 1.4)),
-                        Expanded(
-                          child: Text(
-                            reason,
-                            style: const TextStyle(
-                              fontSize: 14,
-                              height: 1.4,
-                              color: _DesignColors.textPrimary,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  )).toList(),
-                  const SizedBox(height: 20),
-                ],
-
-                // Skills & Growth Row
-                if (match.topSkillsNeeded.isNotEmpty || match.jobGrowth != null) ...[
-                  const Divider(),
-                  const SizedBox(height: 16),
-
-                  // Top Skills
-                  if (match.topSkillsNeeded.isNotEmpty) ...[
+          // 2. Expandable Content Sections
+          AnimatedCrossFade(
+            firstChild: const SizedBox.shrink(),
+            secondChild: Padding(
+              padding: const EdgeInsets.all(20),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Job Description (Detailed)
+                  if (match.jobsDescription != null && match.jobsDescription!.isNotEmpty) ...[
                     const Text(
-                      'Top Skills Needed',
+                      'About this Role',
                       style: TextStyle(
-                        fontSize: 14,
+                        fontSize: 16,
                         fontWeight: FontWeight.bold,
                         color: _DesignColors.textPrimary,
                       ),
                     ),
                     const SizedBox(height: 8),
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
-                      children: match.topSkillsNeeded.map((skill) => Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                        decoration: BoxDecoration(
-                          color: _DesignColors.background,
-                          borderRadius: BorderRadius.circular(6),
-                          border: Border.all(color: Colors.grey[300]!),
-                        ),
-                        child: Text(
-                          skill,
-                          style: const TextStyle(
-                            fontSize: 12,
-                            color: _DesignColors.textSecondary,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      )).toList(),
+                    Text(
+                      match.jobsDescription!,
+                      style: const TextStyle(
+                        fontSize: 14,
+                        color: _DesignColors.textSecondary,
+                        height: 1.5,
+                      ),
                     ),
-                    const SizedBox(height: 16),
+                    const SizedBox(height: 20),
                   ],
 
-                  // Growth Potential
-                  if (match.jobGrowth != null) ...[
-                    Row(
-                      children: [
-                        const Icon(Icons.trending_up, size: 20, color: _DesignColors.info),
-                        const SizedBox(width: 8),
-                        const Text(
-                          'Growth Potential: ',
-                          style: TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.bold,
-                            color: _DesignColors.textPrimary,
-                          ),
-                        ),
-                        Expanded(
-                          child: Text(
-                            match.jobGrowth!,
-                            style: const TextStyle(
-                              fontSize: 14,
-                              color: _DesignColors.textSecondary,
+                  // Why this fits you (Reasons List)
+                  if (match.reasons.isNotEmpty) ...[
+                    const Text(
+                      'Why it fits you',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: _DesignColors.textPrimary,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    ...match.reasons.map((reason) => Padding(
+                      padding: const EdgeInsets.only(bottom: 8),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text('• ', style: TextStyle(fontWeight: FontWeight.bold, color: _DesignColors.primary, height: 1.4)),
+                          Expanded(
+                            child: Text(
+                              reason,
+                              style: const TextStyle(
+                                fontSize: 14,
+                                height: 1.4,
+                                color: _DesignColors.textPrimary,
+                              ),
                             ),
                           ),
+                        ],
+                      ),
+                    )).toList(),
+                    const SizedBox(height: 20),
+                  ],
+
+                  // Skills & Growth Row
+                  if (match.topSkillsNeeded.isNotEmpty || match.jobGrowth != null) ...[
+                    const Divider(),
+                    const SizedBox(height: 16),
+
+                    // Top Skills
+                    if (match.topSkillsNeeded.isNotEmpty) ...[
+                      const Text(
+                        'Top Skills Needed',
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.bold,
+                          color: _DesignColors.textPrimary,
                         ),
-                      ],
+                      ),
+                      const SizedBox(height: 8),
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: match.topSkillsNeeded.map((skill) => Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                          decoration: BoxDecoration(
+                            color: _DesignColors.background,
+                            borderRadius: BorderRadius.circular(6),
+                            border: Border.all(color: Colors.grey[300]!),
+                          ),
+                          child: Text(
+                            skill,
+                            style: const TextStyle(
+                              fontSize: 12,
+                              color: _DesignColors.textSecondary,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        )).toList(),
+                      ),
+                      const SizedBox(height: 16),
+                    ],
+
+                    // Growth Potential
+                    if (match.jobGrowth != null) ...[
+                      Row(
+                        children: [
+                          const Icon(Icons.trending_up, size: 20, color: _DesignColors.info),
+                          const SizedBox(width: 8),
+                          const Text(
+                            'Growth Potential: ',
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.bold,
+                              color: _DesignColors.textPrimary,
+                            ),
+                          ),
+                          Expanded(
+                            child: Text(
+                              match.jobGrowth!,
+                              style: const TextStyle(
+                                fontSize: 14,
+                                color: _DesignColors.textSecondary,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 16),
+                    ],
+                  ],
+
+                  // Next Steps
+                  if (match.suggestedNextSteps != null && match.suggestedNextSteps!.isNotEmpty) ...[
+                    const Divider(),
+                    const SizedBox(height: 16),
+                    const Text(
+                      'Suggested Next Steps',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: _DesignColors.textPrimary,
+                      ),
                     ),
+                    const SizedBox(height: 8),
+                    ...match.suggestedNextSteps!.map((step) => Padding(
+                      padding: const EdgeInsets.only(bottom: 8),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text('• ', style: TextStyle(fontWeight: FontWeight.bold, color: _DesignColors.primary)),
+                          Expanded(
+                            child: Text(
+                              step,
+                              style: const TextStyle(
+                                fontSize: 14,
+                                height: 1.4,
+                                color: _DesignColors.textSecondary,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    )).toList(),
                     const SizedBox(height: 16),
                   ],
                 ],
+              ),
+            ),
+            crossFadeState: isExpanded ? CrossFadeState.showSecond : CrossFadeState.showFirst,
+            duration: const Duration(milliseconds: 300),
+          ),
 
-                // Next Steps
-                if (match.suggestedNextSteps != null && match.suggestedNextSteps!.isNotEmpty) ...[
-                  const Divider(),
-                  const SizedBox(height: 16),
-                  const Text(
-                    'Suggested Next Steps',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                      color: _DesignColors.textPrimary,
+          // 3. View More Button & Find Jobs Button
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+            child: Column(
+              children: [
+                // View More Button
+                SizedBox(
+                  width: double.infinity,
+                  height: 45,
+                  child: OutlinedButton.icon(
+                    onPressed: () => _toggleCardExpansion(index),
+                    icon: Icon(
+                      isExpanded ? Icons.keyboard_arrow_up : Icons.keyboard_arrow_down,
+                      color: _DesignColors.primary,
+                    ),
+                    label: Text(
+                      isExpanded ? 'View Less' : 'View More',
+                      style: const TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w600,
+                        color: _DesignColors.primary,
+                      ),
+                    ),
+                    style: OutlinedButton.styleFrom(
+                      side: const BorderSide(color: _DesignColors.primary, width: 1.5),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
                     ),
                   ),
-                  const SizedBox(height: 8),
-                  ...match.suggestedNextSteps!.map((step) => Padding(
-                    padding: const EdgeInsets.only(bottom: 8),
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text('• ', style: TextStyle(fontWeight: FontWeight.bold, color: _DesignColors.primary)),
-                        Expanded(
-                          child: Text(
-                            step,
-                            style: const TextStyle(
-                              fontSize: 14,
-                              height: 1.4,
-                              color: _DesignColors.textSecondary,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  )).toList(),
-                  const SizedBox(height: 24),
-                ],
-
-                // Action Button
+                ),
+                const SizedBox(height: 12),
+                // Find Jobs Button
                 SizedBox(
                   width: double.infinity,
                   height: 50,
@@ -667,9 +712,42 @@ class _CareerDiscoveryViewState extends State<CareerDiscoveryView> {
     }
   }
 
+  Future<void> _confirmGenerate(BuildContext context) async {
+    final shouldRegenerate = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text('Generate Career Analysis?'),
+        content: const Text(
+          'This will analyze your profile and generate new career suggestions. Previous suggestions will be replaced.',
+          style: TextStyle(color: _DesignColors.textSecondary),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel', style: TextStyle(color: _DesignColors.textSecondary)),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: _DesignColors.primary,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            ),
+            child: const Text('Predict', style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+
+    if (shouldRegenerate == true) {
+      _generatePrediction(context);
+    }
+  }
+
   Future<void> _generatePrediction(BuildContext context) async {
     final careerVM = context.read<CareerViewModel>();
     final profileVM = context.read<ProfileViewModel>();
+    final aiMatchVM = context.read<AIMatchViewModel>();
 
     if (profileVM.profile == null) {
       await profileVM.loadAll();

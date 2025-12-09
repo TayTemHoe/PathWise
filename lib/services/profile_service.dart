@@ -62,7 +62,7 @@ class ProfileService {
   // Root user
   // =============================
 
-  Future<UserProfile?> getUser(String uid) async {
+  Future<UserModel?> getUser(String uid) async {
     try {
       debugPrint('🔍 ProfileService: Getting user document for uid=$uid');
       final doc = await _userDoc(uid).get();
@@ -71,7 +71,7 @@ class ProfileService {
         return null;
       }
       debugPrint('✅ ProfileService: User document found');
-      return UserProfile.fromFirestore(doc as DocumentSnapshot<Map<String, dynamic>>);
+      return UserModel.fromFirestore(doc as DocumentSnapshot<Map<String, dynamic>>);
     } catch (e, st) {
       debugPrint('❌ ProfileService: getUser error: $e');
       debugPrint('Stack trace: $st');
@@ -79,7 +79,7 @@ class ProfileService {
     }
   }
 
-  Future<UserProfile?> getUserWithSubcollections(String uid) async {
+  Future<UserModel?> getUserWithSubcollections(String uid) async {
     try {
       debugPrint('🔍 ProfileService: Getting user with subcollections for uid=$uid');
 
@@ -90,7 +90,7 @@ class ProfileService {
       }
 
       debugPrint('✅ ProfileService: User document found, loading subcollections...');
-      final root = UserProfile.fromFirestore(doc as DocumentSnapshot<Map<String, dynamic>>);
+      final root = UserModel.fromFirestore(doc as DocumentSnapshot<Map<String, dynamic>>);
 
       // Load subcollections with better error handling
       final results = await Future.wait<List<dynamic>>([
@@ -134,7 +134,7 @@ class ProfileService {
     }
   }
 
-  Future<void> createOrMergeUser(String uid, UserProfile profile) async {
+  Future<void> createOrMergeUser(String uid, UserModel profile) async {
     try {
       debugPrint('🔧 ProfileService: Creating/merging user uid=$uid');
       final exists = (await _userDoc(uid).get()).exists;

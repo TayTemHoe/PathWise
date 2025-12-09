@@ -215,7 +215,7 @@ class CareerRoadmapViewModel extends ChangeNotifier {
       final result = await _aiService.saveCareerRoadmapToFirestore(
         uid: profileViewModel.uid,
         jobTitle: jobTitle,
-        userProfile: userProfile,
+        userModel: userProfile,
       );
 
       _currentRoadmapId = result['roadmapId'];
@@ -552,7 +552,7 @@ class CareerRoadmapViewModel extends ChangeNotifier {
 
   /// Check if user profile is outdated (>6 months)
   /// UC015 Alternate Flow: A7: Outdated Profile Information
-  bool _isProfileOutdated(UserProfile profile) {
+  bool _isProfileOutdated(UserModel profile) {
     final lastUpdated = profile.lastUpdated?.toDate();
 
     if (lastUpdated == null) {

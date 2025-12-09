@@ -1,15 +1,12 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:flutter/cupertino.dart';
-import 'package:path_wise/model/ai_match_model.dart';
+import 'package:flutter/foundation.dart';
+import 'package:path_wise/model/ai_match_model.dart'; // Ensure this file exists for AcademicRecord
 
 /// ===============================
-/// Safe parsers (resilient to type drift)
+/// Safe Parsers (Resilient to type drift)
 /// ===============================
-String get uid {
-  return 'U0001'; // fallback for local testing
-}
 
-String? _s(Object? v) => v == null ? null : v.toString();
+String? _s(Object? v) => v?.toString();
 
 double? _d(Object? v) {
   if (v == null) return null;
@@ -32,8 +29,7 @@ bool? _b(Object? v) {
   if (v is num) return v != 0;
   if (v is String) {
     final t = v.toLowerCase().trim();
-    if (t == 'true' || t == '1' || t == 'yes') return true;
-    if (t == 'false' || t == '0' || t == 'no') return false;
+    return ['true', '1', 'yes'].contains(t);
   }
   return null;
 }
@@ -42,7 +38,6 @@ List<String>? _list(Object? v) {
   if (v == null) return null;
   if (v is List) return v.map((e) => e.toString()).toList();
   if (v is String && v.isNotEmpty) {
-    // Support "A, B, C" → ["A","B","C"]
     return v.split(',').map((e) => e.trim()).where((e) => e.isNotEmpty).toList();
   }
   return null;
@@ -55,279 +50,420 @@ Map<String, dynamic>? _map(Object? v) {
   return null;
 }
 
+/// Helper to safely cast to Timestamp (handles String ISO8601 & Timestamp)
+Timestamp? _timestamp(Object? value) {
+  if (value == null) return null;
+  if (value is Timestamp) return value;
+  if (value is String && value.isNotEmpty) {
+    try {
+      return Timestamp.fromDate(DateTime.parse(value));
+    } catch (e) {
+      debugPrint('⚠️ Could not parse timestamp string: $value');
+    }
+  }
+  return null;
+}
+
 /// ===============================
-/// Root: users/{uid}
+/// Unified UserModel Model
 /// ===============================
 
-class UserProfile {
-  // Meta
-  final double? completionPercent; // computed
-  final Timestamp? lastUpdated;    // date only (you can store date-only)
-  final Timestamp? createdAt;      // date only
-  final int? profileFreshnessMonths;
+class UserModel {
+  // -- Identifiers & Role --
+  final String userId;
+  final String userRole;
 
-  // Personality (map)
-  final String? mbti;
-  final String? riasec; // NOTE: per your spec this is now a single string
-  final Timestamp? personalityUpdatedAt;
-
-  // Preferences (map)
-  final Preferences? preferences;
-
-  // Personal Info (map)
-  final String? name;
+  // -- Personal Info --
+  final String? firstName;
+  final String? lastName;
   final String? email;
   final String? phone;
-  final Timestamp? dob; // date only
-  final String? gender; // Male/Female/PreferNotToSay
+  final Timestamp? dob; // Stored as Timestamp, parsed from String if needed
+  final String? gender;
+  final String? profilePictureUrl;
+
+  // -- Location / Address --
+  final String? addressLine1;
+  final String? addressLine2;
   final String? city;
   final String? state;
   final String? country;
-  final String? profilePictureUrl;
+  final String? zipCode;
 
-  // Subcollections: loaded separately (optional cache)
+  // -- Meta Data --
+  final double? completionPercent;
+  final Timestamp? lastUpdated;
+  final Timestamp? createdAt;
+  final int? profileFreshnessMonths;
+
+  // -- Personality & Assessments --
+  final String? mbti;
+  final String? riasec;
+  final Timestamp? personalityUpdatedAt;
+
+  // -- Complex Sub-structures --
+  final Preferences? preferences;
+
+  // Subcollections loaded separately (optional cache)
   final List<Skill>? skills;
   final List<AcademicRecord>? education;
   final List<Experience>? experience;
 
-  const UserProfile({
-    // meta
+  const UserModel({
+    required this.userId,
+    this.userRole = 'education',
+    required this.firstName,
+    required this.lastName,
+    required this.email,
+    this.phone,
+    this.dob,
+    this.gender,
+    this.profilePictureUrl,
+    this.addressLine1,
+    this.addressLine2,
+    this.city,
+    this.state,
+    this.country,
+    this.zipCode,
     this.completionPercent,
     this.lastUpdated,
     this.createdAt,
     this.profileFreshnessMonths,
-
-    // personality
     this.mbti,
     this.riasec,
     this.personalityUpdatedAt,
-
-    // preferences
     this.preferences,
-
-    // personal info
-    this.name,
-    this.email,
-    this.phone,
-    this.dob,
-    this.gender,
-    this.city,
-    this.state,
-    this.country,
-    this.profilePictureUrl,
-
-    // subcollections
     this.skills,
     this.education,
     this.experience,
   });
-  /// Robust reader for nested OR legacy-flat docs.
-  factory UserProfile.fromFirestore(DocumentSnapshot<Map<String, dynamic>> doc) {
+
+  /// Getter for full name
+  String get name => [firstName, lastName].where((s) => s != null && s.isNotEmpty).join(' ');
+
+  /// Robust reader for Firestore docs (handles nested & flat structures)
+  factory UserModel.fromFirestore(DocumentSnapshot<Map<String, dynamic>> doc) {
     final data = doc.data() ?? {};
+    return UserModel.fromMap(data, userId: doc.id);
+  }
 
-    // Nested maps
-    final personal    = _map(data['personalInfo']) ?? {};
-    final loc         = _map(personal['location']) ?? {};
-    final prefs = Preferences.fromAny(data);
+  /// General purpose Map parser
+  factory UserModel.fromMap(Map<String, dynamic> data, {String? userId}) {
+    // Handle nested structures if they exist (UserModel style)
+    final personal = _map(data['personalInfo']) ?? {};
+    final loc = _map(personal['location']) ?? _map(data['location']) ?? {}; // Check nested then flat
     final personality = _map(data['personality']) ?? {};
+    final prefs = Preferences.fromAny(data);
 
-    // Helper to safely cast to Timestamp (handles both Timestamp and String)
-    Timestamp? _timestamp(Object? value) {
-      if (value == null) return null;
-      if (value is Timestamp) return value;
-      if (value is String) {
-        try {
-          // Try parsing ISO 8601 string to DateTime, then convert to Timestamp
-          final dateTime = DateTime.parse(value);
-          return Timestamp.fromDate(dateTime);
-        } catch (e) {
-          debugPrint('⚠️ Could not parse timestamp string: $value');
-          return null;
-        }
-      }
-      return null;
-    }
+    // Resolve fields (Priority: Direct Key -> Nested Key)
+    return UserModel(
+      userId: userId ?? _s(data['userId']) ?? _s(data['uid']) ?? '',
+      userRole: _s(data['user_role']) ?? _s(data['userRole']) ?? 'education',
 
-    return UserProfile(
-      // meta
-      completionPercent: _d(data['completionPercent']),
-      lastUpdated: _timestamp(data['lastUpdated']),
+      // Name
+      firstName: _s(data['first_name']) ?? _s(data['firstName']) ?? _s(personal['firstName']),
+      lastName: _s(data['last_name']) ?? _s(data['lastName']) ?? _s(personal['lastName']),
+
+      // Contact
+      email: _s(data['email']) ?? _s(personal['email']),
+      phone: _s(data['phone']) ?? _s(personal['phone']),
+      profilePictureUrl: _s(data['profilePictureUrl']) ?? _s(personal['profilePictureUrl']),
+
+      // Dates
+      dob: _timestamp(data['dob']) ?? _timestamp(personal['dob']),
       createdAt: _timestamp(data['createdAt']),
+      lastUpdated: _timestamp(data['lastUpdated']),
+
+      // Demographics
+      gender: _s(data['gender']) ?? _s(personal['gender']),
+
+      // Location (Flattened from UserModel logic + UserModel specific fields)
+      addressLine1: _s(data['address_line1']) ?? _s(data['addressLine1']) ?? _s(data['address']),
+      addressLine2: _s(data['address_line2']) ?? _s(data['addressLine2']),
+      city: _s(data['city']) ?? _s(loc['city']),
+      state: _s(data['state']) ?? _s(loc['state']),
+      country: _s(data['country']) ?? _s(loc['country']),
+      zipCode: _s(data['zip_code']) ?? _s(data['zipCode']),
+
+      // Meta
+      completionPercent: _d(data['completionPercent']),
       profileFreshnessMonths: _i(data['profileFreshnessMonths']),
 
-      // personality
-      mbti: _s(personality['mbti']) ?? _s(data['mbti']),
-      riasec: _s(personality['riasec']) ?? _s(data['riasec']), // STRING per spec
-      personalityUpdatedAt:
-      _timestamp(personality['updatedAt']) ?? _timestamp(data['personalityUpdatedAt']),
+      // Personality
+      mbti: _s(data['mbti']) ?? _s(personality['mbti']),
+      riasec: _s(data['riasec']) ?? _s(personality['riasec']),
+      personalityUpdatedAt: _timestamp(data['personalityUpdatedAt']) ?? _timestamp(personality['updatedAt']),
 
-      // preferences
+      // Preferences
       preferences: prefs,
 
-
-      // personalInfo (nested → flat fallback)
-      name: _s(personal['name']) ?? _s(data['name']),
-      email: _s(personal['email']) ?? _s(data['email']),
-      phone: _s(personal['phone']) ?? _s(data['phone']),
-      dob: _timestamp(personal['dob']) ?? _timestamp(data['dob']),
-      gender: _s(personal['gender']) ?? _s(data['gender']),
-      city: _s(loc['city']) ?? _s(data['city']),
-      state: _s(loc['state']) ?? _s(data['state']),
-      country: _s(loc['country']) ?? _s(data['country']),
-      profilePictureUrl:
-      _s(personal['profilePictureUrl']) ?? _s(data['profilePictureUrl']),
-
-      // subcollections: not loaded here
+      // Sub-lists are usually loaded via separate collection queries, but strictly mapping if present:
       skills: null,
       education: null,
       experience: null,
     );
   }
 
-  /// Serialize to Firestore (nested, per your schema)
+  /// Serialize to Map (Supports Firestore nested structure preference)
   Map<String, dynamic> toMap() {
     return {
-      if (completionPercent != null) 'completionPercent': completionPercent,
-      if (lastUpdated != null) 'lastUpdated': lastUpdated,
-      if (createdAt != null) 'createdAt': createdAt,
-      if (profileFreshnessMonths != null) 'profileFreshnessMonths': profileFreshnessMonths,
+      'userId': userId,
+      'userRole': userRole,
+      'completionPercent': completionPercent,
+      'lastUpdated': lastUpdated,
+      'createdAt': createdAt,
+      'profileFreshnessMonths': profileFreshnessMonths,
 
       'personality': {
-        if (mbti != null) 'mbti': mbti,
-        if (riasec != null) 'riasec': riasec, // string
-        if (personalityUpdatedAt != null) 'updatedAt': personalityUpdatedAt,
+        'mbti': mbti,
+        'riasec': riasec,
+        'updatedAt': personalityUpdatedAt,
       },
 
       'preferences': preferences?.toFirestore() ?? {},
 
       'personalInfo': {
-        if (name != null) 'name': name,
-        if (email != null) 'email': email,
-        if (phone != null) 'phone': phone,
-        if (dob != null) 'dob': dob,
-        if (gender != null) 'gender': gender,
+        'firstName': firstName,
+        'lastName': lastName,
+        'name': name, // Redundant but useful
+        'email': email,
+        'phone': phone,
+        'dob': dob,
+        'gender': gender,
+        'profilePictureUrl': profilePictureUrl,
         'location': {
-          if (city != null) 'city': city,
-          if (state != null) 'state': state,
-          if (country != null) 'country': country,
+          'addressLine1': addressLine1,
+          'addressLine2': addressLine2,
+          'city': city,
+          'state': state,
+          'country': country,
+          'zipCode': zipCode,
         },
-        if (profilePictureUrl != null) 'profilePictureUrl': profilePictureUrl,
       },
+
+      // Flattened keys for backward compatibility if needed:
+      // 'first_name': firstName,
+      // 'last_name': lastName,
+      // 'city': city,
     };
   }
 
-  UserProfile copyWith({
-    double? completionPercent,
-    Timestamp? lastUpdated,
-    Timestamp? createdAt,
-    int? profileFreshnessMonths,
-
-    String? mbti,
-    String? riasec,
-    Timestamp? personalityUpdatedAt,
-
-    Preferences? preferences,
-
-    String? name,
+  UserModel copyWith({
+    String? userId,
+    String? userRole,
+    String? firstName,
+    String? lastName,
     String? email,
     String? phone,
     Timestamp? dob,
     String? gender,
+    String? profilePictureUrl,
+    String? addressLine1,
+    String? addressLine2,
     String? city,
     String? state,
     String? country,
-    String? profilePictureUrl,
-
+    String? zipCode,
+    double? completionPercent,
+    Timestamp? lastUpdated,
+    Timestamp? createdAt,
+    int? profileFreshnessMonths,
+    String? mbti,
+    String? riasec,
+    Timestamp? personalityUpdatedAt,
+    Preferences? preferences,
     List<Skill>? skills,
     List<AcademicRecord>? education,
     List<Experience>? experience,
-    String? currentEducationId,
   }) {
-    return UserProfile(
-      completionPercent: completionPercent ?? this.completionPercent,
-      lastUpdated: lastUpdated ?? this.lastUpdated,
-      createdAt: createdAt ?? this.createdAt,
-      profileFreshnessMonths: profileFreshnessMonths ?? this.profileFreshnessMonths,
-
-      mbti: mbti ?? this.mbti,
-      riasec: riasec ?? this.riasec,
-      personalityUpdatedAt: personalityUpdatedAt ?? this.personalityUpdatedAt,
-
-      preferences: preferences ?? this.preferences,
-
-      name: name ?? this.name,
+    return UserModel(
+      userId: userId ?? this.userId,
+      userRole: userRole ?? this.userRole,
+      firstName: firstName ?? this.firstName,
+      lastName: lastName ?? this.lastName,
       email: email ?? this.email,
       phone: phone ?? this.phone,
       dob: dob ?? this.dob,
       gender: gender ?? this.gender,
+      profilePictureUrl: profilePictureUrl ?? this.profilePictureUrl,
+      addressLine1: addressLine1 ?? this.addressLine1,
+      addressLine2: addressLine2 ?? this.addressLine2,
       city: city ?? this.city,
       state: state ?? this.state,
       country: country ?? this.country,
-      profilePictureUrl: profilePictureUrl ?? this.profilePictureUrl,
-
+      zipCode: zipCode ?? this.zipCode,
+      completionPercent: completionPercent ?? this.completionPercent,
+      lastUpdated: lastUpdated ?? this.lastUpdated,
+      createdAt: createdAt ?? this.createdAt,
+      profileFreshnessMonths: profileFreshnessMonths ?? this.profileFreshnessMonths,
+      mbti: mbti ?? this.mbti,
+      riasec: riasec ?? this.riasec,
+      personalityUpdatedAt: personalityUpdatedAt ?? this.personalityUpdatedAt,
+      preferences: preferences ?? this.preferences,
       skills: skills ?? this.skills,
       education: education ?? this.education,
       experience: experience ?? this.experience,
     );
   }
+
+    @override
+    String toString() {
+      return 'UserModel(userId: $userId, firstName: $firstName, lastName: $lastName, phone: $phone, email: $email, dob: $dob, addressLine1: $addressLine1, addressLine2: $addressLine2, city: $city, state: $state, country: $country, zipCode: $zipCode, userRole: $userRole)';
+    }
+
+    @override
+    bool operator ==(Object other) {
+      if (identical(this, other)) return true;
+
+      return other is UserModel &&
+          other.userId == userId &&
+          other.firstName == firstName &&
+          other.lastName == lastName &&
+          other.phone == phone &&
+          other.email == email &&
+          other.dob == dob &&
+          other.addressLine1 == addressLine1 &&
+          other.addressLine2 == addressLine2 &&
+          other.city == city &&
+          other.state == state &&
+          other.country == country &&
+          other.zipCode == zipCode;
+    }
+
+    @override
+    int get hashCode {
+      return Object.hash(
+        userId,
+        firstName,
+        lastName,
+        phone,
+        email,
+        dob,
+        addressLine1,
+        addressLine2,
+        city,
+        state,
+        country,
+        zipCode,
+      );
+    }
 }
 
-/// Preferences.salary
-class SalaryPref {
-  final double? min;
-  final double? max;
-  final String? type; // "Monthly"/"Annual"
-  final List<String>? benefitsPriority; // drag-order
+/// ===============================
+/// Helper Classes (Preferences, Salary, Skill, Experience)
+/// ===============================
 
-  const SalaryPref({
-    this.min,
-    this.max,
-    this.type,
-    this.benefitsPriority,
+class Preferences {
+  final List<String>? desiredJobTitles;
+  final List<String>? industries;
+  final String? companySize;
+  final List<String>? workEnvironment;
+  final List<String>? preferredLocations;
+  final bool? willingToRelocate;
+  final String? remoteAcceptance;
+  final PrefSalary? salary;
+
+  const Preferences({
+    this.desiredJobTitles,
+    this.industries,
+    this.companySize,
+    this.workEnvironment,
+    this.preferredLocations,
+    this.willingToRelocate,
+    this.remoteAcceptance,
+    this.salary,
   });
 
-  factory SalaryPref.fromMap(Map<String, dynamic> map) {
-    return SalaryPref(
-      min: _d(map['min']),
-      max: _d(map['max']),
-      type: _s(map['type']),
-      benefitsPriority: _list(map['benefitsPriority']),
+  static Preferences fromAny(Map<String, dynamic> root) {
+    final prefRaw = root['preferences'];
+    if (prefRaw is Map<String, dynamic>) {
+      return Preferences.fromMap(prefRaw);
+    }
+    return Preferences.fromMap(root); // Attempt to read flat structure
+  }
+
+  factory Preferences.fromMap(Map<String, dynamic>? m) {
+    if (m == null) return const Preferences();
+    return Preferences(
+      desiredJobTitles: _list(m['desiredJobTitles']),
+      industries: _list(m['industries']),
+      companySize: _s(m['companySize']),
+      workEnvironment: _list(m['workEnvironment']),
+      preferredLocations: _list(m['preferredLocations']),
+      willingToRelocate: _b(m['willingToRelocate']),
+      remoteAcceptance: _s(m['remoteAcceptance']),
+      salary: PrefSalary.fromMap(m['salary'] as Map<String, dynamic>?),
     );
   }
 
-  Map<String, dynamic> toMap() => {
+  Map<String, dynamic> toFirestore() {
+    final map = <String, dynamic>{};
+    if (desiredJobTitles?.isNotEmpty == true) map['desiredJobTitles'] = desiredJobTitles;
+    if (industries?.isNotEmpty == true) map['industries'] = industries;
+    if (companySize?.isNotEmpty == true) map['companySize'] = companySize;
+    if (workEnvironment?.isNotEmpty == true) map['workEnvironment'] = workEnvironment;
+    if (preferredLocations?.isNotEmpty == true) map['preferredLocations'] = preferredLocations;
+    if (willingToRelocate != null) map['willingToRelocate'] = willingToRelocate;
+    if (remoteAcceptance?.isNotEmpty == true) map['remoteAcceptance'] = remoteAcceptance;
+    if (salary != null) map['salary'] = salary!.toFirestore();
+    return map;
+  }
+}
+
+class PrefSalary {
+  final int? min;
+  final int? max;
+  final String? type; // "Monthly" or "Annual"
+  final String? currency;
+  final List<String>? benefitsPriority;
+
+  const PrefSalary({this.min, this.max, this.type, this.currency, this.benefitsPriority});
+
+  factory PrefSalary.fromMap(Map<String, dynamic>? m) {
+    if (m == null) return const PrefSalary();
+    return PrefSalary(
+      min: _i(m['min']),
+      max: _i(m['max']),
+      type: _s(m['type']),
+      currency: _s(m['currency']),
+      benefitsPriority: _list(m['benefitsPriority']),
+    );
+  }
+
+  Map<String, dynamic> toFirestore() => {
     if (min != null) 'min': min,
     if (max != null) 'max': max,
     if (type != null) 'type': type,
+    if (currency != null) 'currency': currency,
     if (benefitsPriority != null) 'benefitsPriority': benefitsPriority,
   };
 
-  SalaryPref copyWith({
-    double? min,
-    double? max,
+  PrefSalary copyWith({
+    int? min,
+    int? max,
     String? type,
+    String? currency,
     List<String>? benefitsPriority,
-  }) =>
-      SalaryPref(
-        min: min ?? this.min,
-        max: max ?? this.max,
-        type: type ?? this.type,
-        benefitsPriority: benefitsPriority ?? this.benefitsPriority,
-      );
+  }) {
+    return PrefSalary(
+      min: min ?? this.min,
+      max: max ?? this.max,
+      type: type ?? this.type,
+      currency: currency ?? this.currency,
+      benefitsPriority: benefitsPriority ?? this.benefitsPriority,
+    );
+  }
 }
 
-/// ===============================
-/// Subcollection: users/{uid}/skills/{skillId}
-/// ===============================
 class Skill {
   final String id;
   final String? name;
-  final String? category; // Technical/Soft/Language/Industry
-  final int? level;       // 1–5 (for Technical/Soft); Language uses levelText
-  final String? levelText; // e.g., Basic/Intermediate/Advanced/Native
+  final String? category;
+  final int? level;
+  final String? levelText;
   final Verification? verification;
   final int? order;
-  final Timestamp? updatedAt; // date only
+  final Timestamp? updatedAt;
 
   const Skill({
     required this.id,
@@ -351,7 +487,7 @@ class Skill {
       levelText: _s(data['levelText']),
       verification: ver.isEmpty ? null : Verification.fromMap(ver),
       order: _i(data['order']),
-      updatedAt: data['updatedAt'] as Timestamp?,
+      updatedAt: _timestamp(data['updatedAt']),
     );
   }
 
@@ -404,121 +540,21 @@ class Verification {
   };
 }
 
-/// ===============================
-/// Subcollection: users/{uid}/education/{eduId}
-/// ===============================
-// class Education {
-//   final String id;
-//   final String? institution;
-//   final String? degreeLevel;  // HighSchool/Diploma/Bachelor/Master/PhD/Other
-//   final String? fieldOfStudy;
-//   final Timestamp? startDate; // date only
-//   final Timestamp? endDate;   // date only
-//   final bool? isCurrent;
-//   final String? gpa;          // string per spec
-//   final String? city;
-//   final String? country;
-//   final int? order;           // most recent first
-//   final Timestamp? updatedAt; // date only
-//
-//   const Education({
-//     required this.id,
-//     this.institution,
-//     this.degreeLevel,
-//     this.fieldOfStudy,
-//     this.startDate,
-//     this.endDate,
-//     this.isCurrent,
-//     this.gpa,
-//     this.city,
-//     this.country,
-//     this.order,
-//     this.updatedAt,
-//   });
-//
-//   factory Education.fromFirestore(DocumentSnapshot<Map<String, dynamic>> doc) {
-//     final data = doc.data() ?? {};
-//     final loc = _map(data['location']) ?? {};
-//     return Education(
-//       id: doc.id,
-//       institution: _s(data['institution']),
-//       degreeLevel: _s(data['degreeLevel']),
-//       fieldOfStudy: _s(data['fieldOfStudy']),
-//       startDate: data['startDate'] as Timestamp?,
-//       endDate: data['endDate'] as Timestamp?,
-//       isCurrent: _b(data['isCurrent']),
-//       gpa: _s(data['gpa']),
-//       city: _s(loc['city']),
-//       country: _s(loc['country']),
-//       order: _i(data['order']),
-//       updatedAt: data['updatedAt'] as Timestamp?,
-//     );
-//   }
-//
-//   Map<String, dynamic> toMap() => {
-//     if (institution != null) 'institution': institution,
-//     if (degreeLevel != null) 'degreeLevel': degreeLevel,
-//     if (fieldOfStudy != null) 'fieldOfStudy': fieldOfStudy,
-//     if (startDate != null) 'startDate': startDate,
-//     if (endDate != null) 'endDate': endDate,
-//     if (isCurrent != null) 'isCurrent': isCurrent,
-//     if (gpa != null) 'gpa': gpa,
-//     'location': {
-//       if (city != null) 'city': city,
-//       if (country != null) 'country': country,
-//     },
-//     if (order != null) 'order': order,
-//     if (updatedAt != null) 'updatedAt': updatedAt,
-//   };
-//
-//   Education copyWith({
-//     String? id,
-//     String? institution,
-//     String? degreeLevel,
-//     String? fieldOfStudy,
-//     Timestamp? startDate,
-//     Timestamp? endDate,
-//     bool? isCurrent,
-//     String? gpa,
-//     String? city,
-//     String? country,
-//     int? order,
-//     Timestamp? updatedAt,
-//   }) =>
-//       Education(
-//         id: id ?? this.id,
-//         institution: institution ?? this.institution,
-//         degreeLevel: degreeLevel ?? this.degreeLevel,
-//         fieldOfStudy: fieldOfStudy ?? this.fieldOfStudy,
-//         startDate: startDate ?? this.startDate,
-//         endDate: endDate ?? this.endDate,
-//         isCurrent: isCurrent ?? this.isCurrent,
-//         gpa: gpa ?? this.gpa,
-//         city: city ?? this.city,
-//         country: country ?? this.country,
-//         order: order ?? this.order,
-//         updatedAt: updatedAt ?? this.updatedAt,
-//       );
-// }
-
-/// ===============================
-/// Subcollection: users/{uid}/experience/{expId}
-/// ===============================
 class Experience {
   final String id;
   final String? jobTitle;
   final String? company;
-  final String? employmentType; // Full-time/Part-time/Contract/Internship/Freelance
-  final Timestamp? startDate;   // date only
-  final Timestamp? endDate;     // date only
+  final String? employmentType;
+  final Timestamp? startDate;
+  final Timestamp? endDate;
   final bool? isCurrent;
   final String? city;
   final String? country;
   final String? industry;
   final String? description;
-  final ExpAchievements? achievements; // map
+  final ExpAchievements? achievements;
   final int? order;
-  final Timestamp? updatedAt;         // date only
+  final Timestamp? updatedAt;
 
   const Experience({
     required this.id,
@@ -546,8 +582,8 @@ class Experience {
       jobTitle: _s(data['jobTitle']),
       company: _s(data['company']),
       employmentType: _s(data['employmentType']),
-      startDate: data['startDate'] as Timestamp?,
-      endDate: data['endDate'] as Timestamp?,
+      startDate: _timestamp(data['startDate']),
+      endDate: _timestamp(data['endDate']),
       isCurrent: _b(data['isCurrent']),
       city: _s(loc['city']),
       country: _s(loc['country']),
@@ -555,7 +591,7 @@ class Experience {
       description: _s(data['description']),
       achievements: ach.isEmpty ? null : ExpAchievements.fromMap(ach),
       order: _i(data['order']),
-      updatedAt: data['updatedAt'] as Timestamp?,
+      updatedAt: _timestamp(data['updatedAt']),
     );
   }
 
@@ -636,175 +672,3 @@ class ExpAchievements {
         skillsUsed: skillsUsed ?? this.skillsUsed,
       );
 }
-
-class Preferences {
-  final List<String>? desiredJobTitles;
-  final List<String>? industries;
-  final String? companySize;                 // Startup/Small/Medium/Large/Any
-  final List<String>? workEnvironment;       // Office/Remote/Hybrid/Any
-  final List<String>? preferredLocations;    // e.g. "Kuala Lumpur"
-  final bool? willingToRelocate;
-  final String? remoteAcceptance;            // Yes / No / HybridOnly
-  final PrefSalary? salary;                  // {min,max,type,currency?,benefitsPriority[]}
-
-  const Preferences({
-    this.desiredJobTitles,
-    this.industries,
-    this.companySize,
-    this.workEnvironment,
-    this.preferredLocations,
-    this.willingToRelocate,
-    this.remoteAcceptance,
-    this.salary,
-  });
-
-  factory Preferences.empty() => const Preferences();
-
-  // Build from nested map (preferred) OR from flattened top-level structure.
-  static Preferences fromAny(Map<String, dynamic> root) {
-    // If nested exists, use it.
-    final prefRaw = root['preferences'];
-    if (prefRaw is Map<String, dynamic>) {
-      return Preferences.fromMap(prefRaw);
-    }
-    // Otherwise, try read flattened keys from root.
-    return Preferences(
-      desiredJobTitles: _ls(root['desiredJobTitles']),
-      industries: _ls(root['industries']),
-      companySize: _s(root['companySize']),
-      workEnvironment: _ls(root['workEnvironment']),
-      preferredLocations: _ls(root['preferredLocations']),
-      willingToRelocate: root['willingToRelocate'] is bool ? root['willingToRelocate'] as bool : null,
-      remoteAcceptance: _s(root['remoteAcceptance']),
-      salary: PrefSalary.fromMap(root['salary'] as Map<String, dynamic>?),
-    );
-  }
-
-  factory Preferences.fromMap(Map<String, dynamic>? m) {
-    if (m == null) return const Preferences();
-    return Preferences(
-      desiredJobTitles: _ls(m['desiredJobTitles']),
-      industries: _ls(m['industries']),
-      companySize: _s(m['companySize']),
-      workEnvironment: _ls(m['workEnvironment']),
-      preferredLocations: _ls(m['preferredLocations']),
-      willingToRelocate: m['willingToRelocate'] is bool ? m['willingToRelocate'] as bool : null,
-      remoteAcceptance: _s(m['remoteAcceptance']),
-      salary: PrefSalary.fromMap(m['salary'] as Map<String, dynamic>?),
-    );
-  }
-
-  Map<String, dynamic> toFirestore() {
-    final map = <String, dynamic>{};
-
-    // only add each field if not null (clean map)
-    if (desiredJobTitles != null && desiredJobTitles!.isNotEmpty) {
-      map['desiredJobTitles'] = desiredJobTitles;
-    }
-    if (industries != null && industries!.isNotEmpty) {
-      map['industries'] = industries;
-    }
-    if (companySize != null && companySize!.isNotEmpty) {
-      map['companySize'] = companySize;
-    }
-    if (workEnvironment != null && workEnvironment!.isNotEmpty) {
-      map['workEnvironment'] = workEnvironment;
-    }
-    if (preferredLocations != null && preferredLocations!.isNotEmpty) {
-      map['preferredLocations'] = preferredLocations;
-    }
-    if (willingToRelocate != null) {
-      map['willingToRelocate'] = willingToRelocate;
-    }
-    if (remoteAcceptance != null && remoteAcceptance!.isNotEmpty) {
-      map['remoteAcceptance'] = remoteAcceptance;
-    }
-
-    // safely serialize nested salary object
-    if (salary != null) {
-      map['salary'] = salary!.toFirestore();
-    }
-
-    return map;
-  }
-
-
-  Preferences copyWith({
-    List<String>? desiredJobTitles,
-    List<String>? industries,
-    String? companySize,
-    List<String>? workEnvironment,
-    List<String>? preferredLocations,
-    bool? willingToRelocate,
-    String? remoteAcceptance,
-    PrefSalary? salary,
-  }) {
-    return Preferences(
-      desiredJobTitles: desiredJobTitles ?? this.desiredJobTitles,
-      industries: industries ?? this.industries,
-      companySize: companySize ?? this.companySize,
-      workEnvironment: workEnvironment ?? this.workEnvironment,
-      preferredLocations: preferredLocations ?? this.preferredLocations,
-      willingToRelocate: willingToRelocate ?? this.willingToRelocate,
-      remoteAcceptance: remoteAcceptance ?? this.remoteAcceptance,
-      salary: salary ?? this.salary,
-    );
-  }
-}
-
-class PrefSalary {
-  final int? min;
-  final int? max;
-  final String? type;                 // Monthly / Annual
-  final String? currency;
-  final List<String>? benefitsPriority;
-
-  const PrefSalary({
-    this.min,
-    this.max,
-    this.type,
-    this.currency,
-    this.benefitsPriority,
-  });
-
-  factory PrefSalary.fromMap(Map<String, dynamic>? m) {
-    if (m == null) return const PrefSalary();
-    return PrefSalary(
-      min: _i(m['min']),
-      max: _i(m['max']),
-      type: _s(m['type']),
-      currency: _s(m['currency']),
-      benefitsPriority: _ls(m['benefitsPriority']),
-    );
-  }
-
-  Map<String, dynamic> toFirestore() => {
-    if (min != null) 'min': min,
-    if (max != null) 'max': max,
-    if (type != null) 'type': type,
-    if (currency != null) 'currency': currency,
-    if (benefitsPriority != null) 'benefitsPriority': benefitsPriority,
-  };
-
-  PrefSalary copyWith({
-    int? min,
-    int? max,
-    String? type,
-    String? currency,
-    List<String>? benefitsPriority,
-  }) {
-    return PrefSalary(
-      min: min ?? this.min,
-      max: max ?? this.max,
-      type: type ?? this.type,
-      currency: currency ?? this.currency,
-      benefitsPriority: benefitsPriority ?? this.benefitsPriority,
-    );
-  }
-}
-
-// Small helpers for safe casting.
-List<String>? _ls(dynamic v) =>
-    v is List ? v.map((e) => e.toString()).toList() : null;
-
-

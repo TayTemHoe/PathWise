@@ -260,7 +260,7 @@ class AIMatchViewModel extends ChangeNotifier {
   }
 
   // Around line 185, replace the existing syncFromUserProfile method
-  Future<void> syncFromUserProfile(UserProfile? profile) async {
+  Future<void> syncFromUserProfile(UserModel? profile) async {
     if (profile == null) return;
 
     debugPrint('🔄 Syncing AI Match state from User Profile...');

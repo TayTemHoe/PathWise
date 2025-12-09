@@ -4,9 +4,9 @@ import 'package:permission_handler/permission_handler.dart';
 import 'package:flutter/foundation.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:path_wise/model/resume_model.dart';
-import 'package:path_wise/model/user_profile.dart';
 import 'package:path_wise/services/resume_service.dart';
 import 'package:path_wise/services/profile_service.dart';
+import 'package:path_wise/model/user_profile.dart';
 
 class ResumeViewModel extends ChangeNotifier {
   ResumeViewModel({
@@ -24,9 +24,10 @@ class ResumeViewModel extends ChangeNotifier {
   // =============================
   // State
   // =============================
+  UserModel? _UserModel;
   List<ResumeDoc> _resumes = [];
   ResumeDoc? _currentResume;
-  UserProfile? _userProfile;
+
 
   bool _isLoading = false;
   bool _isCreating = false;
@@ -44,7 +45,7 @@ class ResumeViewModel extends ChangeNotifier {
   // =============================
   List<ResumeDoc> get resumes => _resumes;
   ResumeDoc? get currentResume => _currentResume;
-  UserProfile? get userProfile => _userProfile;
+  UserModel? get userModel => _UserModel;
 
   bool get isLoading => _isLoading;
   bool get isCreating => _isCreating;
@@ -140,7 +141,7 @@ class ResumeViewModel extends ChangeNotifier {
       ]);
 
       _resumes = results[0] as List<ResumeDoc>;
-      _userProfile = results[1] as UserProfile?;
+      _UserModel = results[1] as UserModel?;
 
       notifyListeners();
     } catch (e) {
@@ -193,9 +194,9 @@ class ResumeViewModel extends ChangeNotifier {
 
     try {
       // Validate user profile
-      if (_userProfile == null) {
+      if (_UserModel == null) {
         await _profileService.getUserWithSubcollections(uid!);
-        if (_userProfile == null) {
+        if (_UserModel == null) {
           _setError('Please complete your profile before creating a resume');
           return false;
         }
@@ -318,18 +319,18 @@ class ResumeViewModel extends ChangeNotifier {
         }
       }
 
-      if (_userProfile == null) {
-        _userProfile = await _profileService.getUserWithSubcollections(uid!);
+      if (_UserModel == null) {
+        _UserModel = await _profileService.getUserWithSubcollections(uid!);
       }
 
-      if (_userProfile == null) {
+      if (_UserModel == null) {
         _setError('Profile data not found');
         return null;
       }
 
       final path = await _resumeService.downloadResumePDF(
         resume: resume,
-        profile: _userProfile!,
+        profile: _UserModel!,
       );
 
       _setSuccess('Resume saved successfully!\nLocation: $path');
@@ -350,18 +351,18 @@ class ResumeViewModel extends ChangeNotifier {
     _setError(null);
 
     try {
-      if (_userProfile == null) {
-        _userProfile = await _profileService.getUserWithSubcollections(uid!);
+      if (_UserModel == null) {
+        _UserModel = await _profileService.getUserWithSubcollections(uid!);
       }
 
-      if (_userProfile == null) {
+      if (_UserModel == null) {
         _setError('Profile data not found');
         return false;
       }
 
       await _resumeService.shareResumePDF(
         resume: resume,
-        profile: _userProfile!,
+        profile: _UserModel!,
       );
 
       _setSuccess('Resume shared successfully!');
@@ -380,18 +381,18 @@ class ResumeViewModel extends ChangeNotifier {
     _setError(null);
 
     try {
-      if (_userProfile == null) {
-        _userProfile = await _profileService.getUserWithSubcollections(uid!);
+      if (_UserModel == null) {
+        _UserModel = await _profileService.getUserWithSubcollections(uid!);
       }
 
-      if (_userProfile == null) {
+      if (_UserModel == null) {
         _setError('Profile data not found');
         return false;
       }
 
       await _resumeService.generateResumePDF(
         resume: resume,
-        profile: _userProfile!,
+        profile: _UserModel!,
       );
 
       return true;
@@ -411,31 +412,31 @@ class ResumeViewModel extends ChangeNotifier {
   List<String> _validateProfileData(ResumeSectionConfig sections) {
     final missing = <String>[];
 
-    if (_userProfile == null) {
+    if (_UserModel == null) {
       missing.add('Profile');
       return missing;
     }
 
     // Check personal info
     if (sections.personalInfo) {
-      if (_userProfile!.name == null || _userProfile!.name!.isEmpty) {
+      if (_UserModel!.name == null || _UserModel!.name!.isEmpty) {
         missing.add('Name');
       }
-      if (_userProfile!.email == null || _userProfile!.email!.isEmpty) {
+      if (_UserModel!.email == null || _UserModel!.email!.isEmpty) {
         missing.add('Email');
       }
     }
 
     // Check skills
     if (sections.skills) {
-      if (_userProfile!.skills == null || _userProfile!.skills!.isEmpty) {
+      if (_UserModel!.skills == null || _UserModel!.skills!.isEmpty) {
         missing.add('At least one skill');
       }
     }
 
     // Check education
     if (sections.education) {
-      if (_userProfile!.education == null || _userProfile!.education!.isEmpty) {
+      if (_UserModel!.education == null || _UserModel!.education!.isEmpty) {
         missing.add('At least one education entry');
       }
     }
@@ -445,25 +446,25 @@ class ResumeViewModel extends ChangeNotifier {
 
   /// Check if profile is complete enough to create a resume
   bool get isProfileComplete {
-    if (_userProfile == null) return false;
+    if (_UserModel == null) return false;
 
-    return (_userProfile!.name?.isNotEmpty ?? false) &&
-        (_userProfile!.email?.isNotEmpty ?? false) &&
-        ((_userProfile!.skills?.isNotEmpty ?? false) ||
-            (_userProfile!.education?.isNotEmpty ?? false));
+    return (_UserModel!.name?.isNotEmpty ?? false) &&
+        (_UserModel!.email?.isNotEmpty ?? false) &&
+        ((_UserModel!.skills?.isNotEmpty ?? false) ||
+            (_UserModel!.education?.isNotEmpty ?? false));
   }
 
   /// Get profile completion message
   String get profileCompletionMessage {
-    if (_userProfile == null) {
+    if (_UserModel == null) {
       return 'Please create a profile first';
     }
 
     final missing = <String>[];
-    if (_userProfile!.name?.isEmpty ?? true) missing.add('Name');
-    if (_userProfile!.email?.isEmpty ?? true) missing.add('Email');
-    if (_userProfile!.skills?.isEmpty ?? true) missing.add('Skills');
-    if (_userProfile!.education?.isEmpty ?? true) missing.add('Education');
+    if (_UserModel!.name?.isEmpty ?? true) missing.add('Name');
+    if (_UserModel!.email?.isEmpty ?? true) missing.add('Email');
+    if (_UserModel!.skills?.isEmpty ?? true) missing.add('Skills');
+    if (_UserModel!.education?.isEmpty ?? true) missing.add('Education');
 
     if (missing.isEmpty) {
       return 'Profile is complete!';

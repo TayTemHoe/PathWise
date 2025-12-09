@@ -4,8 +4,10 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 
-import 'package:path_wise/model/user_profile.dart';
+// ✅ CHANGED: Imported UserModel (formerly UserProfile)
+import 'package:path_wise/model/user_profile.dart'; // Ensure this file exports 'UserModel'
 import 'package:path_wise/services/profile_service.dart';
+import 'package:path_wise/services/shared_preference_services.dart'; // ✅ Added
 
 import '../model/ai_match_model.dart';
 
@@ -18,12 +20,23 @@ class ProfileViewModel extends ChangeNotifier {
 
   final ProfileService _service;
   final FirebaseAuth _auth;
+  // ✅ Added: Reference to SharedPreferenceService
+  final SharedPreferenceService _sharedPrefs = SharedPreferenceService.instance;
 
   // ------------- State -------------
-  UserProfile? _profile;
+  // ✅ CHANGED: UserProfile -> UserModel
+  UserModel? _profile;
+
+  // Firestore Subcollections
   List<Skill> _skills = const [];
   List<AcademicRecord> _education = const [];
   List<Experience> _experience = const [];
+
+  // ✅ NEW: AI Match / Shared Preference Data
+  List<EnglishTest> _englishTests = const [];
+  List<String> _interests = const [];
+  PersonalityProfile? _aiPersonality;
+  UserPreferences? _aiPreferences;
 
   bool _isLoading = false;
   bool _savingRoot = false;
@@ -34,10 +47,16 @@ class ProfileViewModel extends ChangeNotifier {
   String? _error;
 
   // ------------- Getters -------------
-  UserProfile? get profile => _profile;
+  UserModel? get profile => _profile;
   List<Skill> get skills => _skills;
   List<AcademicRecord> get education => _education;
   List<Experience> get experience => _experience;
+
+  // ✅ NEW Getters for AI Data
+  List<EnglishTest> get englishTests => _englishTests;
+  List<String> get interests => _interests;
+  PersonalityProfile? get aiPersonality => _aiPersonality;
+  UserPreferences? get aiPreferences => _aiPreferences;
 
   bool get isLoading => _isLoading;
   bool get savingRoot => _savingRoot;
@@ -49,6 +68,9 @@ class ProfileViewModel extends ChangeNotifier {
 
   String get uid => FirebaseAuth.instance.currentUser?.uid ?? '';
 
+  UserModel? _user;
+
+  UserModel? get user => _user; // <= needed by the view
 
   // ------------- Internal setters -------------
   void _setLoading(bool v) {
@@ -87,33 +109,43 @@ class ProfileViewModel extends ChangeNotifier {
     _setLoading(true);
     _setError(null);
     try {
+      // 1. Load Firestore Data (Core Profile)
       final up = await _service.getUserWithSubcollections(uid);
-
-      // ✅ DEBUG: Print what we got from service
-      debugPrint('📦 ProfileViewModel: Received profile=${up != null}');
-      debugPrint('📦 ProfileViewModel: Skills count=${up?.skills?.length ?? 0}');
-      debugPrint('📦 ProfileViewModel: Education count=${up?.education?.length ?? 0}');
-      debugPrint('📦 ProfileViewModel: Experience count=${up?.experience?.length ?? 0}');
 
       if (up == null) {
         debugPrint('⚠️ ProfileViewModel: No profile found, creating new one');
         // First-time bootstrap minimal doc
         await _service.createOrMergeUser(
           uid,
-          const UserProfile(
-            completionPercent: 0,
+          const UserModel(
+            completionPercent: 0, userId: '', firstName: '', lastName: '', email: '',
           ),
         );
         final created = await _service.getUserWithSubcollections(uid);
-        debugPrint('✅ ProfileViewModel: Created profile=${created != null}');
         _applyBundle(created);
       } else {
         _applyBundle(up);
       }
 
-      // ✅ DEBUG: Print final state
-      debugPrint('✅ ProfileViewModel: Final state - Skills=${_skills.length}, Education=${_education.length}, Experience=${_experience.length}');
+      // 2. ✅ NEW: Load SharedPreference Data (AI Match Data)
+      debugPrint('🔄 ProfileViewModel: Loading AI Match data from SharedPrefs...');
+      final spData = await _sharedPrefs.loadProgressWithPrograms(userId: uid);
 
+      if (spData != null) {
+        _englishTests = spData.englishTests;
+        _interests = spData.interests;
+        _aiPersonality = spData.personality;
+        _aiPreferences = spData.preferences;
+
+        debugPrint('✅ ProfileViewModel: Loaded ${_englishTests.length} English tests, ${_interests.length} interests');
+      } else {
+        _englishTests = [];
+        _interests = [];
+        _aiPersonality = null;
+        _aiPreferences = null;
+      }
+
+      // 3. Recalculate Completion with combined data
       await _recalcAndPatchCompletion();
     } catch (e, stackTrace) {
       debugPrint('❌ ProfileViewModel: Error in loadAll(): $e');
@@ -124,34 +156,28 @@ class ProfileViewModel extends ChangeNotifier {
     }
   }
 
+  Future<void> loadUserProfile() async {
+    debugPrint('🔄 ProfileViewModel: Reloading user profile');
+    await loadAll();
+  }
+
   Future<void> refresh() => loadAll();
 
-  void _applyBundle(UserProfile? up) {
-    debugPrint('📝 ProfileViewModel: _applyBundle called');
-    debugPrint('📝 Skills before: ${_skills.length}');
-
+  void _applyBundle(UserModel? up) {
     _profile = up;
     _skills = up?.skills ?? const [];
     _education = up?.education ?? const [];
     _experience = up?.experience ?? const [];
-
-    debugPrint('📝 Skills after: ${_skills.length}');
-    if (_skills.isNotEmpty) {
-      for (var skill in _skills) {
-        debugPrint('  - Skill: ${skill.name}, Category: "${skill.category}"');
-      }
-    }
-
     notifyListeners();
   }
 
   // ------------- Update: Personal Info -------------
   Future<bool> updatePersonalInfo({
     String? name,
-    String? email, // editable if you want
+    String? email,
     String? phone,
     Timestamp? dob,
-    String? gender, // keep nullable; remove if not used in UI
+    String? gender,
     String? city,
     String? state,
     String? country,
@@ -170,9 +196,9 @@ class ProfileViewModel extends ChangeNotifier {
         state: state,
         country: country,
       );
-      // Update local cache to keep UI snappy
-      _profile = (_profile ?? const UserProfile()).copyWith(
-        name: name ?? _profile?.name,
+      // Update local cache
+      _profile = (_profile ?? const UserModel(userId: '', firstName: '', lastName: '', email: '')).copyWith(
+        firstName: name, // Adapting to new UserModel structure if split first/last, or name
         email: email ?? _profile?.email,
         phone: phone ?? _profile?.phone,
         dob: dob ?? _profile?.dob,
@@ -194,16 +220,18 @@ class ProfileViewModel extends ChangeNotifier {
     }
   }
 
-  // ------------- Update: Personality -------------
+  // ------------- Update: Personality (Firestore Sync) -------------
+  // Note: This updates the Firestore record. The AI Match VM updates SharedPrefs.
+  // Ideally, these should be synced, but for completion calculation, we check both/either.
   Future<bool> updatePersonality({
     String? mbti,
-    String? riasec, // string in your latest schema
+    String? riasec,
   }) async {
     _setSavingRoot(true);
     _setError(null);
     try {
       await _service.updatePersonality(uid: uid, mbti: mbti, riasec: riasec);
-      _profile = (_profile ?? const UserProfile()).copyWith(
+      _profile = (_profile ?? const UserModel(userId: '', firstName: '', lastName: '', email: '')).copyWith(
         mbti: mbti ?? _profile?.mbti,
         riasec: riasec ?? _profile?.riasec,
         personalityUpdatedAt: Timestamp.now(),
@@ -222,10 +250,6 @@ class ProfileViewModel extends ChangeNotifier {
   }
 
   // ------------- Update: Preferences -------------
-  UserProfile? _user;
-
-  UserProfile? get user => _user; // <= needed by the view
-
   Future<bool> updatePreferences(Preferences prefs) async {
     _setSavingRoot(true);
     _setError(null);
@@ -233,22 +257,13 @@ class ProfileViewModel extends ChangeNotifier {
     try {
       await _service.updatePreferences(uid, prefs.toFirestore());
 
-      // Update local cache immediately
-      _profile = (_profile ?? const UserProfile()).copyWith(
+      _profile = (_profile ?? const UserModel(userId: '', firstName: '', lastName: '', email: '')).copyWith(
         preferences: prefs,
         lastUpdated: Timestamp.now(),
       );
 
-      // Also update _user if it exists
-      if (_user != null) {
-        _user = _user!.copyWith(preferences: prefs);
-      }
-
       notifyListeners();
-
-      debugPrint('✅ Profile preferences updated in Firestore');
-
-      // Don't recalculate completion for preferences alone
+      await _recalcAndPatchCompletion();
       return true;
     } catch (e) {
       _setError(e);
@@ -259,18 +274,14 @@ class ProfileViewModel extends ChangeNotifier {
     }
   }
 
-
   // ------------- Upload Profile Picture -------------
   Future<String?> uploadProfilePicture(File file, {String? fileExt}) async {
     _setSavingRoot(true);
     _setError(null);
     try {
-      // Print debug info
-      debugPrint('Attempting upload for user: $uid');
-
       final url = await _service.uploadProfilePicture(uid: uid, file: file, fileExt: fileExt);
       if (url != null) {
-        _profile = (_profile ?? const UserProfile()).copyWith(
+        _profile = (_profile ?? const UserModel(userId: '', firstName: '', lastName: '', email: '')).copyWith(
           profilePictureUrl: url,
           lastUpdated: Timestamp.now(),
         );
@@ -279,7 +290,6 @@ class ProfileViewModel extends ChangeNotifier {
       }
       return url;
     } catch (e) {
-      // Capture the full error string
       debugPrint('viewModel Upload Error: $e');
       _setError(e.toString());
       return null;
@@ -290,19 +300,15 @@ class ProfileViewModel extends ChangeNotifier {
 
   // ------------- Skills CRUD -------------
   Future<bool> addSkill(Skill draft) async {
-    debugPrint('➕ Adding skill: ${draft.name}, Category: "${draft.category}"');
     _setSavingSkill(true);
     _setError(null);
     try {
       final created = await _service.createSkill(uid: uid, skill: draft);
-      debugPrint('✅ Skill created with ID: ${created.id}');
       _skills = [..._skills, created]..sort((a, b) => (a.order ?? 0).compareTo(b.order ?? 0));
-      debugPrint('✅ Total skills now: ${_skills.length}');
       notifyListeners();
       await _recalcAndPatchCompletion();
       return true;
     } catch (e) {
-      debugPrint('❌ Error adding skill: $e');
       _setError(e);
       return false;
     } finally {
@@ -311,19 +317,16 @@ class ProfileViewModel extends ChangeNotifier {
   }
 
   Future<bool> saveSkill(Skill skill) async {
-    debugPrint('💾 Updating skill: ${skill.name}, Category: "${skill.category}"');
     _setSavingSkill(true);
     _setError(null);
     try {
       await _service.updateSkill(uid: uid, skill: skill);
       _skills = _skills.map((s) => s.id == skill.id ? skill : s).toList()
         ..sort((a, b) => (a.order ?? 0).compareTo(b.order ?? 0));
-      debugPrint('✅ Skill updated successfully');
       notifyListeners();
       await _recalcAndPatchCompletion();
       return true;
     } catch (e) {
-      debugPrint('❌ Error updating skill: $e');
       _setError(e);
       return false;
     } finally {
@@ -332,18 +335,15 @@ class ProfileViewModel extends ChangeNotifier {
   }
 
   Future<bool> deleteSkill(String skillId) async {
-    debugPrint('🗑️ Deleting skill: $skillId');
     _setSavingSkill(true);
     _setError(null);
     try {
       await _service.deleteSkill(uid: uid, skillId: skillId);
       _skills = _skills.where((s) => s.id != skillId).toList();
-      debugPrint('✅ Skill deleted. Total skills now: ${_skills.length}');
       notifyListeners();
       await _recalcAndPatchCompletion();
       return true;
     } catch (e) {
-      debugPrint('❌ Error deleting skill: $e');
       _setError(e);
       return false;
     } finally {
@@ -358,11 +358,8 @@ class ProfileViewModel extends ChangeNotifier {
       final created = await _service.createEducation(uid: uid, education: draft);
       _education = [..._education, created];
 
-      // If the new record is marked current, enforce exclusivity
       if (draft.isCurrent == true) {
         await _service.setCurrentEducation(uid: uid, eduId: created.id);
-
-        // Refresh local list states
         _education = _education.map((e) {
           return e.copyWith(isCurrent: e.id == created.id);
         }).toList();
@@ -383,7 +380,6 @@ class ProfileViewModel extends ChangeNotifier {
     _setSavingEducation(true);
     try {
       await _service.updateEducation(uid: uid, education: edu);
-
       if (edu.isCurrent == true) {
         await _service.setCurrentEducation(uid: uid, eduId: edu.id);
         _education = _education.map((e) {
@@ -392,7 +388,6 @@ class ProfileViewModel extends ChangeNotifier {
       } else {
         _education = _education.map((e) => e.id == edu.id ? edu : e).toList();
       }
-
       notifyListeners();
       await _recalcAndPatchCompletion();
       return true;
@@ -404,18 +399,13 @@ class ProfileViewModel extends ChangeNotifier {
     }
   }
 
-// ✅ NEW: Set specific education record as current
   Future<bool> setCurrentEducation(String eduId) async {
     _setSavingEducation(true);
-    _setError(null);
     try {
       await _service.setCurrentEducation(uid: uid, eduId: eduId);
-
-      // Reflect change locally immediately for UI responsiveness
       _education = _education.map((e) {
         return e.copyWith(isCurrent: e.id == eduId);
       }).toList();
-
       notifyListeners();
       return true;
     } catch (e) {
@@ -426,7 +416,6 @@ class ProfileViewModel extends ChangeNotifier {
     }
   }
 
-  // Add this helper to get current education
   AcademicRecord? get currentEducation {
     try {
       return _education.firstWhere((e) => e.isCurrent == true);
@@ -436,18 +425,14 @@ class ProfileViewModel extends ChangeNotifier {
   }
 
   Future<bool> deleteEducation(String eduId) async {
-    debugPrint('🗑️ Deleting education: $eduId');
     _setSavingEducation(true);
-    _setError(null);
     try {
       await _service.deleteEducation(uid: uid, eduId: eduId);
       _education = _education.where((e) => e.id != eduId).toList();
-      debugPrint('✅ Education deleted. Total entries now: ${_education.length}');
       notifyListeners();
       await _recalcAndPatchCompletion();
       return true;
     } catch (e) {
-      debugPrint('❌ Error deleting education: $e');
       _setError(e);
       return false;
     } finally {
@@ -455,26 +440,16 @@ class ProfileViewModel extends ChangeNotifier {
     }
   }
 
-  Future<void> loadUserProfile() async {
-    debugPrint('🔄 ProfileViewModel: Reloading user profile');
-    await loadAll();
-  }
-
   // ------------- Experience CRUD -------------
   Future<bool> addExperience(Experience draft) async {
-    debugPrint('➕ Adding experience: ${draft.company}');
     _setSavingExperience(true);
-    _setError(null);
     try {
       final created = await _service.createExperience(uid: uid, experience: draft);
-      debugPrint('✅ Experience created with ID: ${created.id}');
       _experience = [..._experience, created]..sort((a, b) => (a.order ?? 0).compareTo(b.order ?? 0));
-      debugPrint('✅ Total experience entries now: ${_experience.length}');
       notifyListeners();
       await _recalcAndPatchCompletion();
       return true;
     } catch (e) {
-      debugPrint('❌ Error adding experience: $e');
       _setError(e);
       return false;
     } finally {
@@ -483,19 +458,15 @@ class ProfileViewModel extends ChangeNotifier {
   }
 
   Future<bool> saveExperience(Experience exp) async {
-    debugPrint('💾 Updating experience: ${exp.company}');
     _setSavingExperience(true);
-    _setError(null);
     try {
       await _service.updateExperience(uid: uid, experience: exp);
       _experience = _experience.map((e) => e.id == exp.id ? exp : e).toList()
         ..sort((a, b) => (a.order ?? 0).compareTo(b.order ?? 0));
-      debugPrint('✅ Experience updated successfully');
       notifyListeners();
       await _recalcAndPatchCompletion();
       return true;
     } catch (e) {
-      debugPrint('❌ Error updating experience: $e');
       _setError(e);
       return false;
     } finally {
@@ -504,18 +475,14 @@ class ProfileViewModel extends ChangeNotifier {
   }
 
   Future<bool> deleteExperience(String expId) async {
-    debugPrint('🗑️ Deleting experience: $expId');
     _setSavingExperience(true);
-    _setError(null);
     try {
       await _service.deleteExperience(uid: uid, expId: expId);
       _experience = _experience.where((e) => e.id != expId).toList();
-      debugPrint('✅ Experience deleted. Total entries now: ${_experience.length}');
       notifyListeners();
       await _recalcAndPatchCompletion();
       return true;
     } catch (e) {
-      debugPrint('❌ Error deleting experience: $e');
       _setError(e);
       return false;
     } finally {
@@ -524,27 +491,28 @@ class ProfileViewModel extends ChangeNotifier {
   }
 
   // ------------- Completion % (weighted) -------------
+  // ✅ RE-DESIGNED: Weighted calculation including AI Match Data
   Future<void> _recalcAndPatchCompletion() async {
     final pct = _computeCompletionPercent();
-    // Update remote only if changed significantly (avoid thrashing)
+
+    // Update remote only if changed significantly
     final prev = _profile?.completionPercent ?? -1;
     final roundedPrev = (prev.isNaN ? -1 : prev).toStringAsFixed(1);
     final roundedNew = pct.toStringAsFixed(1);
+
     if (roundedPrev != roundedNew) {
       try {
         await _service.updateCompletionPercent(uid, pct);
-        _profile = (_profile ?? const UserProfile()).copyWith(
+        _profile = (_profile ?? const UserModel(userId: '', firstName: '', lastName: '', email: '')).copyWith(
           completionPercent: pct,
           lastUpdated: Timestamp.now(),
         );
         notifyListeners();
       } catch (e) {
-        // not fatal; keep UI value
         _setError(e);
       }
     } else {
-      // still update local
-      _profile = (_profile ?? const UserProfile()).copyWith(
+      _profile = (_profile ?? const UserModel(userId: '', firstName: '', lastName: '', email: '')).copyWith(
         completionPercent: pct,
         lastUpdated: Timestamp.now(),
       );
@@ -552,14 +520,23 @@ class ProfileViewModel extends ChangeNotifier {
     }
   }
 
+  /// ✅ New Calculation Logic
+  /// Total = 100%
+  /// 1. Personal Info (15%) - Name, Email, Phone, DOB, Loc, Photo
+  /// 2. Education (15%) - At least one record
+  /// 3. Experience (15%) - At least one record
+  /// 4. Skills (10%) - At least one skill
+  /// 5. English Tests (10%) - From SharedPrefs
+  /// 6. Interests (10%) - From SharedPrefs
+  /// 7. Personality (15%) - From SharedPrefs OR Firestore
+  /// 8. Preferences (10%) - From SharedPrefs OR Firestore
   double _computeCompletionPercent() {
     final p = _profile;
 
-    // --- Personal (20%) ---
-    // choose a simple rubric (6 fields)
-    int personalTotal = 6;
+    // 1. Personal Info (15%)
     int personalScore = 0;
-    if ((p?.name ?? '').trim().isNotEmpty) personalScore++;
+    int personalTotal = 6;
+    if ((p?.firstName ?? p?.name ?? '').trim().isNotEmpty) personalScore++;
     if ((p?.email ?? '').trim().isNotEmpty) personalScore++;
     if ((p?.phone ?? '').trim().isNotEmpty) personalScore++;
     if (p?.dob != null) personalScore++;
@@ -567,37 +544,56 @@ class ProfileViewModel extends ChangeNotifier {
     if ((p?.profilePictureUrl ?? '').isNotEmpty) personalScore++;
     final personalPct = personalTotal == 0 ? 0.0 : (personalScore / personalTotal) * 100.0;
 
-    // --- Skills (25%) ---
-    final skillsPct = _skills.isNotEmpty ? 100.0 : 0.0;
-
-    // --- Education (20%) ---
+    // 2. Education (15%)
     final educationPct = _education.isNotEmpty ? 100.0 : 0.0;
 
-    // --- Experience (25%) ---
+    // 3. Experience (15%)
     final experiencePct = _experience.isNotEmpty ? 100.0 : 0.0;
 
-    // --- Preferences (10%) ---
-    final prefs = p?.preferences;
-    final hasPrefs = (prefs?.desiredJobTitles?.isNotEmpty == true) ||
-        (prefs?.industries?.isNotEmpty == true) ||
-        (prefs?.workEnvironment?.isNotEmpty == true) ||
-        (prefs?.preferredLocations?.isNotEmpty == true) ||
-        (prefs?.willingToRelocate != null) ||
-        ((prefs?.remoteAcceptance ?? '').isNotEmpty) ||
-        (prefs?.salary != null);
-    final preferencesPct = hasPrefs ? 100.0 : 0.0;
+    // 4. Skills (10%)
+    final skillsPct = _skills.isNotEmpty ? 100.0 : 0.0;
 
-    // weights
-    const wPersonal = 0.20;
-    const wSkills = 0.25;
-    const wEducation = 0.20;
-    const wExperience = 0.25;
+    // 5. English Tests (10%) - Data from SharedPrefs
+    final englishPct = _englishTests.isNotEmpty ? 100.0 : 0.0;
+
+    // 6. Interests (10%) - Data from SharedPrefs
+    final interestsPct = _interests.isNotEmpty ? 100.0 : 0.0;
+
+    // 7. Personality (15%) - Check both Firestore & SharedPrefs
+    final hasFirestorePersonality = (p?.mbti?.isNotEmpty == true) || (p?.riasec?.isNotEmpty == true);
+    final hasAiPersonality = _aiPersonality != null && _aiPersonality!.hasData;
+    final personalityPct = (hasFirestorePersonality || hasAiPersonality) ? 100.0 : 0.0;
+
+    // 8. Preferences (10%) - Check both Firestore & SharedPrefs
+    final pPrefs = p?.preferences;
+    final hasFirestorePrefs = (pPrefs?.desiredJobTitles?.isNotEmpty == true) ||
+        (pPrefs?.industries?.isNotEmpty == true) ||
+        (pPrefs?.preferredLocations?.isNotEmpty == true);
+
+    final hasAiPrefs = _aiPreferences != null && (
+        _aiPreferences!.studyLevel.isNotEmpty ||
+            _aiPreferences!.locations.isNotEmpty
+    );
+
+    final preferencesPct = (hasFirestorePrefs || hasAiPrefs) ? 100.0 : 0.0;
+
+    // Weights
+    const wPersonal = 0.15;
+    const wEducation = 0.15;
+    const wExperience = 0.15;
+    const wSkills = 0.10;
+    const wEnglish = 0.10;
+    const wInterests = 0.10;
+    const wPersonality = 0.15;
     const wPreferences = 0.10;
 
     final total = (personalPct * wPersonal) +
-        (skillsPct * wSkills) +
         (educationPct * wEducation) +
         (experiencePct * wExperience) +
+        (skillsPct * wSkills) +
+        (englishPct * wEnglish) +
+        (interestsPct * wInterests) +
+        (personalityPct * wPersonality) +
         (preferencesPct * wPreferences);
 
     final clamped = total.clamp(0.0, 100.0);

@@ -13,7 +13,7 @@ class EditSkillsScreen extends StatefulWidget {
 }
 
 class _EditSkillsScreenState extends State<EditSkillsScreen> {
-  static const _tabs = ['Technical', 'Soft', 'Languages', 'Industry'];
+  static const _tabs = ['Technical', 'Soft'];
 
   //  Design Colors
   final Color _primaryColor = const Color(0xFF6C63FF);

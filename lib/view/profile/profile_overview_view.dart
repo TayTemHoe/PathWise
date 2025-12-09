@@ -182,13 +182,15 @@ class _ProfileOverviewScreenState extends State<ProfileOverviewScreen> {
                       : null,
                   child: (photoUrl == null || photoUrl.isEmpty)
                       ? Text(
-                    initials,
-                    style: const TextStyle(
-                      fontSize: 20,
-                      color: Color(0xFF111827),
-                      fontWeight: FontWeight.w700,
-                    ),
-                  )
+                        (profile != null && profile.name != null && profile.name!.isNotEmpty)
+                            ? profile.name!.trim().characters.first.toUpperCase()
+                            : 'A',
+                        style: TextStyle(
+                          fontSize: 20,
+                          color: _DesignColors.primary,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      )
                       : null,
                 ),
               ],

@@ -119,7 +119,7 @@ class PreviewResumePage extends StatelessWidget {
     );
   }
 
-  Widget _buildTemplateLayout(UserProfile profile,
+  Widget _buildTemplateLayout(UserModel profile,
       List<Skill> skills,
       List<AcademicRecord> education,
       List<Experience> experience,) {
@@ -138,7 +138,7 @@ class PreviewResumePage extends StatelessWidget {
   // ========================================
   // TECH MODERN TEMPLATE
   // ========================================
-  Widget _buildTechTemplate(UserProfile profile,
+  Widget _buildTechTemplate(UserModel profile,
       List<Skill> skills,
       List<AcademicRecord> education,
       List<Experience> experience,) {
@@ -416,6 +416,17 @@ class PreviewResumePage extends StatelessWidget {
                     fontSize: resume.font.contentFontSize.toDouble() + 1,
                     fontWeight: FontWeight.bold,
                     fontFamily: resume.font.fontFamily,
+                    color: const Color(0xFF000000),
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  edu.institution ?? '',
+                  style: TextStyle(
+                    fontSize: resume.font.contentFontSize.toDouble() + 1,
+                    fontWeight: FontWeight.bold,
+                    fontFamily: resume.font.fontFamily,
+                    color: const Color(0xFF000000),
                   ),
                 ),
                 const SizedBox(height: 4),
@@ -491,7 +502,7 @@ class PreviewResumePage extends StatelessWidget {
   // ========================================
   // BUSINESS PROFESSIONAL TEMPLATE
   // ========================================
-  Widget _buildBusinessTemplate(UserProfile profile,
+  Widget _buildBusinessTemplate(UserModel profile,
       List<Skill> skills,
       List<AcademicRecord> education,
       List<Experience> experience,) {
@@ -772,7 +783,7 @@ class PreviewResumePage extends StatelessWidget {
   // ========================================
   // CREATIVE TEMPLATE
   // ========================================
-  Widget _buildCreativeTemplate(UserProfile profile,
+  Widget _buildCreativeTemplate(UserModel profile,
       List<Skill> skills,
       List<AcademicRecord> education,
       List<Experience> experience,) {
@@ -1003,7 +1014,7 @@ class PreviewResumePage extends StatelessWidget {
   // ========================================
   // ACADEMIC TEMPLATE
   // ========================================
-  Widget _buildAcademicTemplate(UserProfile profile,
+  Widget _buildAcademicTemplate(UserModel profile,
       List<Skill> skills,
       List<AcademicRecord> education,
       List<Experience> experience,) {

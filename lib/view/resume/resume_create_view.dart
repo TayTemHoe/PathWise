@@ -610,7 +610,7 @@ class _TemplateSelectionPageState extends State<TemplateSelectionPage> {
 
   // --- Full Template Implementations (Preserved for logic, styled for content) ---
 
-  Widget _buildFullTechTemplate(UserProfile profile, List<Skill> skills, List<Experience> experience) {
+  Widget _buildFullTechTemplate(UserModel profile, List<Skill> skills, List<Experience> experience) {
     return SingleChildScrollView(
       child: Column(
         children: [
@@ -727,7 +727,7 @@ class _TemplateSelectionPageState extends State<TemplateSelectionPage> {
     );
   }
 
-  Widget _buildFullBusinessTemplate(UserProfile profile, List<Experience> experience) {
+  Widget _buildFullBusinessTemplate(UserModel profile, List<Experience> experience) {
     return SingleChildScrollView(
       child: Padding(
         padding: const EdgeInsets.all(24),
@@ -791,7 +791,7 @@ class _TemplateSelectionPageState extends State<TemplateSelectionPage> {
     );
   }
 
-  Widget _buildFullCreativeTemplate(UserProfile profile, List<Experience> experience) {
+  Widget _buildFullCreativeTemplate(UserModel profile, List<Experience> experience) {
     return Row(
       children: [
         Container(
@@ -896,7 +896,7 @@ class _TemplateSelectionPageState extends State<TemplateSelectionPage> {
     );
   }
 
-  Widget _buildFullAcademicTemplate(UserProfile profile, List<AcademicRecord> education) {
+  Widget _buildFullAcademicTemplate(UserModel profile, List<AcademicRecord> education) {
     return SingleChildScrollView(
       padding: const EdgeInsets.all(24),
       child: Column(

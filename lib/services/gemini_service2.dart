@@ -6,7 +6,10 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:path_wise/model/career_suggestion.dart';
 import 'package:path_wise/model/careerroadmap_model.dart';
 import 'package:path_wise/model/user_profile.dart';
+import 'package:path_wise/model/ai_match_model.dart';
 import 'package:path_wise/viewModel/profile_view_model.dart';
+
+import '../viewModel/ai_match_view_model.dart';
 
 class AiService {
   final String apiKey = 'AIzaSyDOmbENlNrvNacS9fCbUqD9PSyEhilP9Ss';
@@ -18,12 +21,13 @@ class AiService {
   /// Main method to get career suggestions from Gemini AI
   Future<Map<String, dynamic>> getCareerSuggestions(
       ProfileViewModel profileVM) async {
-    final UserProfile? userProfile = profileVM.profile;
-    if (userProfile == null) {
+    final UserModel? userModel = profileVM.profile;
+
+    if (UserModel == null) {
       throw Exception("User profile is missing!");
     }
 
-    final prompt = _createGeminiPrompt(userProfile);
+    final prompt = _createGeminiPrompt(userModel!, profileVM);
 
     try {
       final response = await http.post(
@@ -72,7 +76,7 @@ class AiService {
   /// If found, returns cached data. If not, generates new one via Gemini AI
   Future<Map<String, dynamic>> generateCareerRoadmap({
     required String jobTitle,
-    required UserProfile userProfile,
+    required UserModel userModel,
     String? uid, // Optional: needed to check user-specific Firestore
   }) async {
     try {
@@ -117,7 +121,7 @@ class AiService {
           } else {
             debugPrint('⚠️ No skill gap found. Will generate new skill gap based on user profile.');
             // Generate skill gaps based on user's current skills vs roadmap requirements
-            skillGapsData = _generateSkillGapsFromRoadmap(existingRoadmapData, userProfile);
+            skillGapsData = _generateSkillGapsFromRoadmap(existingRoadmapData, userModel);
           }
 
           // Return cached roadmap with skill gaps
@@ -133,7 +137,7 @@ class AiService {
       }
 
       // Step 2: No existing roadmap found, generate via Gemini AI
-      final prompt = _createCareerRoadmapPrompt(jobTitle, userProfile);
+      final prompt = _createCareerRoadmapPrompt(jobTitle, userModel);
 
       final response = await http.post(
         Uri.parse(apiUrl),
@@ -179,7 +183,7 @@ class AiService {
   /// Helper method to generate skill gaps by comparing user skills with roadmap requirements
   List<Map<String, dynamic>> _generateSkillGapsFromRoadmap(
       Map<String, dynamic> roadmapData,
-      UserProfile userProfile,
+      UserModel UserModel,
       ) {
     try {
       final roadmapStages = roadmapData['roadmap'] as List<dynamic>?;
@@ -190,7 +194,7 @@ class AiService {
       final requiredSkills = List<String>.from(firstStage['requiredSkills'] ?? []);
 
       // Get user's current skills
-      final userSkills = userProfile.skills ?? [];
+      final userSkills = UserModel.skills ?? [];
       final userSkillMap = <String, int>{};
       for (var skill in userSkills) {
         userSkillMap[skill.name ?? ''] = skill.level ?? 0;
@@ -277,23 +281,56 @@ class AiService {
     }
   }
 
-  /// Helper: Builds the prediction JSON payload based on UserProfile
-  Map<String, dynamic> _buildPredictionRequest(UserProfile userProfile) {
+  /// Helper: Builds the prediction JSON payload based on UserModel
+  Map<String, dynamic> _buildPredictionRequest(UserModel userModel, ProfileViewModel pVM) {
     return {
       "location": {
-        "city": userProfile.city ?? "Unknown",
-        "state": userProfile.state ?? "Unknown",
-        "country": userProfile.country ?? "Malaysia",
+        "city": userModel.city ?? "Unknown",
+        "state": userModel.state ?? "Unknown",
+        "country": userModel.country ?? "Malaysia",
       },
-      "education": userProfile.education?.map((edu) {
+      "englishTests": pVM.englishTests.map((test) {
         return {
-          "degreeLevel": edu.level ?? "Unknown",
-          "fieldOfStudy": edu.major ?? "Unknown",
-          "gpa": edu.cgpa ?? "",
-          "isCurrent": edu.isCurrent ?? false,
+          "testName": test.type,          // e.g. "MUET", "IELTS"
+          "overallScore": test.result,    // e.g. "Band 4", 7.5
+          "year": test.year,              // e.g. 2023
+          // Include breakdown if available (e.g. Listening, Speaking scores)
+          "components": test.bands ?? {},
+        };
+      }).toList(),
+      "education": userModel.education?.map((edu) {
+        // 1. Unify distinction/achievement types into a single readable field
+        // Logic: Pick the one that is not null, as they are mutually exclusive by degree level
+        String achievementLevel = edu.honors ??
+            edu.classOfAward ??
+            edu.classification ??
+            "Not specified";
+        return {
+          // Core Info
+          "educationLevel": edu.level,
+          "institution": edu.institution ?? "Unknown",
+          "programName": edu.programName ?? "Unknown",
+          "major": edu.major ?? "Unknown",
+          // Context specific (Pre-U / High School)
+          "examType": edu.examType ?? "Unknown", // e.g., SPM, STPM
+          "stream": edu.stream ?? "Unknown", // e.g., Science, Arts
+          // Performance Stats
+          "cgpa": edu.cgpa?.toStringAsFixed(2) ?? "Unknown",
+          "totalScore": edu.totalScore?.toString() ?? "Unknown", // Useful for UEC/IB
+          "achievementLevel": achievementLevel ?? "Unknown", // e.g., First Class, Merit
+          // Research (Master/PhD)
+          "researchArea": edu.researchArea ?? "Unknown",
+          "thesisTitle": edu.thesisTitle ?? "Unknown",
+          // Detailed Subjects (Useful for skill extraction)
+          // Assuming SubjectGrade has properties like 'name' or 'grade'.
+          // We map this to a simplified list for the prompt.
+          "subjects": edu.subjects.map((s) => {
+            "name": s.name ?? "Unknown", // Replace with actual property from SubjectGrade
+            "grade": s.grade ?? "Unknown"      // Replace with actual property from SubjectGrade
+          }).toList(),
         };
       }).toList() ?? [],
-      "skills": userProfile.skills?.map((skill) {
+      "skills": userModel.skills?.map((skill) {
         return {
           "name": skill.name ?? "Unknown",
           "category": skill.category ?? "Unknown",
@@ -301,7 +338,7 @@ class AiService {
           "levelText": skill.levelText ?? "",
         };
       }).toList() ?? [],
-      "experience": userProfile.experience?.map((exp) {
+      "experience": userModel.experience?.map((exp) {
         final startDate = exp.startDate?.toDate();
         final endDate = exp.isCurrent == true ? DateTime.now() : exp.endDate?.toDate();
 
@@ -322,28 +359,34 @@ class AiService {
         };
       }).toList() ?? [],
       "personality": {
-        "mbti": userProfile.mbti ?? null,
-        "riasec": userProfile.riasec ?? null,
+        // 1. MBTI (String, e.g., "INTJ")
+        "mbti": pVM.aiPersonality?.mbti ?? "Unknown",
+
+        // 2. RIASEC (Map<String, double>, e.g., {"Realistic": 25.0})
+        "riasec": pVM.aiPersonality?.riasec ?? {},
+
+        // 3. Big Five / OCEAN (Map<String, double>)
+        "ocean": pVM.aiPersonality?.ocean ?? {},
       },
       "preferences": {
-        "desiredJobTitles": userProfile.preferences?.desiredJobTitles ?? [],
-        "industries": userProfile.preferences?.industries ?? [],
-        "companySize": userProfile.preferences?.companySize ?? "Any",
-        "workEnvironment": userProfile.preferences?.workEnvironment ?? [],
-        "preferredLocations": userProfile.preferences?.preferredLocations ?? [],
-        "willingToRelocate": userProfile.preferences?.willingToRelocate ?? false,
+        "desiredJobTitles": userModel.preferences?.desiredJobTitles ?? [],
+        "industries": userModel.preferences?.industries ?? [],
+        "companySize": userModel.preferences?.companySize ?? "Any",
+        "workEnvironment": userModel.preferences?.workEnvironment ?? [],
+        "preferredLocations": userModel.preferences?.preferredLocations ?? [],
+        "willingToRelocate": userModel.preferences?.willingToRelocate ?? false,
         "salaryExpectation": {
-          "min": userProfile.preferences?.salary?.min ?? 0,
-          "max": userProfile.preferences?.salary?.max ?? 0,
-          "type": userProfile.preferences?.salary?.type ?? "Monthly",
+          "min": userModel.preferences?.salary?.min ?? 0,
+          "max": userModel.preferences?.salary?.max ?? 0,
+          "type": userModel.preferences?.salary?.type ?? "Monthly",
         },
       },
     };
   }
 
   /// Create prompt for career suggestions
-  String _createGeminiPrompt(UserProfile p) {
-    final profileData = _buildPredictionRequest(p);
+  String _createGeminiPrompt(UserModel p, ProfileViewModel profileVM) {
+    final profileData = _buildPredictionRequest(p, profileVM);
     return """
 You are a career guidance assistant. Based on the user's profile data below, analyze their education, skills, experience, personality traits, and preferences to recommend the most suitable careers in Malaysia.
 
@@ -411,8 +454,8 @@ IMPORTANT: Return ONLY the JSON object. Do not include any markdown formatting, 
   }
 
   /// Create prompt for career roadmap generation
-  String _createCareerRoadmapPrompt(String jobTitle, UserProfile userProfile) {
-    final userSkills = userProfile.skills?.map((skill) {
+  String _createCareerRoadmapPrompt(String jobTitle, UserModel UserModel) {
+    final userSkills = UserModel.skills?.map((skill) {
       return {
         "name": skill.name ?? "Unknown",
         "proficiency": skill.level ?? 1,
@@ -655,7 +698,7 @@ IMPORTANT:
   Future<Map<String, String>> saveCareerRoadmapToFirestore({
     required String uid,
     required String jobTitle,
-    required UserProfile userProfile,
+    required UserModel userModel,
   }) async {
     try {
       // Generate roadmap (will check Firestore cache internally)
@@ -663,7 +706,7 @@ IMPORTANT:
 
       final aiResponse = await generateCareerRoadmap(
         jobTitle: jobTitle,
-        userProfile: userProfile,
+        userModel: userModel,
         uid: uid, // Pass uid to enable Firestore checking
       );
 
@@ -905,7 +948,7 @@ IMPORTANT:
 
   /// Save career suggestion to Firestore
   Future<String> saveCareerSuggestionToFirestore(
-      String uid, Map<String, dynamic> aiResponse, UserProfile p) async {
+      String uid, Map<String, dynamic> aiResponse, UserModel p) async {
     try {
       await _markAllPreviousAsStale(uid);
 

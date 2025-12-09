@@ -5,6 +5,8 @@ import 'package:path_wise/services/gemini_service2.dart';
 import 'package:path_wise/services/career_service.dart';
 import 'package:path_wise/viewModel/profile_view_model.dart';
 
+import 'ai_match_view_model.dart';
+
 /// viewModel for managing career suggestions
 /// Follows MVVM architecture pattern with ChangeNotifier for state management
 class CareerViewModel extends ChangeNotifier {
