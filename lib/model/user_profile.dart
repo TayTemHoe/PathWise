@@ -79,7 +79,6 @@ class UserModel {
   final String? email;
   final String? phone;
   final Timestamp? dob; // Stored as Timestamp, parsed from String if needed
-  final String? gender;
   final String? profilePictureUrl;
 
   // -- Location / Address --
@@ -117,7 +116,6 @@ class UserModel {
     required this.email,
     this.phone,
     this.dob,
-    this.gender,
     this.profilePictureUrl,
     this.addressLine1,
     this.addressLine2,
@@ -174,9 +172,6 @@ class UserModel {
       createdAt: _timestamp(data['createdAt']),
       lastUpdated: _timestamp(data['lastUpdated']),
 
-      // Demographics
-      gender: _s(data['gender']) ?? _s(personal['gender']),
-
       // Location (Flattened from UserModel logic + UserModel specific fields)
       addressLine1: _s(data['address_line1']) ?? _s(data['addressLine1']) ?? _s(data['address']),
       addressLine2: _s(data['address_line2']) ?? _s(data['addressLine2']),
@@ -229,7 +224,6 @@ class UserModel {
         'email': email,
         'phone': phone,
         'dob': dob,
-        'gender': gender,
         'profilePictureUrl': profilePictureUrl,
         'location': {
           'addressLine1': addressLine1,
@@ -256,7 +250,6 @@ class UserModel {
     String? email,
     String? phone,
     Timestamp? dob,
-    String? gender,
     String? profilePictureUrl,
     String? addressLine1,
     String? addressLine2,
@@ -284,7 +277,6 @@ class UserModel {
       email: email ?? this.email,
       phone: phone ?? this.phone,
       dob: dob ?? this.dob,
-      gender: gender ?? this.gender,
       profilePictureUrl: profilePictureUrl ?? this.profilePictureUrl,
       addressLine1: addressLine1 ?? this.addressLine1,
       addressLine2: addressLine2 ?? this.addressLine2,

@@ -71,17 +71,11 @@ class _ProfileOverviewScreenState extends State<ProfileOverviewScreen> {
           IconButton(
             icon: const Icon(Icons.settings_outlined, color: _DesignColors.textPrimary),
             onPressed: () {
-              // TODO: Navigate to settings screen
               ScaffoldMessenger.of(context).showSnackBar(
                 const SnackBar(content: Text('Settings coming soon!')),
               );
             },
             tooltip: 'Settings',
-          ),
-          IconButton(
-            icon: const Icon(Icons.logout_rounded, color: _DesignColors.error),
-            onPressed: () => _confirmLogout(context),
-            tooltip: 'Log Out',
           ),
         ],
       ),
@@ -108,7 +102,7 @@ class _ProfileOverviewScreenState extends State<ProfileOverviewScreen> {
                   padding: const EdgeInsets.all(20),
                   child: ConstrainedBox(
                     constraints: BoxConstraints(
-                      minHeight: constraints.maxHeight - 40, // Adjust for padding
+                      minHeight: constraints.maxHeight - 40,
                     ),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.center,
@@ -120,6 +114,8 @@ class _ProfileOverviewScreenState extends State<ProfileOverviewScreen> {
                         _buildQuickStats(profileVM),
                         const SizedBox(height: 24),
                         _buildMenuSection(),
+                        const SizedBox(height: 24),
+                        _buildSignOutButton(),
                         const SizedBox(height: 30),
                       ],
                     ),
@@ -136,15 +132,11 @@ class _ProfileOverviewScreenState extends State<ProfileOverviewScreen> {
   Widget _buildProfileHeader(dynamic profile) {
     final String name = profile?.name ?? 'User';
     final String location = '${profile?.city ?? ''}, ${profile?.country ?? ''}'.replaceAll(RegExp(r'^, |,$'), '').trim();
-    final String? photoUrl = profile?.profilePictureUrl ?? 'null'; // Assuming profile doesn't have photoUrl yet, or add if available
+    final String? photoUrl = profile?.profilePictureUrl;
 
     // Format last updated date
     String? lastUpdated;
     if (profile?.lastUpdated != null) {
-      // Assuming lastUpdated is a Timestamp or similar that can be converted to DateTime
-      // If it's already a DateTime or String, adjust accordingly.
-      // Using DateTime.now() as fallback/placeholder logic if type is unknown from context,
-      // but based on typical patterns:
       try {
         final date = profile!.lastUpdated.toDate();
         lastUpdated = DateFormat('MMM d, yyyy').format(date);
@@ -153,47 +145,42 @@ class _ProfileOverviewScreenState extends State<ProfileOverviewScreen> {
       }
     }
 
-    final initials = (name.isNotEmpty)
-        ? name
-        .trim()
-        .split(RegExp(r'\s+'))
-        .where((e) => e.isNotEmpty)
-        .map((e) => e[0])
-        .take(2)
-        .join()
-        .toUpperCase()
-        : 'A';
+    // Get first character of name for avatar
+    String getInitial() {
+      if (name.isEmpty) return 'A';
+      return name.trim().characters.first.toUpperCase();
+    }
+
+    // Check if photoUrl is valid
+    bool hasValidPhoto() {
+      return photoUrl != null &&
+          photoUrl.isNotEmpty &&
+          photoUrl != 'null' &&
+          photoUrl != 'undefined';
+    }
 
     return Card(
       elevation: 0,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      color: Colors.white, // Or _DesignColors.cardBackground
+      color: Colors.white,
       child: Padding(
         padding: const EdgeInsets.all(14),
         child: Row(
           children: [
-            Stack(
-              children: [
-                CircleAvatar(
-                  radius: 36,
-                  backgroundColor: const Color(0xFFE5E7EB),
-                  backgroundImage: (photoUrl != null && photoUrl.isNotEmpty)
-                      ? NetworkImage(photoUrl)
-                      : null,
-                  child: (photoUrl == null || photoUrl.isEmpty)
-                      ? Text(
-                        (profile != null && profile.name != null && profile.name!.isNotEmpty)
-                            ? profile.name!.trim().characters.first.toUpperCase()
-                            : 'A',
-                        style: TextStyle(
-                          fontSize: 20,
-                          color: _DesignColors.primary,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      )
-                      : null,
+            CircleAvatar(
+              radius: 36,
+              backgroundColor: _DesignColors.primary.withOpacity(0.1),
+              backgroundImage: hasValidPhoto() ? NetworkImage(photoUrl!) : null,
+              child: !hasValidPhoto()
+                  ? Text(
+                getInitial(),
+                style: const TextStyle(
+                  fontSize: 28,
+                  color: _DesignColors.primary,
+                  fontWeight: FontWeight.bold,
                 ),
-              ],
+              )
+                  : null,
             ),
             const SizedBox(width: 12),
             Expanded(
@@ -469,7 +456,6 @@ class _ProfileOverviewScreenState extends State<ProfileOverviewScreen> {
       color: Colors.transparent,
       child: InkWell(
         onTap: onTap,
-        // Ensure rounding for first and last items if needed, mostly visual preference
         borderRadius: BorderRadius.circular(16),
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
@@ -502,11 +488,57 @@ class _ProfileOverviewScreenState extends State<ProfileOverviewScreen> {
     );
   }
 
+  Widget _buildSignOutButton() {
+    return Container(
+      width: double.infinity,
+      decoration: BoxDecoration(
+        color: _DesignColors.cardBackground,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: _DesignColors.shadow,
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: () => _confirmLogout(context),
+          borderRadius: BorderRadius.circular(16),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
+                  Icons.logout_rounded,
+                  color: _DesignColors.error,
+                  size: 22,
+                ),
+                const SizedBox(width: 12),
+                Text(
+                  'Sign Out',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    color: _DesignColors.error,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _buildDivider() {
     return const Divider(
       height: 1,
       thickness: 1,
-      indent: 64, // Aligned with text start
+      indent: 64,
       endIndent: 0,
       color: Color(0xFFF0F0F0),
     );
@@ -536,9 +568,9 @@ class _ProfileOverviewScreenState extends State<ProfileOverviewScreen> {
       context: context,
       builder: (context) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Text('Log Out'),
+        title: const Text('Sign Out'),
         content: const Text(
-          'Are you sure you want to log out?',
+          'Are you sure you want to sign out?',
           style: TextStyle(color: _DesignColors.textSecondary),
         ),
         actions: [
@@ -548,7 +580,7 @@ class _ProfileOverviewScreenState extends State<ProfileOverviewScreen> {
           ),
           ElevatedButton(
             onPressed: () async {
-              Navigator.pop(context); // Close dialog
+              Navigator.pop(context);
               await FirebaseAuth.instance.signOut();
               if (mounted) {
                 Navigator.of(context).pushReplacementNamed('/login');
@@ -558,7 +590,7 @@ class _ProfileOverviewScreenState extends State<ProfileOverviewScreen> {
               backgroundColor: _DesignColors.error,
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
             ),
-            child: const Text('Log Out', style: TextStyle(color: Colors.white)),
+            child: const Text('Sign Out', style: TextStyle(color: Colors.white)),
           ),
         ],
       ),

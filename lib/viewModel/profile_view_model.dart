@@ -202,7 +202,6 @@ class ProfileViewModel extends ChangeNotifier {
         email: email ?? _profile?.email,
         phone: phone ?? _profile?.phone,
         dob: dob ?? _profile?.dob,
-        gender: gender ?? _profile?.gender,
         city: city ?? _profile?.city,
         state: state ?? _profile?.state,
         country: country ?? _profile?.country,

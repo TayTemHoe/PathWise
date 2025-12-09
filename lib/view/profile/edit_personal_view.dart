@@ -6,7 +6,6 @@ import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:path_wise/viewModel/profile_view_model.dart';
-
 import '../../utils/app_color.dart';
 
 class EditPersonalInfoScreen extends StatefulWidget {
@@ -19,19 +18,23 @@ class EditPersonalInfoScreen extends StatefulWidget {
 class _EditPersonalInfoScreenState extends State<EditPersonalInfoScreen> {
   final _formKey = GlobalKey<FormState>();
 
-  final _nameCtrl = TextEditingController();
-  final _emailCtrl = TextEditingController();
+  // Updated controllers
+  final _firstNameCtrl = TextEditingController();
+  final _lastNameCtrl = TextEditingController();
+  final _emailCtrl = TextEditingController(); // Read-only
   final _phoneCtrl = TextEditingController();
+  final _addressLine1Ctrl = TextEditingController();
+  final _addressLine2Ctrl = TextEditingController();
   final _cityCtrl = TextEditingController();
   final _stateCtrl = TextEditingController();
   final _countryCtrl = TextEditingController();
+  final _zipCodeCtrl = TextEditingController();
 
-  DateTime? _dob;
+  DateTime? _dob; // Read-only
 
   // Define KYYAP Style Colors locally to ensure standalone functionality
   final Color _primaryColor = const Color(0xFF6C63FF);
   final Color _textColor = const Color(0xFF1A1A1A);
-
 
   @override
   void initState() {
@@ -39,24 +42,32 @@ class _EditPersonalInfoScreenState extends State<EditPersonalInfoScreen> {
     final vm = context.read<ProfileViewModel>();
     final p = vm.profile;
     if (p != null) {
-      _nameCtrl.text = p.name ?? '';
+      _firstNameCtrl.text = p.firstName ?? '';
+      _lastNameCtrl.text = p.lastName ?? '';
       _emailCtrl.text = p.email ?? '';
       _phoneCtrl.text = p.phone ?? '';
+      _addressLine1Ctrl.text = p.addressLine1 ?? '';
+      _addressLine2Ctrl.text = p.addressLine2 ?? '';
       _cityCtrl.text = p.city ?? '';
       _stateCtrl.text = p.state ?? '';
       _countryCtrl.text = p.country ?? '';
+      _zipCodeCtrl.text = p.zipCode ?? '';
       _dob = p.dob?.toDate();
     }
   }
 
   @override
   void dispose() {
-    _nameCtrl.dispose();
+    _firstNameCtrl.dispose();
+    _lastNameCtrl.dispose();
     _emailCtrl.dispose();
     _phoneCtrl.dispose();
+    _addressLine1Ctrl.dispose();
+    _addressLine2Ctrl.dispose();
     _cityCtrl.dispose();
     _stateCtrl.dispose();
     _countryCtrl.dispose();
+    _zipCodeCtrl.dispose();
     super.dispose();
   }
 
@@ -131,7 +142,6 @@ class _EditPersonalInfoScreenState extends State<EditPersonalInfoScreen> {
         final p = vm.profile;
 
         return Scaffold(
-          // KYYAP Style: White background
           backgroundColor: Colors.white,
           appBar: AppBar(
             elevation: 0,
@@ -176,8 +186,8 @@ class _EditPersonalInfoScreenState extends State<EditPersonalInfoScreen> {
                             child: (p?.profilePictureUrl == null ||
                                 (p!.profilePictureUrl!.isEmpty))
                                 ? Text(
-                              (p != null && p.name != null && p.name!.isNotEmpty)
-                                  ? p.name!.trim().characters.first.toUpperCase()
+                              (p != null && p.firstName != null && p.firstName!.isNotEmpty)
+                                  ? p.firstName!.trim().characters.first.toUpperCase()
                                   : 'A',
                               style: TextStyle(
                                 fontSize: 32,
@@ -221,22 +231,42 @@ class _EditPersonalInfoScreenState extends State<EditPersonalInfoScreen> {
                   // ===== Basic Information =====
                   _SectionTitle('Basic Information', color: _textColor),
                   const SizedBox(height: 16),
-                  _StyledField(
-                    label: 'Full Name',
-                    controller: _nameCtrl,
-                    validator: (v) => v == null || v.trim().isEmpty ? 'Required' : null,
-                    primaryColor: _primaryColor,
+
+                  // First Name & Last Name (Editable, Required)
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _StyledField(
+                          label: 'First Name',
+                          controller: _firstNameCtrl,
+                          validator: (v) => v == null || v.trim().isEmpty ? 'Required' : null,
+                          primaryColor: _primaryColor,
+                        ),
+                      ),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: _StyledField(
+                          label: 'Last Name',
+                          controller: _lastNameCtrl,
+                          validator: (v) => v == null || v.trim().isEmpty ? 'Required' : null,
+                          primaryColor: _primaryColor,
+                        ),
+                      ),
+                    ],
                   ),
                   const SizedBox(height: 20),
+
+                  // Email (Read-only)
                   _StyledField(
                     label: 'Email Address',
                     controller: _emailCtrl,
-                    keyboardType: TextInputType.emailAddress,
-                    validator: (v) => v == null || v.trim().isEmpty ? 'Required' : null,
+                    enabled: false,
                     primaryColor: _primaryColor,
                     prefixIcon: const Icon(Icons.email_outlined, color: Colors.grey),
                   ),
                   const SizedBox(height: 20),
+
+                  // Phone Number (Editable, Required)
                   _StyledField(
                     label: 'Phone Number',
                     controller: _phoneCtrl,
@@ -246,32 +276,58 @@ class _EditPersonalInfoScreenState extends State<EditPersonalInfoScreen> {
                     prefixIcon: const Icon(Icons.phone_outlined, color: Colors.grey),
                   ),
                   const SizedBox(height: 20),
+
+                  // Date of Birth (Read-only)
                   _StyledDateField(
                     label: 'Date of Birth',
                     value: _dob,
-                    onPick: (d) => setState(() => _dob = d),
+                    onPick: null, // Read-only
                     primaryColor: _primaryColor,
+                    enabled: false,
                   ),
 
                   const SizedBox(height: 32),
 
-                  // ===== Location Information =====
-                  _SectionTitle('Location Information', color: _textColor),
+                  // ===== Address Information =====
+                  _SectionTitle('Address Information', color: _textColor),
                   const SizedBox(height: 16),
+
+                  // Address Line 1 (Required)
                   _StyledField(
-                    label: 'Current City',
+                    label: 'Address Line 1',
+                    controller: _addressLine1Ctrl,
+                    validator: (v) => v == null || v.trim().isEmpty ? 'Required' : null,
+                    primaryColor: _primaryColor,
+                    prefixIcon: const Icon(Icons.home_outlined, color: Colors.grey),
+                  ),
+                  const SizedBox(height: 20),
+
+                  // Address Line 2 (Optional)
+                  _StyledField(
+                    label: 'Address Line 2 (Optional)',
+                    controller: _addressLine2Ctrl,
+                    primaryColor: _primaryColor,
+                    prefixIcon: const Icon(Icons.home_outlined, color: Colors.grey),
+                  ),
+                  const SizedBox(height: 20),
+
+                  // City (Required)
+                  _StyledField(
+                    label: 'City',
                     controller: _cityCtrl,
                     validator: (v) => v == null || v.trim().isEmpty ? 'Required' : null,
                     primaryColor: _primaryColor,
                     prefixIcon: const Icon(Icons.location_city_outlined, color: Colors.grey),
                   ),
                   const SizedBox(height: 20),
+
+                  // State & Zip Code Row
                   Row(
                     children: [
                       Expanded(
                         child: _StyledField(
-                          label: 'Country',
-                          controller: _countryCtrl,
+                          label: 'State/Province',
+                          controller: _stateCtrl,
                           validator: (v) => v == null || v.trim().isEmpty ? 'Required' : null,
                           primaryColor: _primaryColor,
                         ),
@@ -279,18 +335,28 @@ class _EditPersonalInfoScreenState extends State<EditPersonalInfoScreen> {
                       const SizedBox(width: 16),
                       Expanded(
                         child: _StyledField(
-                          label: 'State/Province',
-                          controller: _stateCtrl,
+                          label: 'Zip Code',
+                          controller: _zipCodeCtrl,
+                          validator: (v) => v == null || v.trim().isEmpty ? 'Required' : null,
                           primaryColor: _primaryColor,
                         ),
                       ),
                     ],
                   ),
+                  const SizedBox(height: 20),
+
+                  // Country (Required)
+                  _StyledField(
+                    label: 'Country',
+                    controller: _countryCtrl,
+                    validator: (v) => v == null || v.trim().isEmpty ? 'Required' : null,
+                    primaryColor: _primaryColor,
+                    prefixIcon: const Icon(Icons.flag_outlined, color: Colors.grey),
+                  ),
 
                   const SizedBox(height: 40),
 
-                  // ===== Actions =====
-                  // Save Button styled like KYYAP CustomButton
+                  // ===== Save Button =====
                   SizedBox(
                     width: double.infinity,
                     height: 54,
@@ -301,7 +367,7 @@ class _EditPersonalInfoScreenState extends State<EditPersonalInfoScreen> {
                         if (!_formKey.currentState!.validate()) return;
 
                         final ok = await vm.updatePersonalInfo(
-                          name: _nameCtrl.text.trim(),
+                          name: '${_firstNameCtrl.text.trim()} ${_lastNameCtrl.text.trim()}',
                           phone: _phoneCtrl.text.trim(),
                           dob: _dob != null ? Timestamp.fromDate(_dob!) : null,
                           city: _cityCtrl.text.trim(),
@@ -314,7 +380,7 @@ class _EditPersonalInfoScreenState extends State<EditPersonalInfoScreen> {
                           ScaffoldMessenger.of(context).showSnackBar(
                             const SnackBar(
                               content: Text('Personal information saved'),
-                              backgroundColor: Color(0xFF00B894), // Success green
+                              backgroundColor: Color(0xFF00B894),
                             ),
                           );
                           Navigator.pop(context);
@@ -322,7 +388,7 @@ class _EditPersonalInfoScreenState extends State<EditPersonalInfoScreen> {
                           ScaffoldMessenger.of(context).showSnackBar(
                             SnackBar(
                               content: Text(vm.error ?? 'Failed to save'),
-                              backgroundColor: const Color(0xFFD63031), // Error red
+                              backgroundColor: const Color(0xFFD63031),
                             ),
                           );
                         }
@@ -354,7 +420,7 @@ class _EditPersonalInfoScreenState extends State<EditPersonalInfoScreen> {
   }
 }
 
-// ===== Reusable Components Styled to Match KYYAP =====
+// ===== Reusable Components =====
 
 class _SectionTitle extends StatelessWidget {
   const _SectionTitle(this.title, {required this.color});
@@ -377,7 +443,6 @@ class _SectionTitle extends StatelessWidget {
   }
 }
 
-// Modified to match KYYAP's "CustomTextField" look
 class _StyledField extends StatelessWidget {
   const _StyledField({
     required this.label,
@@ -416,10 +481,13 @@ class _StyledField extends StatelessWidget {
           validator: validator,
           enabled: enabled,
           keyboardType: keyboardType,
-          style: const TextStyle(fontSize: 16, color: Color(0xFF1A1A1A)),
+          style: TextStyle(
+            fontSize: 16,
+            color: enabled ? const Color(0xFF1A1A1A) : Colors.grey[600],
+          ),
           decoration: InputDecoration(
             filled: true,
-            fillColor: Colors.grey[50],
+            fillColor: enabled ? Colors.grey[50] : Colors.grey[100],
             prefixIcon: prefixIcon,
             contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
             border: OutlineInputBorder(
@@ -427,6 +495,10 @@ class _StyledField extends StatelessWidget {
               borderSide: BorderSide(color: Colors.grey[300]!),
             ),
             enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide(color: Colors.grey[300]!),
+            ),
+            disabledBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
               borderSide: BorderSide(color: Colors.grey[300]!),
             ),
@@ -455,12 +527,14 @@ class _StyledDateField extends StatelessWidget {
     required this.value,
     required this.onPick,
     required this.primaryColor,
+    this.enabled = true,
   });
 
   final String label;
   final DateTime? value;
-  final ValueChanged<DateTime> onPick;
+  final ValueChanged<DateTime>? onPick;
   final Color primaryColor;
+  final bool enabled;
 
   @override
   Widget build(BuildContext context) {
@@ -468,36 +542,6 @@ class _StyledDateField extends StatelessWidget {
       text: value == null ? '' : DateFormat('dd/MM/yyyy').format(value!),
     );
 
-    return _StyledField(
-      label: label,
-      controller: ctrl,
-      primaryColor: primaryColor,
-      prefixIcon: const Icon(Icons.calendar_today, color: Colors.grey),
-    ).copyWithTap(
-      onTap: () async {
-        final now = DateTime.now();
-        final picked = await showDatePicker(
-          context: context,
-          initialDate: value ?? DateTime(now.year - 20),
-          firstDate: DateTime(1950),
-          lastDate: now,
-          builder: (context, child) {
-            return Theme(
-              data: Theme.of(context).copyWith(
-                colorScheme: ColorScheme.light(primary: primaryColor),
-              ),
-              child: child!,
-            );
-          },
-        );
-        if (picked != null) onPick(picked);
-      },
-    );
-  }
-}
-
-extension on _StyledField {
-  Widget copyWithTap({required VoidCallback onTap}) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -511,16 +555,39 @@ extension on _StyledField {
         ),
         const SizedBox(height: 8),
         InkWell(
-          onTap: onTap,
+          onTap: enabled && onPick != null
+              ? () async {
+            final now = DateTime.now();
+            final picked = await showDatePicker(
+              context: context,
+              initialDate: value ?? DateTime(now.year - 20),
+              firstDate: DateTime(1950),
+              lastDate: now,
+              builder: (context, child) {
+                return Theme(
+                  data: Theme.of(context).copyWith(
+                    colorScheme: ColorScheme.light(primary: primaryColor),
+                  ),
+                  child: child!,
+                );
+              },
+            );
+            if (picked != null) onPick!(picked);
+          }
+              : null,
           borderRadius: BorderRadius.circular(12),
           child: IgnorePointer(
             child: TextFormField(
-              controller: controller,
-              style: const TextStyle(fontSize: 16, color: Color(0xFF1A1A1A)),
+              controller: ctrl,
+              enabled: enabled,
+              style: TextStyle(
+                fontSize: 16,
+                color: enabled ? const Color(0xFF1A1A1A) : Colors.grey[600],
+              ),
               decoration: InputDecoration(
                 filled: true,
-                fillColor: Colors.grey[50],
-                prefixIcon: prefixIcon,
+                fillColor: enabled ? Colors.grey[50] : Colors.grey[100],
+                prefixIcon: const Icon(Icons.calendar_today, color: Colors.grey),
                 contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
@@ -530,7 +597,7 @@ extension on _StyledField {
                   borderRadius: BorderRadius.circular(12),
                   borderSide: BorderSide(color: Colors.grey[300]!),
                 ),
-                disabledBorder: OutlineInputBorder( // Ensure styled even when disabled/ignored
+                disabledBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
                   borderSide: BorderSide(color: Colors.grey[300]!),
                 ),
