@@ -299,6 +299,24 @@ class ProgramListViewModel extends ChangeNotifier {
     }
   }
 
+  void resetToDefaultMalaysianView() {
+    debugPrint('🇲🇾 Resetting to default Malaysian + ranking view');
+
+    _programs.clear();
+    _currentPage = 0;
+    _hasMore = true;
+    _isLoading = false;
+    _filter = ProgramFilterModel();
+    _isAIFilterActive = false;
+    _isInitialLoad = true;  // ✅ This ensures Malaysian filter is applied
+    _matchedProgramIds = null;
+
+    notifyListeners();
+
+    // Load programs with default Malaysian filter
+    loadPrograms(refresh: false);
+  }
+
   Future<UniversityModel?> getUniversityForProgram(String universityId) async {
     try {
       return await _repository.getUniversityForProgram(universityId);
