@@ -13,6 +13,7 @@ import 'package:path_wise/view/profile/edit_personality_view.dart';
 
 import '../../utils/app_color.dart';
 import 'edit_education_preferences_view.dart';
+import 'edit_interests_view.dart';
 import 'edit_language_preferences_view.dart';
 
 // Defining KYYAP Design Colors locally
@@ -411,6 +412,12 @@ class _ProfileOverviewScreenState extends State<ProfileOverviewScreen> {
             icon: Icons.bolt_outlined,
             title: 'Skills',
             onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const EditSkillsScreen())),
+          ),
+          _buildDivider(),
+          _buildMenuItem(
+            icon: Icons.favorite_outlined,
+            title: 'Interests',
+            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const EditInterestsScreen())),
           ),
           _buildDivider(),
           _buildMenuItem(

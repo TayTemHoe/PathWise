@@ -22,6 +22,7 @@ class EditPersonalityScreenState extends State<EditPersonalityScreen> {
   // MBTI state
   String? _selectedMBTI;
   PersonalityProfile? _lastSyncedProfile;
+  bool _hasUnsavedChanges = false;
 
   // RIASEC state
   final Map<String, double> _riasecScores = {
@@ -43,10 +44,22 @@ class EditPersonalityScreenState extends State<EditPersonalityScreen> {
   };
 
   final List<String> _mbtiTypes = [
-    'ISTJ', 'ISFJ', 'INFJ', 'INTJ',
-    'ISTP', 'ISFP', 'INFP', 'INTP',
-    'ESTP', 'ESFP', 'ENFP', 'ENTP',
-    'ESTJ', 'ESFJ', 'ENFJ', 'ENTJ',
+    'ISTJ',
+    'ISFJ',
+    'INFJ',
+    'INTJ',
+    'ISTP',
+    'ISFP',
+    'INFP',
+    'INTP',
+    'ESTP',
+    'ESFP',
+    'ENFP',
+    'ENTP',
+    'ESTJ',
+    'ESFJ',
+    'ENFJ',
+    'ENTJ',
   ];
 
   bool _isLoading = true;
@@ -63,7 +76,10 @@ class EditPersonalityScreenState extends State<EditPersonalityScreen> {
 
   /// Load personality data from both ProfileViewModel (Firestore) and AIMatchViewModel (SharedPreferences)
   Future<void> _loadPersonalityData() async {
-    setState(() => _isLoading = true);
+    setState(() {
+      _isLoading = false;
+      _hasUnsavedChanges = false; // Add this to reset state
+    });
     try {
       final aiMatchVM = context.read<AIMatchViewModel>();
       // If VM has no data, try loading from disk. Otherwise, we trust the VM's current state.
@@ -97,6 +113,7 @@ class EditPersonalityScreenState extends State<EditPersonalityScreen> {
               _oceanScores.addAll(profile.ocean!);
             }
 
+            _hasUnsavedChanges = false;
             _lastSyncedProfile = profile;
           });
         }
@@ -116,7 +133,8 @@ class EditPersonalityScreenState extends State<EditPersonalityScreen> {
       debugPrint('💾 Saving to Firestore: MBTI=$_selectedMBTI');
       await profileVM.updatePersonality(
         mbti: _selectedMBTI,
-        riasec: null, // We keep this null for now unless serializing map to string
+        riasec:
+            null, // We keep this null for now unless serializing map to string
       );
 
       // 2. Update AIMatchViewModel (Memory + SharedPrefs)
@@ -138,6 +156,7 @@ class EditPersonalityScreenState extends State<EditPersonalityScreen> {
       await aiMatchVM.saveProgress();
 
       if (mounted) {
+        setState(() => _hasUnsavedChanges = false);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: const Row(
@@ -168,53 +187,104 @@ class EditPersonalityScreenState extends State<EditPersonalityScreen> {
     }
   }
 
+  Future<bool> _onWillPop() async {
+    if (!_hasUnsavedChanges) return true;
+
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text('Unsaved Changes'),
+        content: const Text(
+          'You have unsaved changes. Do you want to discard them?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red[700],
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('Discard'),
+          ),
+        ],
+      ),
+    );
+
+    return result ?? false;
+  }
+
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.white,
-      appBar: AppBar(
-        elevation: 0,
+    // 1. Wrap Scaffold in WillPopScope
+    return WillPopScope(
+      onWillPop: _onWillPop,
+      child: Scaffold(
         backgroundColor: Colors.white,
-        centerTitle: true,
-        leading: IconButton(
-          icon: const Icon(
-              Icons.arrow_back_ios, color: AppColors.textPrimary, size: 20),
-          onPressed: () => Navigator.pop(context),
-        ),
-        title: Text(
-          'Personality Tests',
-          style: TextStyle(
-            color: _textColor,
-            fontWeight: FontWeight.bold,
-            fontSize: 20,
+        appBar: AppBar(
+          elevation: 0,
+          backgroundColor: Colors.white,
+          centerTitle: true,
+          leading: IconButton(
+            icon: const Icon(
+              Icons.arrow_back_ios,
+              color: AppColors.textPrimary,
+              size: 20,
+            ),
+            // 2. Update the back button logic
+            onPressed: () async {
+              if (await _onWillPop()) {
+                if (mounted) Navigator.pop(context);
+              }
+            },
+          ),
+          title: Text(
+            'Personality Insight',
+            style: TextStyle(
+              color: _textColor,
+              fontWeight: FontWeight.bold,
+              fontSize: 20,
+            ),
           ),
         ),
-      ),
-      // MODIFY: Wrap body in Consumer to listen for updates
-      body: Consumer<AIMatchViewModel>(
-        builder: (context, aiMatchVM, child) {
-          // Check for updates every time the ViewModel notifies listeners
-          _syncFromViewModel(aiMatchVM.personalityProfile);
+        // ... existing body code (Consumer, Column, etc.)
+        body: Consumer<AIMatchViewModel>(
+          builder: (context, aiMatchVM, child) {
+            // Check for updates every time the ViewModel notifies listeners
+            _syncFromViewModel(aiMatchVM.personalityProfile);
 
-          if (_isLoading) {
-            return const Center(child: CircularProgressIndicator());
-          }
+            if (_isLoading) {
+              return const Center(child: CircularProgressIndicator());
+            }
 
-          return ListView(
-            padding: const EdgeInsets.all(16),
-            children: [
-              _buildInfoCard(),
-              const SizedBox(height: 20),
-              _buildMBTISection(),
-              const SizedBox(height: 20),
-              _buildRIASECSection(),
-              const SizedBox(height: 20),
-              _buildBigFiveSection(),
-              const SizedBox(height: 32),
-              _buildSaveButton(),
-            ],
-          );
-        },
+            return Column(
+              children: [
+                Expanded(
+                  child: ListView(
+                    padding: const EdgeInsets.all(16),
+                    children: [
+                      _buildInfoCard(),
+                      const SizedBox(height: 20),
+                      _buildMBTISection(),
+                      const SizedBox(height: 20),
+                      _buildRIASECSection(),
+                      const SizedBox(height: 20),
+                      _buildBigFiveSection(),
+                      const SizedBox(height: 20),
+                      // Remove _buildSaveButton() from here
+                    ],
+                  ),
+                ),
+                // Move it here, conditioned on state
+                if (_hasUnsavedChanges) _buildSaveButton(),
+              ],
+            );
+          },
+        ),
       ),
     );
   }
@@ -280,7 +350,11 @@ class EditPersonalityScreenState extends State<EditPersonalityScreen> {
                       color: Colors.purple[600],
                       borderRadius: BorderRadius.circular(10),
                     ),
-                    child: const Icon(Icons.psychology_rounded, color: Colors.white, size: 28),
+                    child: const Icon(
+                      Icons.psychology_rounded,
+                      color: Colors.white,
+                      size: 28,
+                    ),
                   ),
                   const SizedBox(width: 16),
                   Expanded(
@@ -289,17 +363,28 @@ class EditPersonalityScreenState extends State<EditPersonalityScreen> {
                       children: [
                         Text(
                           'Take 16 Personalities Test',
-                          style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.purple[900]),
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.purple[900],
+                          ),
                         ),
                         const SizedBox(height: 4),
                         Text(
                           'Discover your personality type • 10-15 min',
-                          style: TextStyle(fontSize: 13, color: Colors.purple[700]),
+                          style: TextStyle(
+                            fontSize: 13,
+                            color: Colors.purple[700],
+                          ),
                         ),
                       ],
                     ),
                   ),
-                  Icon(Icons.arrow_forward_ios_rounded, color: Colors.purple[600], size: 20),
+                  Icon(
+                    Icons.arrow_forward_ios_rounded,
+                    color: Colors.purple[600],
+                    size: 20,
+                  ),
                 ],
               ),
             ),
@@ -313,7 +398,14 @@ class EditPersonalityScreenState extends State<EditPersonalityScreen> {
               Expanded(child: Divider(color: Colors.grey[300])),
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 12),
-                child: Text('OR', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.grey[600])),
+                child: Text(
+                  'OR',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.grey[600],
+                  ),
+                ),
               ),
               Expanded(child: Divider(color: Colors.grey[300])),
             ],
@@ -323,6 +415,7 @@ class EditPersonalityScreenState extends State<EditPersonalityScreen> {
 
           // Option 2: Manual selection
           DropdownButtonFormField<String>(
+            isExpanded: true,
             value: _selectedMBTI,
             decoration: InputDecoration(
               labelText: 'Select Your MBTI Type',
@@ -346,7 +439,10 @@ class EditPersonalityScreenState extends State<EditPersonalityScreen> {
               return DropdownMenuItem(value: type, child: Text(type));
             }).toList(),
             onChanged: (value) {
-              setState(() => _selectedMBTI = value);
+              setState(() {
+                _selectedMBTI = value;
+                _hasUnsavedChanges = true; // Add this
+              });
             },
           ),
 
@@ -364,7 +460,11 @@ class EditPersonalityScreenState extends State<EditPersonalityScreen> {
                   const SizedBox(width: 8),
                   Text(
                     'Selected: $_selectedMBTI',
-                    style: TextStyle(color: Colors.purple[900], fontWeight: FontWeight.w500, fontSize: 13),
+                    style: TextStyle(
+                      color: Colors.purple[900],
+                      fontWeight: FontWeight.w500,
+                      fontSize: 13,
+                    ),
                   ),
                 ],
               ),
@@ -399,7 +499,9 @@ class EditPersonalityScreenState extends State<EditPersonalityScreen> {
             child: Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                gradient: LinearGradient(colors: [Colors.blue[100]!, Colors.blue[50]!]),
+                gradient: LinearGradient(
+                  colors: [Colors.blue[100]!, Colors.blue[50]!],
+                ),
                 borderRadius: BorderRadius.circular(12),
                 border: Border.all(color: Colors.blue[300]!, width: 2),
               ),
@@ -407,21 +509,45 @@ class EditPersonalityScreenState extends State<EditPersonalityScreen> {
                 children: [
                   Container(
                     padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(color: Colors.blue[600], borderRadius: BorderRadius.circular(10)),
-                    child: const Icon(Icons.work_outline_rounded, color: Colors.white, size: 28),
+                    decoration: BoxDecoration(
+                      color: Colors.blue[600],
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: const Icon(
+                      Icons.work_outline_rounded,
+                      color: Colors.white,
+                      size: 28,
+                    ),
                   ),
                   const SizedBox(width: 16),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text('Take RIASEC Test', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.blue[900])),
+                        Text(
+                          'Take RIASEC Test',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.blue[900],
+                          ),
+                        ),
                         const SizedBox(height: 4),
-                        Text('Discover your career interests • 10-15 min', style: TextStyle(fontSize: 13, color: Colors.blue[700])),
+                        Text(
+                          'Discover your career interests • 10-15 min',
+                          style: TextStyle(
+                            fontSize: 13,
+                            color: Colors.blue[700],
+                          ),
+                        ),
                       ],
                     ),
                   ),
-                  Icon(Icons.arrow_forward_ios_rounded, color: Colors.blue[600], size: 20),
+                  Icon(
+                    Icons.arrow_forward_ios_rounded,
+                    color: Colors.blue[600],
+                    size: 20,
+                  ),
                 ],
               ),
             ),
@@ -434,7 +560,14 @@ class EditPersonalityScreenState extends State<EditPersonalityScreen> {
               Expanded(child: Divider(color: Colors.grey[300])),
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 12),
-                child: Text('OR', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.grey[600])),
+                child: Text(
+                  'OR',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.grey[600],
+                  ),
+                ),
               ),
               Expanded(child: Divider(color: Colors.grey[300])),
             ],
@@ -442,7 +575,10 @@ class EditPersonalityScreenState extends State<EditPersonalityScreen> {
 
           const SizedBox(height: 16),
 
-          Text('Adjust sliders manually (0.0 - 1.0)', style: TextStyle(fontSize: 12, color: Colors.grey[600])),
+          Text(
+            'Adjust sliders manually (0.0 - 1.0)',
+            style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+          ),
           const SizedBox(height: 20),
 
           ...labels.entries.map((entry) {
@@ -453,7 +589,10 @@ class EditPersonalityScreenState extends State<EditPersonalityScreen> {
                 label: entry.value,
                 value: _riasecScores[entry.key]!,
                 color: Colors.blue,
-                onChanged: (value) => setState(() => _riasecScores[entry.key] = value),
+                onChanged: (value) {
+                  setState(() => _riasecScores[entry.key] = value);
+                  _markAsChanged();
+                },
               ),
             );
           }),
@@ -476,7 +615,9 @@ class EditPersonalityScreenState extends State<EditPersonalityScreen> {
             child: Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                gradient: LinearGradient(colors: [Colors.teal[100]!, Colors.teal[50]!]),
+                gradient: LinearGradient(
+                  colors: [Colors.teal[100]!, Colors.teal[50]!],
+                ),
                 borderRadius: BorderRadius.circular(12),
                 border: Border.all(color: Colors.teal[300]!, width: 2),
               ),
@@ -484,21 +625,45 @@ class EditPersonalityScreenState extends State<EditPersonalityScreen> {
                 children: [
                   Container(
                     padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(color: Colors.teal[600], borderRadius: BorderRadius.circular(10)),
-                    child: const Icon(Icons.psychology_rounded, color: Colors.white, size: 28),
+                    decoration: BoxDecoration(
+                      color: Colors.teal[600],
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: const Icon(
+                      Icons.psychology_rounded,
+                      color: Colors.white,
+                      size: 28,
+                    ),
                   ),
                   const SizedBox(width: 16),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text('Take Big Five Test', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.teal[900])),
+                        Text(
+                          'Take Big Five Test',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.teal[900],
+                          ),
+                        ),
                         const SizedBox(height: 4),
-                        Text('Comprehensive personality assessment • 15-20 min', style: TextStyle(fontSize: 13, color: Colors.teal[700])),
+                        Text(
+                          'Comprehensive personality assessment • 15-20 min',
+                          style: TextStyle(
+                            fontSize: 13,
+                            color: Colors.teal[700],
+                          ),
+                        ),
                       ],
                     ),
                   ),
-                  Icon(Icons.arrow_forward_ios_rounded, color: Colors.teal[600], size: 20),
+                  Icon(
+                    Icons.arrow_forward_ios_rounded,
+                    color: Colors.teal[600],
+                    size: 20,
+                  ),
                 ],
               ),
             ),
@@ -511,7 +676,14 @@ class EditPersonalityScreenState extends State<EditPersonalityScreen> {
               Expanded(child: Divider(color: Colors.grey[300])),
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 12),
-                child: Text('OR', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.grey[600])),
+                child: Text(
+                  'OR',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.grey[600],
+                  ),
+                ),
               ),
               Expanded(child: Divider(color: Colors.grey[300])),
             ],
@@ -519,7 +691,10 @@ class EditPersonalityScreenState extends State<EditPersonalityScreen> {
 
           const SizedBox(height: 16),
 
-          Text('Adjust sliders manually (0.0 - 1.0)', style: TextStyle(fontSize: 12, color: Colors.grey[600])),
+          Text(
+            'Adjust sliders manually (0.0 - 1.0)',
+            style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+          ),
           const SizedBox(height: 20),
 
           ...{
@@ -536,13 +711,22 @@ class EditPersonalityScreenState extends State<EditPersonalityScreen> {
                 label: entry.value,
                 value: _oceanScores[entry.key]!,
                 color: Colors.teal,
-                onChanged: (value) => setState(() => _oceanScores[entry.key] = value),
+                onChanged: (value) {
+                  setState(() => _oceanScores[entry.key] = value);
+                  _markAsChanged();
+                },
               ),
             );
           }),
         ],
       ),
     );
+  }
+
+  void _markAsChanged() {
+    if (!_hasUnsavedChanges) {
+      setState(() => _hasUnsavedChanges = true);
+    }
   }
 
   Widget _buildSectionCard({
@@ -558,7 +742,11 @@ class EditPersonalityScreenState extends State<EditPersonalityScreen> {
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: Colors.grey[300]!),
         boxShadow: [
-          BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 8, offset: const Offset(0, 2)),
+          BoxShadow(
+            color: Colors.black.withOpacity(0.04),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
         ],
       ),
       child: Column(
@@ -568,14 +756,21 @@ class EditPersonalityScreenState extends State<EditPersonalityScreen> {
             children: [
               Container(
                 padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(color: color.withOpacity(0.1), borderRadius: BorderRadius.circular(10)),
+                decoration: BoxDecoration(
+                  color: color.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(10),
+                ),
                 child: Icon(icon, color: color, size: 24),
               ),
               const SizedBox(width: 12),
               Expanded(
                 child: Text(
                   title,
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: color),
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: color,
+                  ),
                 ),
               ),
             ],
@@ -609,16 +804,30 @@ class EditPersonalityScreenState extends State<EditPersonalityScreen> {
                   Container(
                     width: 32,
                     height: 32,
-                    decoration: BoxDecoration(color: color.withOpacity(0.1), borderRadius: BorderRadius.circular(8)),
+                    decoration: BoxDecoration(
+                      color: color.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
                     child: Center(
-                      child: Text(key, style: TextStyle(fontWeight: FontWeight.bold, color: color, fontSize: 14)),
+                      child: Text(
+                        key,
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          color: color,
+                          fontSize: 14,
+                        ),
+                      ),
                     ),
                   ),
                   const SizedBox(width: 12),
                   Expanded(
                     child: Text(
                       label,
-                      style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500, color: AppColors.textPrimary),
+                      style: const TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w500,
+                        color: AppColors.textPrimary,
+                      ),
                       overflow: TextOverflow.ellipsis,
                     ),
                   ),
@@ -627,13 +836,26 @@ class EditPersonalityScreenState extends State<EditPersonalityScreen> {
             ),
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-              decoration: BoxDecoration(color: color.withOpacity(0.1), borderRadius: BorderRadius.circular(8)),
+              decoration: BoxDecoration(
+                color: color.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(8),
+              ),
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Text(formattedValue, style: TextStyle(fontWeight: FontWeight.bold, color: color, fontSize: 14)),
+                  Text(
+                    formattedValue,
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      color: color,
+                      fontSize: 14,
+                    ),
+                  ),
                   const SizedBox(width: 4),
-                  Text('($percentage)', style: TextStyle(fontSize: 11, color: color)),
+                  Text(
+                    '($percentage)',
+                    style: TextStyle(fontSize: 11, color: color),
+                  ),
                 ],
               ),
             ),
@@ -648,35 +870,83 @@ class EditPersonalityScreenState extends State<EditPersonalityScreen> {
             overlayColor: color.withOpacity(0.2),
             trackHeight: 6,
           ),
-          child: Slider(value: value, min: 0.0, max: 1.0, divisions: 100, onChanged: onChanged),
+          child: Slider(
+            value: value,
+            min: 0.0,
+            max: 1.0,
+            divisions: 100,
+            onChanged: onChanged,
+          ),
         ),
       ],
     );
   }
 
   Widget _buildSaveButton() {
-    return SizedBox(
-      width: double.infinity,
-      child: ElevatedButton(
-        onPressed: _isSaving ? null : _savePersonalityData,
-        style: ElevatedButton.styleFrom(
-          backgroundColor: AppColors.primary,
-          foregroundColor: Colors.white,
-          padding: const EdgeInsets.symmetric(vertical: 16),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-          elevation: 2,
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.transparent,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.08),
+            blurRadius: 20,
+            offset: const Offset(0, -4),
+          ),
+        ],
+      ),
+      child: SafeArea(
+        top: false,
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: SizedBox(
+            width: double.infinity,
+            child: ElevatedButton(
+              onPressed: _isSaving ? null : _savePersonalityData,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primary,
+                foregroundColor: Colors.white,
+                disabledBackgroundColor: Colors.grey[300],
+                disabledForegroundColor: Colors.grey[500],
+                padding: const EdgeInsets.symmetric(vertical: 16),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                elevation: 2,
+              ),
+              child: _isSaving
+                  ? const SizedBox(
+                      height: 20,
+                      width: 20,
+                      child: CircularProgressIndicator(
+                        color: Colors.white,
+                        strokeWidth: 2,
+                      ),
+                    )
+                  : const Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.save_rounded, size: 20),
+                        SizedBox(width: 8),
+                        Text(
+                          'Save Personality Data',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ],
+                    ),
+            ),
+          ),
         ),
-        child: _isSaving
-            ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
-            : const Text('Save Personality Data', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
       ),
     );
   }
 
   Future<void> _navigateToMBTITest(BuildContext context) async {
-    await Navigator.of(context).push(
-        MaterialPageRoute(builder: (context) => const MBTITestScreen())
-    );
+    await Navigator.of(
+      context,
+    ).push(MaterialPageRoute(builder: (context) => const MBTITestScreen()));
 
     if (mounted) {
       _lastSyncedProfile = null; // Force UI refresh
@@ -686,9 +956,9 @@ class EditPersonalityScreenState extends State<EditPersonalityScreen> {
   }
 
   Future<void> _navigateToRiasecTest(BuildContext context) async {
-    await Navigator.of(context).push(
-        MaterialPageRoute(builder: (context) => const RiasecTestScreen())
-    );
+    await Navigator.of(
+      context,
+    ).push(MaterialPageRoute(builder: (context) => const RiasecTestScreen()));
 
     if (mounted) {
       _lastSyncedProfile = null;
@@ -698,9 +968,9 @@ class EditPersonalityScreenState extends State<EditPersonalityScreen> {
   }
 
   Future<void> _navigateToBigFiveTest(BuildContext context) async {
-    await Navigator.of(context).push(
-        MaterialPageRoute(builder: (context) => const BigFiveTestScreen())
-    );
+    await Navigator.of(
+      context,
+    ).push(MaterialPageRoute(builder: (context) => const BigFiveTestScreen()));
 
     if (mounted) {
       _lastSyncedProfile = null;

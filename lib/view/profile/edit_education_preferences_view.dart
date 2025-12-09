@@ -306,25 +306,32 @@ class _EditEducationPreferencesScreenState extends State<EditEducationPreference
           ),
         ),
         body: _isLoading
-            ? Center(child: CircularProgressIndicator())
-            : SingleChildScrollView(
-          padding: const EdgeInsets.all(20),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _buildInfoCard(),
-              SizedBox(height: 24),
-              _buildAcademicSection(),
-              SizedBox(height: 20),
-              _buildRankingSection(),
-              SizedBox(height: 20),
-              _buildLocationSection(),
-              SizedBox(height: 20),
-              _buildFinancialSection(),
-              SizedBox(height: 32),
-              _buildSaveButton(),
-            ],
-          ),
+            ? const Center(child: CircularProgressIndicator())
+            : Column(
+          children: [
+            Expanded(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.all(20),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _buildInfoCard(),
+                    const SizedBox(height: 24),
+                    _buildAcademicSection(),
+                    const SizedBox(height: 20),
+                    _buildRankingSection(),
+                    const SizedBox(height: 20),
+                    _buildLocationSection(),
+                    const SizedBox(height: 20),
+                    _buildFinancialSection(),
+                    const SizedBox(height: 20), // Add padding for scrolling space
+                  ],
+                ),
+              ),
+            ),
+            // Only show button if there are changes (Sticky Bottom)
+            if (_hasChanges) _buildSaveButton(),
+          ],
         ),
       ),
     );
@@ -659,31 +666,63 @@ class _EditEducationPreferencesScreenState extends State<EditEducationPreference
   }
 
   Widget _buildSaveButton() {
-    return SizedBox(
-      width: double.infinity,
-      child: ElevatedButton(
-        onPressed: _isSaving || !_hasChanges ? null : _savePreferences,
-        style: ElevatedButton.styleFrom(
-          backgroundColor: AppColors.primary,
-          foregroundColor: Colors.white,
-          padding: EdgeInsets.symmetric(vertical: 16),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.transparent,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.08),
+            blurRadius: 20,
+            offset: const Offset(0, -4),
           ),
-          elevation: _hasChanges ? 2 : 0,
-        ),
-        child: _isSaving
-            ? SizedBox(
-          height: 20,
-          width: 20,
-          child: CircularProgressIndicator(
-            color: Colors.white,
-            strokeWidth: 2,
+        ],
+      ),
+      child: SafeArea(
+        top: false,
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: SizedBox(
+            width: double.infinity,
+            child: ElevatedButton(
+              // Logic remains the same, styling is updated
+              onPressed: _isSaving ? null : _savePreferences,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primary,
+                foregroundColor: Colors.white,
+                disabledBackgroundColor: Colors.grey[300],
+                disabledForegroundColor: Colors.grey[500],
+                padding: const EdgeInsets.symmetric(vertical: 16),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                elevation: 2,
+              ),
+              child: _isSaving
+                  ? const SizedBox(
+                height: 20,
+                width: 20,
+                child: CircularProgressIndicator(
+                  color: Colors.white,
+                  strokeWidth: 2,
+                ),
+              )
+                  : const Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.save_rounded, size: 20),
+                  SizedBox(width: 8),
+                  Text(
+                    'Save Preferences',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      letterSpacing: 0.3,
+                    ),
+                  ),
+                ],
+              ),
+            ),
           ),
-        )
-            : Text(
-          _hasChanges ? 'Save Preferences' : 'No Changes to Save',
-          style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
         ),
       ),
     );
