@@ -85,7 +85,7 @@ class _BigFiveResultScreenState extends State<BigFiveResultScreen>
                 onPressed: () => Navigator.of(context).pop(true),
               ),
               title: const Text(
-                'Big Five Results',
+                'Big Five (OCEAN) Results',
                 style: TextStyle(
                   color: AppColors.textPrimary,
                   fontSize: 18,

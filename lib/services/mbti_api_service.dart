@@ -4,6 +4,7 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 
+import '../config/api_config.dart';
 import '../model/mbti.dart';
 
 class MBTIApiService {
@@ -13,7 +14,7 @@ class MBTIApiService {
   //Android Emulator used: http://10.0.2.2:8000
   //Physical Android Device (Wi-Fi) used: http://192.168.0.11:8000
   //Physical Android Device (ADB Reverse) used:	http://localhost:8000 (after running adb reverse tcp:8000 tcp:8000)
-  static const String baseUrl = 'http://192.168.0.11:8000';
+  static const String baseUrl = ApiConfig.baseUrl;
 
   // Cache for questions to avoid repeated API calls
   List<MBTIQuestion>? _cachedQuestions;

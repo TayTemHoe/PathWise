@@ -1,8 +1,9 @@
 // lib/view/mbti_result_screen.dart
 
 import 'package:flutter/material.dart';
+import 'package:flutter_svg_provider/flutter_svg_provider.dart';
 import 'package:provider/provider.dart';
-import 'package:flutter_svg/flutter_svg.dart';
+import 'package:webview_flutter/webview_flutter.dart';
 import '../services/share_service.dart';
 import '../utils/app_color.dart';
 import '../viewModel/mbti_test_view_model.dart';
@@ -97,7 +98,7 @@ class _MBTIResultScreenState extends State<MBTIResultScreen>
                 onPressed: () => Navigator.of(context).pop(true),
               ),
               title: const Text(
-                'Personality Results',
+                'MBTI Results',
                 style: TextStyle(
                   color: AppColors.textPrimary,
                   fontSize: 18,
@@ -164,16 +165,11 @@ class _MBTIResultScreenState extends State<MBTIResultScreen>
                           shape: BoxShape.circle,
                         ),
                         child: ClipOval(
-                          child: SvgPicture.network(
-                            result.avatarSrcStatic,
-                            fit: BoxFit.cover,
-                            placeholderBuilder: (context) => Center(
-                              child: CircularProgressIndicator(
-                                valueColor: AlwaysStoppedAnimation<Color>(
-                                  AppColors.primary,
-                                ),
-                              ),
-                            ),
+                          child: WebViewWidget(
+                            controller: WebViewController()
+                              ..setJavaScriptMode(JavaScriptMode.unrestricted)
+                              ..setBackgroundColor(Colors.transparent)
+                              ..loadRequest(Uri.parse(result.avatarSrcStatic)),
                           ),
                         ),
                       ),

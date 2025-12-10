@@ -88,7 +88,7 @@ class _RiasecResultScreenState extends State<RiasecResultScreen>
                 onPressed: () => Navigator.of(context).pop(true),
               ),
               title: const Text(
-                'RIASEC Results',
+                'RIASEC / Holland Code Results',
                 style: TextStyle(
                   color: AppColors.textPrimary,
                   fontSize: 18,
