@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
@@ -69,6 +70,70 @@ class _EditPersonalInfoScreenState extends State<EditPersonalInfoScreen> {
     _countryCtrl.dispose();
     _zipCodeCtrl.dispose();
     super.dispose();
+  }
+
+  // Validation Methods
+  String? _validateName(String? value, String fieldName) {
+    if (value == null || value.trim().isEmpty) {
+      return '$fieldName is required';
+    }
+    // Only allow letters and spaces
+    if (!RegExp(r'^[a-zA-Z\s]+$').hasMatch(value)) {
+      return 'Only letters are allowed';
+    }
+    return null;
+  }
+
+  String? _validatePhone(String? value) {
+    if (value == null || value.trim().isEmpty) {
+      return 'Phone number is required';
+    }
+    // Remove any spaces
+    final cleanValue = value.replaceAll(' ', '');
+    // Only allow numbers
+    if (!RegExp(r'^[0-9]+$').hasMatch(cleanValue)) {
+      return 'Only numbers are allowed';
+    }
+    // Check length (6-10 digits)
+    if (cleanValue.length < 6 || cleanValue.length > 10) {
+      return 'Phone must be 6-10 digits';
+    }
+    return null;
+  }
+
+  String? _validateZipCode(String? value) {
+    if (value == null || value.trim().isEmpty) {
+      return 'Zip code is required';
+    }
+    // Only allow numbers
+    if (!RegExp(r'^[0-9]+$').hasMatch(value)) {
+      return 'Only numbers are allowed';
+    }
+    // Must be exactly 5 digits
+    if (value.length != 5) {
+      return 'Zip code must be 5 digits';
+    }
+    return null;
+  }
+
+  String? _validateCity(String? value) {
+    if (value == null || value.trim().isEmpty) {
+      return 'City is required';
+    }
+    // Only allow letters and spaces
+    if (!RegExp(r'^[a-zA-Z\s]+$').hasMatch(value)) {
+      return 'Only letters are allowed';
+    }
+    return null;
+  }
+
+  String? _validateAddress(String? value, bool isRequired) {
+    if (isRequired && (value == null || value.trim().isEmpty)) {
+      return 'Address is required';
+    }
+    // Address can contain letters, numbers, spaces, and common special characters
+    // This allows alphanumeric plus common address characters like , . - # /
+    return null;
   }
 
   Future<void> _pickAndUploadPhoto(ProfileViewModel vm) async {
@@ -232,15 +297,18 @@ class _EditPersonalInfoScreenState extends State<EditPersonalInfoScreen> {
                   _SectionTitle('Basic Information', color: _textColor),
                   const SizedBox(height: 16),
 
-                  // First Name & Last Name (Editable, Required)
+                  // First Name & Last Name (Editable, Required, Letters only)
                   Row(
                     children: [
                       Expanded(
                         child: _StyledField(
                           label: 'First Name',
                           controller: _firstNameCtrl,
-                          validator: (v) => v == null || v.trim().isEmpty ? 'Required' : null,
+                          validator: (v) => _validateName(v, 'First name'),
                           primaryColor: _primaryColor,
+                          inputFormatters: [
+                            FilteringTextInputFormatter.allow(RegExp(r'[a-zA-Z\s]')),
+                          ],
                         ),
                       ),
                       const SizedBox(width: 16),
@@ -248,8 +316,11 @@ class _EditPersonalInfoScreenState extends State<EditPersonalInfoScreen> {
                         child: _StyledField(
                           label: 'Last Name',
                           controller: _lastNameCtrl,
-                          validator: (v) => v == null || v.trim().isEmpty ? 'Required' : null,
+                          validator: (v) => _validateName(v, 'Last name'),
                           primaryColor: _primaryColor,
+                          inputFormatters: [
+                            FilteringTextInputFormatter.allow(RegExp(r'[a-zA-Z\s]')),
+                          ],
                         ),
                       ),
                     ],
@@ -266,14 +337,18 @@ class _EditPersonalInfoScreenState extends State<EditPersonalInfoScreen> {
                   ),
                   const SizedBox(height: 20),
 
-                  // Phone Number (Editable, Required)
+                  // Phone Number (Editable, Required, Numbers only, 6-10 digits)
                   _StyledField(
                     label: 'Phone Number',
                     controller: _phoneCtrl,
                     keyboardType: TextInputType.phone,
-                    validator: (v) => v == null || v.trim().isEmpty ? 'Required' : null,
+                    validator: _validatePhone,
                     primaryColor: _primaryColor,
                     prefixIcon: const Icon(Icons.phone_outlined, color: Colors.grey),
+                    inputFormatters: [
+                      FilteringTextInputFormatter.digitsOnly,
+                      LengthLimitingTextInputFormatter(10),
+                    ],
                   ),
                   const SizedBox(height: 20),
 
@@ -292,32 +367,36 @@ class _EditPersonalInfoScreenState extends State<EditPersonalInfoScreen> {
                   _SectionTitle('Address Information', color: _textColor),
                   const SizedBox(height: 16),
 
-                  // Address Line 1 (Required)
+                  // Address Line 1 (Required, allows letters, numbers, special chars)
                   _StyledField(
                     label: 'Address Line 1',
                     controller: _addressLine1Ctrl,
-                    validator: (v) => v == null || v.trim().isEmpty ? 'Required' : null,
+                    validator: (v) => _validateAddress(v, true),
                     primaryColor: _primaryColor,
                     prefixIcon: const Icon(Icons.home_outlined, color: Colors.grey),
                   ),
                   const SizedBox(height: 20),
 
-                  // Address Line 2 (Optional)
+                  // Address Line 2 (Optional, allows letters, numbers, special chars)
                   _StyledField(
                     label: 'Address Line 2 (Optional)',
                     controller: _addressLine2Ctrl,
+                    validator: (v) => _validateAddress(v, false),
                     primaryColor: _primaryColor,
                     prefixIcon: const Icon(Icons.home_outlined, color: Colors.grey),
                   ),
                   const SizedBox(height: 20),
 
-                  // City (Required)
+                  // City (Required, Letters only)
                   _StyledField(
                     label: 'City',
                     controller: _cityCtrl,
-                    validator: (v) => v == null || v.trim().isEmpty ? 'Required' : null,
+                    validator: _validateCity,
                     primaryColor: _primaryColor,
                     prefixIcon: const Icon(Icons.location_city_outlined, color: Colors.grey),
+                    inputFormatters: [
+                      FilteringTextInputFormatter.allow(RegExp(r'[a-zA-Z\s]')),
+                    ],
                   ),
                   const SizedBox(height: 20),
 
@@ -328,8 +407,11 @@ class _EditPersonalInfoScreenState extends State<EditPersonalInfoScreen> {
                         child: _StyledField(
                           label: 'State/Province',
                           controller: _stateCtrl,
-                          validator: (v) => v == null || v.trim().isEmpty ? 'Required' : null,
+                          validator: (v) => _validateName(v, 'State'),
                           primaryColor: _primaryColor,
+                          inputFormatters: [
+                            FilteringTextInputFormatter.allow(RegExp(r'[a-zA-Z\s]')),
+                          ],
                         ),
                       ),
                       const SizedBox(width: 16),
@@ -337,21 +419,29 @@ class _EditPersonalInfoScreenState extends State<EditPersonalInfoScreen> {
                         child: _StyledField(
                           label: 'Zip Code',
                           controller: _zipCodeCtrl,
-                          validator: (v) => v == null || v.trim().isEmpty ? 'Required' : null,
+                          validator: _validateZipCode,
                           primaryColor: _primaryColor,
+                          keyboardType: TextInputType.number,
+                          inputFormatters: [
+                            FilteringTextInputFormatter.digitsOnly,
+                            LengthLimitingTextInputFormatter(5),
+                          ],
                         ),
                       ),
                     ],
                   ),
                   const SizedBox(height: 20),
 
-                  // Country (Required)
+                  // Country (Required, Letters only)
                   _StyledField(
                     label: 'Country',
                     controller: _countryCtrl,
-                    validator: (v) => v == null || v.trim().isEmpty ? 'Required' : null,
+                    validator: (v) => _validateName(v, 'Country'),
                     primaryColor: _primaryColor,
                     prefixIcon: const Icon(Icons.flag_outlined, color: Colors.grey),
+                    inputFormatters: [
+                      FilteringTextInputFormatter.allow(RegExp(r'[a-zA-Z\s]')),
+                    ],
                   ),
 
                   const SizedBox(height: 40),
@@ -456,6 +546,7 @@ class _StyledField extends StatelessWidget {
     this.validator,
     this.enabled = true,
     this.prefixIcon,
+    this.inputFormatters,
   });
 
   final String label;
@@ -465,6 +556,7 @@ class _StyledField extends StatelessWidget {
   final bool enabled;
   final Color primaryColor;
   final Widget? prefixIcon;
+  final List<TextInputFormatter>? inputFormatters;
 
   @override
   Widget build(BuildContext context) {
@@ -485,6 +577,7 @@ class _StyledField extends StatelessWidget {
           validator: validator,
           enabled: enabled,
           keyboardType: keyboardType,
+          inputFormatters: inputFormatters,
           style: TextStyle(
             fontSize: 16,
             color: enabled ? const Color(0xFF1A1A1A) : Colors.grey[600],
