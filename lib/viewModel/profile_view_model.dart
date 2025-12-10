@@ -105,6 +105,10 @@ class ProfileViewModel extends ChangeNotifier {
 
   // ------------- Loaders -------------
   Future<void> loadAll() async {
+    if (uid.isEmpty) {
+      debugPrint('⚠️ ProfileViewModel: loadAll skipped - No User ID');
+      return;
+    }
     debugPrint('🔄 ProfileViewModel: Starting loadAll() for uid=$uid');
     _setLoading(true);
     _setError(null);

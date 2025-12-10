@@ -93,7 +93,9 @@ Future<void> main() async {
     // Initialize three-layer architecture (SQLite + Sync)
     await AppInitializationService.instance.initialize(
       onProgress: (message, progress) {
-        debugPrint('📊 Init Progress: $message (${(progress * 100).toStringAsFixed(0)}%)');
+        debugPrint(
+          '📊 Init Progress: $message (${(progress * 100).toStringAsFixed(0)}%)',
+        );
       },
     );
     debugPrint('✅ Three-layer architecture initialized');
@@ -132,7 +134,7 @@ Future<void> main() async {
         ChangeNotifierProvider(create: (_) => AIMatchViewModel()),
         ChangeNotifierProvider(create: (_) => DashboardViewModel()),
 
-        ChangeNotifierProvider(create: (_) {final vm = ProfileViewModel();vm.loadAll(); return vm;}),
+        ChangeNotifierProvider(create: (_) => ProfileViewModel()),
         ChangeNotifierProvider(create: (_) => CareerViewModel()),
         ChangeNotifierProvider(create: (_) => JobViewModel()),
         ChangeNotifierProvider(create: (_) => InterviewViewModel()),
@@ -240,21 +242,23 @@ class _PathWiseAppState extends State<PathWiseApp> with WidgetsBindingObserver {
         '/riasec': (context) => const RiasecTestScreen(),
         '/big_five': (context) => const BigFiveTestScreen(),
 
-        AppRoutes.editPersonal:     (_) => const EditPersonalInfoScreen(),
-        AppRoutes.editSkills:       (_) => const EditSkillsScreen(),
-        AppRoutes.editEducation:    (_) => const EditEducationScreen(),
-        AppRoutes.editExperience:   (_) => const EditExperienceScreen(),
-        AppRoutes.editPreferences:  (_) => const EditPreferencesScreen(),
-        AppRoutes.editPersonality:  (_) => const EditPersonalityScreen(),
-        AppRoutes.editEducationPreferences: (_) => const EditEducationPreferencesScreen(),
-        AppRoutes.editLanguagePreferences: (_) => const EditLanguagePreferencesScreen(),
+        AppRoutes.editPersonal: (_) => const EditPersonalInfoScreen(),
+        AppRoutes.editSkills: (_) => const EditSkillsScreen(),
+        AppRoutes.editEducation: (_) => const EditEducationScreen(),
+        AppRoutes.editExperience: (_) => const EditExperienceScreen(),
+        AppRoutes.editPreferences: (_) => const EditPreferencesScreen(),
+        AppRoutes.editPersonality: (_) => const EditPersonalityScreen(),
+        AppRoutes.editEducationPreferences: (_) =>
+            const EditEducationPreferencesScreen(),
+        AppRoutes.editLanguagePreferences: (_) =>
+            const EditLanguagePreferencesScreen(),
         '/interview-home': (context) => const InterviewHomePage(),
         '/interview-setup': (context) => const InterviewSetupPage(),
         '/interview-session': (context) => const InterviewSessionPage(),
         '/interview-results': (context) => const InterviewResultsPage(),
         '/interview-history': (context) => const InterviewHistoryPage(),
         '/resume/template-selection': (context) => TemplateSelectionPage(),
-        '/resume/edit':(context) => CustomizeResumePage(),
+        '/resume/edit': (context) => CustomizeResumePage(),
       },
       debugShowCheckedModeBanner: false,
     );
@@ -287,7 +291,18 @@ class _AuthWrapperState extends State<AuthWrapper> {
   Future<void> _initializeApp() async {
     try {
       final authViewModel = Provider.of<AuthViewModel>(context, listen: false);
-
+      final notificationViewModel = Provider.of<NotificationViewModel>(
+        context,
+        listen: false,
+      );
+      final universityListViewModel = Provider.of<UniversityListViewModel>(
+        context,
+        listen: false,
+      );
+      final profileViewModel = Provider.of<ProfileViewModel>(
+        context,
+        listen: false,
+      );
       // 2. INITIALIZE tracking variable
       _wasLoggedIn = authViewModel.isUserLoggedIn();
 
@@ -301,40 +316,49 @@ class _AuthWrapperState extends State<AuthWrapper> {
 
           if (mounted) {
             // 1. Clear AI Match
-            try { context.read<AIMatchViewModel>().reset(); } catch (_) {}
+            try {
+              context.read<AIMatchViewModel>().reset();
+            } catch (_) {}
 
             // 2. Clear Comparison
-            try { context.read<ComparisonViewModel>().clearForLogout(); } catch (_) {}
+            try {
+              context.read<ComparisonViewModel>().clearForLogout();
+            } catch (_) {}
 
             // 3. Clear Personality Tests
-            try { context.read<MBTITestViewModel>().reset(); } catch (_) {}
-            try { context.read<RiasecTestViewModel>().reset(); } catch (_) {}
-            try { context.read<BigFiveTestViewModel>().reset(); } catch (_) {}
+            try {
+              context.read<MBTITestViewModel>().reset();
+            } catch (_) {}
+            try {
+              context.read<RiasecTestViewModel>().reset();
+            } catch (_) {}
+            try {
+              context.read<BigFiveTestViewModel>().reset();
+            } catch (_) {}
 
             // 4. Clear Notifications
-            try { context.read<NotificationViewModel>().clearData(); } catch (_) {}
+            try {
+              context.read<NotificationViewModel>().clearData();
+            } catch (_) {}
 
             // 5. Clear User-Specific List Data
-            try { context.read<UniversityListViewModel>().resetUserSpecificData(); } catch (_) {}
-            try { context.read<ProgramListViewModel>().resetUserSpecificData(); } catch (_) {}
+            try {
+              context.read<UniversityListViewModel>().resetUserSpecificData();
+            } catch (_) {}
+            try {
+              context.read<ProgramListViewModel>().resetUserSpecificData();
+            } catch (_) {}
 
             // 6. Clear Dashboard
-            try { context.read<DashboardViewModel>().reset(); } catch (_) {}
+            try {
+              context.read<DashboardViewModel>().reset();
+            } catch (_) {}
           }
         }
 
         // Update state for next time
         _wasLoggedIn = isLoggedIn;
       });
-
-      final notificationViewModel = Provider.of<NotificationViewModel>(
-        context,
-        listen: false,
-      );
-      final universityListViewModel = Provider.of<UniversityListViewModel>(
-        context,
-        listen: false,
-      );
 
       // Step 1: Initialize auth (0-20%)
       setState(() {
@@ -353,8 +377,9 @@ class _AuthWrapperState extends State<AuthWrapper> {
           _initStatus = 'Setting up notifications...';
           _progress = 0.3;
         });
-        await notificationViewModel.initializeForUser(userId);
+        await profileViewModel.loadAll();
         setState(() => _progress = 0.4);
+        await notificationViewModel.initializeForUser(userId);
         debugPrint('✅ Notifications initialized');
 
         // Step 3: Initialize view model with sync check (40-90%)
@@ -378,7 +403,9 @@ class _AuthWrapperState extends State<AuthWrapper> {
 
       final appStatus = await AppInitializationService.instance.getStatus();
       debugPrint('📊 App Status: ${appStatus['initialized']}');
-      debugPrint('📊 Database Size: ${(appStatus['database_size'] / 1024 / 1024).toStringAsFixed(2)} MB');
+      debugPrint(
+        '📊 Database Size: ${(appStatus['database_size'] / 1024 / 1024).toStringAsFixed(2)} MB',
+      );
 
       await Future.delayed(const Duration(milliseconds: 300));
 

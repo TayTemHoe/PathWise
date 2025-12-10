@@ -34,10 +34,15 @@ class _DashboardScreenState extends State<DashboardScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       final authVM = context.read<AuthViewModel>();
       final dashboardVM = context.read<DashboardViewModel>();
+      final profileVM = context.read<ProfileViewModel>(); // ADD THIS
 
       if (authVM.currentUser != null) {
         // First refresh user data from Firestore to ensure we have latest role
         await authVM.refreshCurrentUser();
+
+        // ADD THIS: Load profile data (including picture)
+        await profileVM.loadAll();
+
         // Then initialize dashboard with the refreshed user data
         if (authVM.currentUser != null) {
           dashboardVM.init(authVM.currentUser!);
@@ -109,9 +114,16 @@ class _DashboardScreenState extends State<DashboardScreen> {
             edgeOffset: kToolbarHeight + MediaQuery.of(context).padding.top,
             onRefresh: () async {
               final authVM = context.read<AuthViewModel>();
+              final profileVM = context.read<ProfileViewModel>(); // ADDED
+
               if (authVM.currentUser != null) {
-                // Force re-fetch user data from repository to get latest role
+                // Refresh auth data
                 await authVM.refreshCurrentUser();
+
+                // ADDED: Refresh profile data (including picture)
+                await profileVM.loadAll();
+
+                // Re-init dashboard
                 viewModel.init(authVM.currentUser!);
               }
             },
@@ -217,7 +229,57 @@ class _DashboardScreenState extends State<DashboardScreen> {
             icon: const Icon(Icons.logout_rounded,
                 color: AppColors.error, size: 20),
             tooltip: 'Logout',
+            onPressed: () => _confirmLogout(context),
+          ),
+        ),
+      ],
+    );
+  }
+
+  void _confirmLogout(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: AppColors.error.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: const Icon(
+                Icons.logout_rounded,
+                color: AppColors.error,
+                size: 24,
+              ),
+            ),
+            const SizedBox(width: 12),
+            const Text(
+              'Sign Out',
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            ),
+          ],
+        ),
+        content: const Text(
+          'Are you sure you want to sign out of your account?',
+          style: TextStyle(color: AppColors.textSecondary),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text(
+              'Cancel',
+              style: TextStyle(
+                color: AppColors.textSecondary,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+          ElevatedButton(
             onPressed: () async {
+              Navigator.pop(context);
               final authViewModel =
               Provider.of<AuthViewModel>(context, listen: false);
               await authViewModel.logout();
@@ -225,9 +287,23 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 Navigator.of(context).pushReplacementNamed('/login');
               }
             },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.error,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+            ),
+            child: const Text(
+              'Sign Out',
+              style: TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 
@@ -238,6 +314,117 @@ class _DashboardScreenState extends State<DashboardScreen> {
     final user = viewModel.currentUser;
     final isEdu = viewModel.currentMode == DashboardMode.education;
     final dateStr = DateFormat('EEE, d MMM').format(DateTime.now());
+
+    if (profileVM.isLoading) {
+      return Container(
+        width: double.infinity,
+        constraints: const BoxConstraints(minHeight: 200),
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: [
+              AppColors.primary.withOpacity(0.7),
+              const Color(0xFF8E87FF).withOpacity(0.7)
+            ],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+          borderRadius: BorderRadius.circular(24),
+          boxShadow: [
+            BoxShadow(
+              color: AppColors.primary.withOpacity(0.3),
+              blurRadius: 20,
+              offset: const Offset(0, 10),
+            ),
+          ],
+        ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(24),
+          child: Stack(
+            children: [
+              // Decorative circles
+              Positioned(
+                top: -40,
+                right: -30,
+                child: CircleAvatar(
+                  radius: 70,
+                  backgroundColor: Colors.white.withOpacity(0.1),
+                ),
+              ),
+              Positioned(
+                bottom: -20,
+                left: -20,
+                child: CircleAvatar(
+                  radius: 50,
+                  backgroundColor: Colors.white.withOpacity(0.1),
+                ),
+              ),
+              // Skeleton content
+              Padding(
+                padding: const EdgeInsets.all(20),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        _buildShimmer(
+                          width: 100,
+                          height: 28,
+                          radius: 20,
+                        ),
+                        _buildShimmer(
+                          width: 160,
+                          height: 40,
+                          radius: 20,
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 20),
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              _buildShimmer(
+                                width: 180,
+                                height: 22,
+                                radius: 8,
+                              ),
+                              const SizedBox(height: 8),
+                              _buildShimmer(
+                                width: double.infinity,
+                                height: 28,
+                                radius: 8,
+                              ),
+                              const SizedBox(height: 6),
+                              _buildShimmer(
+                                width: 150,
+                                height: 28,
+                                radius: 8,
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        _buildShimmer(
+                          width: 62,
+                          height: 62,
+                          radius: 31,
+                          isCircle: true,
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
 
     return Container(
       width: double.infinity,
@@ -369,22 +556,54 @@ class _DashboardScreenState extends State<DashboardScreen> {
                         child: CircleAvatar(
                           radius: 28,
                           backgroundColor: Colors.white,
-                          // ✅ NEW: Load network image if available
-                          backgroundImage: (photoUrl != null && photoUrl.isNotEmpty)
-                              ? NetworkImage(photoUrl)
-                              : null,
-                          // ✅ NEW: Show text only if no image
-                          child: (photoUrl == null || photoUrl.isEmpty)
-                              ? Text(
-                            (user?.firstName?.isNotEmpty == true)
-                                ? user!.firstName[0].toUpperCase()
-                                : "U",
-                            style: const TextStyle(
-                                fontSize: 24,
-                                fontWeight: FontWeight.bold,
-                                color: AppColors.primary),
-                          )
-                              : null,
+                          child: ClipOval(
+                            child: (photoUrl != null && photoUrl.isNotEmpty)
+                                ? Image.network(
+                              photoUrl,
+                              fit: BoxFit.cover,
+                              width: 56,
+                              height: 56,
+                              // 👇 Show loading spinner while image loads
+                              loadingBuilder: (context, child, loadingProgress) {
+                                if (loadingProgress == null) return child;
+                                return const SizedBox(
+                                  width: 24,
+                                  height: 24,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    color: AppColors.primary,
+                                  ),
+                                );
+                              },
+                              // 👇 Show fallback initials when image fails
+                              errorBuilder: (context, error, stackTrace) {
+                                return Center(
+                                  child: Text(
+                                    (user?.firstName?.isNotEmpty == true)
+                                        ? user!.firstName[0].toUpperCase()
+                                        : "U",
+                                    style: const TextStyle(
+                                      fontSize: 24,
+                                      fontWeight: FontWeight.bold,
+                                      color: AppColors.primary,
+                                    ),
+                                  ),
+                                );
+                              },
+                            )
+                                : Center(
+                              child: Text(
+                                (user?.firstName?.isNotEmpty == true)
+                                    ? user!.firstName[0].toUpperCase()
+                                    : "U",
+                                style: const TextStyle(
+                                  fontSize: 24,
+                                  fontWeight: FontWeight.bold,
+                                  color: AppColors.primary,
+                                ),
+                              ),
+                            ),
+                          ),
                         ),
                       ),
                     ],
@@ -483,6 +702,42 @@ class _DashboardScreenState extends State<DashboardScreen> {
       },
     );
   }
+
+  Widget _buildShimmer({
+    required double width,
+    required double height,
+    required double radius,
+    bool isCircle = false,
+  }) {
+    return Container(
+      width: width,
+      height: height,
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.2),
+        borderRadius: isCircle ? null : BorderRadius.circular(radius),
+        shape: isCircle ? BoxShape.circle : BoxShape.rectangle,
+      ),
+      child: ClipRRect(
+        borderRadius: isCircle ? BorderRadius.circular(radius) : BorderRadius.circular(radius),
+        child: _ShimmerAnimation(
+          child: Container(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [
+                  Colors.transparent,
+                  Colors.white.withOpacity(0.2),
+                  Colors.transparent,
+                ],
+                stops: const [0.0, 0.5, 1.0],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 class _HorizontalDashboardCard extends StatelessWidget {
@@ -579,6 +834,63 @@ class _HorizontalDashboardCard extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+}
+
+class _ShimmerAnimation extends StatefulWidget {
+  final Widget child;
+
+  const _ShimmerAnimation({required this.child});
+
+  @override
+  State<_ShimmerAnimation> createState() => _ShimmerAnimationState();
+}
+
+class _ShimmerAnimationState extends State<_ShimmerAnimation>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1500),
+    )..repeat();
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _controller,
+      builder: (context, child) {
+        return ShaderMask(
+          shaderCallback: (bounds) {
+            return LinearGradient(
+              colors: [
+                Colors.transparent,
+                Colors.white.withOpacity(0.3),
+                Colors.transparent,
+              ],
+              stops: [
+                _controller.value - 0.3,
+                _controller.value,
+                _controller.value + 0.3,
+              ],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ).createShader(bounds);
+          },
+          child: widget.child,
+        );
+      },
     );
   }
 }
