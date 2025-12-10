@@ -69,6 +69,24 @@ class AuthViewModel extends ChangeNotifier {
     }
   }
 
+  Future<void> refreshCurrentUser() async {
+    if (_currentUser == null) return;
+
+    try {
+      final userDoc = await FirebaseService.getUser(_currentUser!.userId);
+      if (userDoc.exists) {
+        _currentUser = UserModel.fromMap(
+          userDoc.data() as Map<String, dynamic>,
+          userId: _currentUser!.userId,
+        );
+        await SharedPreferencesHelper.saveUserData(_currentUser!);
+        notifyListeners();
+      }
+    } catch (e) {
+      debugPrint('Error refreshing user data: $e');
+    }
+  }
+
   void setAuthMode(int index) {
     final newModeIsLogin = index == 0;
     if (_isLoginMode != newModeIsLogin) {

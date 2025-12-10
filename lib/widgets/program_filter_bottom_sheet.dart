@@ -662,13 +662,18 @@ class _ProgramFilterBottomSheetState extends State<ProgramFilterBottomSheet> {
   }
 
   Widget _buildIntakeMonthFilter(ProgramFilterViewModel filterVM) {
+    // ✅ FIXED: Fallback to standard months if list is empty so the option is always shown
+    final months = (filterVM.availableIntakeMonths.isNotEmpty)
+        ? filterVM.availableIntakeMonths
+        : ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
     return _buildFilterSection(
       title: 'Intake Period',
       icon: Icons.calendar_month,
       child: Wrap(
         spacing: 8,
         runSpacing: 8,
-        children: (filterVM.availableIntakeMonths ?? []).map((month) {
+        children: months.map((month) {
           final isSelected = _selectedIntakeMonths.contains(month);
           return _buildChipOption(month, isSelected, () {
             if (_isDisposed) return;

@@ -94,6 +94,7 @@ class _ProfileOverviewScreenState extends State<ProfileOverviewScreen> {
 
               final profile = profileVM.profile;
               final completion = profile?.completionPercent ?? 0;
+              // User role is now accessed inside the header logic, or passed down
 
               return RefreshIndicator(
                 onRefresh: () => profileVM.loadAll(),
@@ -108,7 +109,11 @@ class _ProfileOverviewScreenState extends State<ProfileOverviewScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.center,
                       children: [
-                        _buildProfileHeader(profile),
+                        // Pass profileVM here
+                        _buildProfileHeader(profile, profileVM),
+
+                        // REMOVED: _buildRoleSwitchCard(profileVM, userRole),
+
                         const SizedBox(height: 24),
                         _buildCompletionCard(completion),
                         const SizedBox(height: 24),
@@ -130,10 +135,12 @@ class _ProfileOverviewScreenState extends State<ProfileOverviewScreen> {
     );
   }
 
-  Widget _buildProfileHeader(dynamic profile) {
+  Widget _buildProfileHeader(dynamic profile, ProfileViewModel profileVM) {
     final String name = profile?.name ?? 'User';
     final String location = '${profile?.city ?? ''}, ${profile?.country ?? ''}'.replaceAll(RegExp(r'^, |,$'), '').trim();
     final String? photoUrl = profile?.profilePictureUrl;
+    final String currentRole = profile?.userRole ?? 'education';
+    final bool isEducation = currentRole == 'education';
 
     // Format last updated date
     String? lastUpdated;
@@ -164,77 +171,375 @@ class _ProfileOverviewScreenState extends State<ProfileOverviewScreen> {
       elevation: 0,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       color: Colors.white,
-      child: Padding(
-        padding: const EdgeInsets.all(14),
-        child: Row(
-          children: [
-            CircleAvatar(
-              radius: 36,
-              backgroundColor: _DesignColors.primary.withOpacity(0.1),
-              backgroundImage: hasValidPhoto() ? NetworkImage(photoUrl!) : null,
-              child: !hasValidPhoto()
-                  ? Text(
-                getInitial(),
-                style: const TextStyle(
-                  fontSize: 28,
-                  color: _DesignColors.primary,
-                  fontWeight: FontWeight.bold,
+      child: Column(
+        children: [
+          // Top Section: User Info
+          Padding(
+            padding: const EdgeInsets.all(16),
+            child: Row(
+              children: [
+                CircleAvatar(
+                  radius: 36,
+                  backgroundColor: _DesignColors.primary.withOpacity(0.1),
+                  backgroundImage: hasValidPhoto() ? NetworkImage(photoUrl!) : null,
+                  child: !hasValidPhoto()
+                      ? Text(
+                    getInitial(),
+                    style: const TextStyle(
+                      fontSize: 28,
+                      color: _DesignColors.primary,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  )
+                      : null,
                 ),
-              )
-                  : null,
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(name,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.w800,
-                        color: Color(0xFF111827),
-                      )),
-                  const SizedBox(height: 2),
-                  if (location.isNotEmpty)
-                    Row(
-                      children: [
-                        const Icon(Icons.location_on_outlined,
-                            size: 16, color: Color(0xFF6B7280)),
-                        const SizedBox(width: 4),
-                        Expanded(
-                          child: Text(
-                            location,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
-                                color: Color(0xFF6B7280), fontSize: 13),
-                          ),
-                        ),
-                      ],
-                    ),
-                  const SizedBox(height: 4),
-                  if (lastUpdated != null)
-                    Row(
-                      children: [
-                        const Icon(Icons.schedule_outlined,
-                            size: 14, color: Color(0xFF9CA3AF)),
-                        const SizedBox(width: 4),
-                        Text(
-                          'Last updated: $lastUpdated',
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(name,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                           style: const TextStyle(
-                              color: Color(0xFF9CA3AF), fontSize: 12),
+                            fontSize: 18,
+                            fontWeight: FontWeight.w800,
+                            color: Color(0xFF111827),
+                          )),
+                      const SizedBox(height: 4),
+                      if (location.isNotEmpty)
+                        Row(
+                          children: [
+                            const Icon(Icons.location_on_outlined,
+                                size: 16, color: Color(0xFF6B7280)),
+                            const SizedBox(width: 4),
+                            Expanded(
+                              child: Text(
+                                location,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                    color: Color(0xFF6B7280), fontSize: 13),
+                              ),
+                            ),
+                          ],
                         ),
-                      ],
-                    ),
-                ],
-              ),
-            )
-          ],
+                      const SizedBox(height: 4),
+                      if (lastUpdated != null)
+                        Row(
+                          children: [
+                            const Icon(Icons.schedule_outlined,
+                                size: 14, color: Color(0xFF9CA3AF)),
+                            const SizedBox(width: 4),
+                            Text(
+                              'Updated: $lastUpdated',
+                              style: const TextStyle(
+                                  color: Color(0xFF9CA3AF), fontSize: 12),
+                            ),
+                          ],
+                        ),
+                    ],
+                  ),
+                )
+              ],
+            ),
+          ),
+
+          // Divider
+          const Divider(height: 1, thickness: 1, color: Color(0xFFF3F4F6)),
+
+          // Bottom Section: Role Toggle
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(6),
+                  decoration: BoxDecoration(
+                    color: (isEducation ? _DesignColors.primary : _DesignColors.warning).withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Icon(
+                    isEducation ? Icons.school_rounded : Icons.work_rounded,
+                    color: isEducation ? _DesignColors.primary : _DesignColors.warning,
+                    size: 18,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        isEducation ? 'Education Mode' : 'Career Mode',
+                        style: const TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.bold,
+                          color: _DesignColors.textPrimary,
+                        ),
+                      ),
+                      Text(
+                        isEducation ? 'Finding programs' : 'Finding jobs',
+                        style: const TextStyle(
+                          fontSize: 11,
+                          color: _DesignColors.textSecondary,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                _buildRoleToggle(profileVM, isEducation),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildRoleToggle(ProfileViewModel profileVM, bool isEducation) {
+    return Container(
+      height: 36,
+      padding: const EdgeInsets.all(3),
+      decoration: BoxDecoration(
+        color: _DesignColors.background,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: Colors.grey[300]!),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          _buildToggleButton(
+            icon: Icons.school_rounded,
+            isSelected: isEducation,
+            onTap: () {
+              if (!isEducation) {
+                _showRoleChangeDialog(profileVM, 'education');
+              }
+            },
+          ),
+          _buildToggleButton(
+            icon: Icons.work_rounded,
+            isSelected: !isEducation,
+            onTap: () {
+              if (isEducation) {
+                _showRoleChangeDialog(profileVM, 'career');
+              }
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildToggleButton({
+    required IconData icon,
+    required bool isSelected,
+    required VoidCallback onTap,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        decoration: BoxDecoration(
+          color: isSelected ? _DesignColors.primary : Colors.transparent,
+          borderRadius: BorderRadius.circular(15),
+        ),
+        child: Icon(
+          icon,
+          size: 18,
+          color: isSelected ? Colors.white : _DesignColors.textSecondary,
         ),
       ),
     );
+  }
+
+  void _showRoleChangeDialog(ProfileViewModel profileVM, String newRole) {
+    final isEducation = newRole == 'education';
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: _DesignColors.warning.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Icon(
+                Icons.swap_horiz_rounded,
+                color: _DesignColors.warning,
+                size: 24,
+              ),
+            ),
+            const SizedBox(width: 12),
+            const Expanded(
+              child: Text(
+                'Switch Mode?',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              ),
+            ),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'You are about to switch to ${isEducation ? "Education" : "Career"} mode.',
+              style: const TextStyle(
+                fontSize: 14,
+                color: _DesignColors.textPrimary,
+                height: 1.4,
+              ),
+            ),
+            const SizedBox(height: 16),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: _DesignColors.info.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: _DesignColors.info.withOpacity(0.3)),
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    Icons.info_outline,
+                    color: _DesignColors.info,
+                    size: 20,
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      isEducation
+                          ? 'Features like university search and program matching will be prioritized.'
+                          : 'Features like job search and career development will be prioritized.',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: _DesignColors.info,
+                        height: 1.3,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 12),
+            const Text(
+              'Your profile data will remain intact. You can switch back anytime.',
+              style: TextStyle(
+                fontSize: 12,
+                color: _DesignColors.textSecondary,
+                height: 1.3,
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text(
+              'Cancel',
+              style: TextStyle(
+                color: _DesignColors.textSecondary,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              Navigator.pop(context);
+              await _updateUserRole(profileVM, newRole);
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: _DesignColors.primary,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+            ),
+            child: Text(
+              'Switch to ${isEducation ? "Education" : "Career"}',
+              style: const TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _updateUserRole(ProfileViewModel profileVM, String newRole) async {
+    try {
+      // Show loading indicator
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Row(
+            children: [
+              const SizedBox(
+                width: 20,
+                height: 20,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                ),
+              ),
+              const SizedBox(width: 12),
+              const Text('Updating mode...'),
+            ],
+          ),
+          backgroundColor: _DesignColors.primary,
+          behavior: SnackBarBehavior.floating,
+          duration: const Duration(seconds: 2),
+        ),
+      );
+
+      // Update the user role in Firestore
+      await profileVM.updateUserRole(newRole);
+
+      // Show success message
+      if (mounted) {
+        ScaffoldMessenger.of(context).hideCurrentSnackBar();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Row(
+              children: [
+                const Icon(Icons.check_circle, color: Colors.white, size: 20),
+                const SizedBox(width: 12),
+                Text('Switched to ${newRole == "education" ? "Education" : "Career"} mode'),
+              ],
+            ),
+            backgroundColor: _DesignColors.success,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).hideCurrentSnackBar();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Row(
+              children: [
+                const Icon(Icons.error_outline, color: Colors.white, size: 20),
+                const SizedBox(width: 12),
+                Text('Failed to update: ${e.toString()}'),
+              ],
+            ),
+            backgroundColor: _DesignColors.error,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          ),
+        );
+      }
+    }
   }
 
   Widget _buildCompletionCard(double completion) {

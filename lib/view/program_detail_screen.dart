@@ -494,12 +494,15 @@ class _ProgramDetailScreenState extends State<ProgramDetailScreen>
             color: isTopRanked ? Colors.white : color,
           ),
           const SizedBox(width: 6),
-          Text(
-            text,
-            style: TextStyle(
-              fontSize: 13,
-              fontWeight: FontWeight.w600,
-              color: isTopRanked ? Colors.white : color,
+          Flexible(
+            child: Text(
+              text,
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+                color: isTopRanked ? Colors.white : color,
+              ),
+              textAlign: TextAlign.center,
             ),
           ),
         ],

@@ -743,17 +743,17 @@ class _UniversityListScreenState extends State<UniversityListScreen> {
           );
         }
 
-        // Institution type filter
-        if (viewModel.filter.institutionType != null) {
-          filterChips.add(
-            _buildFilterChip(viewModel.filter.institutionType!, () {
-              viewModel.removeInstitutionTypeFilter();
-              WidgetsBinding.instance.addPostFrameCallback((_) {
-                if (mounted) setState(() {});
-              });
-            }),
-          );
-        }
+        // // Institution type filter
+        // if (viewModel.filter.institutionType != null) {
+        //   filterChips.add(
+        //     _buildFilterChip(viewModel.filter.institutionType!, () {
+        //       viewModel.removeInstitutionTypeFilter();
+        //       WidgetsBinding.instance.addPostFrameCallback((_) {
+        //         if (mounted) setState(() {});
+        //       });
+        //     }),
+        //   );
+        // }
 
         // If no chips to show, return empty
         if (filterChips.isEmpty) {
