@@ -20,6 +20,7 @@ class AuthScreen extends StatefulWidget {
 
 class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateMixin {
   late TabController _tabController;
+  DateTime? _selectedDob;
 
   // Registration step controller
   int _currentStep = 0;
@@ -38,8 +39,8 @@ class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateM
   final _registerFormKey = GlobalKey<FormState>();
   final _firstNameController = TextEditingController();
   final _lastNameController = TextEditingController();
-  final _dobController = TextEditingController();
   final _phoneController = TextEditingController();
+  final _dobController = TextEditingController();
   final _registerEmailController = TextEditingController();
   final _registerPasswordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
@@ -88,14 +89,14 @@ class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateM
         return _firstNameController.text.trim().isNotEmpty &&
             _lastNameController.text.trim().isNotEmpty &&
             _registerEmailController.text.trim().isNotEmpty &&
-            _dobController.text.trim().isNotEmpty &&
+            _selectedDob != null && // CHANGED: Check DateTime object
             _phoneController.text.trim().isNotEmpty;
 
       case 1: // Account Info
         return _registerPasswordController.text.trim().isNotEmpty &&
             _confirmPasswordController.text.trim().isNotEmpty;
 
-      case 2: // Address Info (Address Line 2 is optional, so we don't check it)
+      case 2: // Address Info
         return _addressLine1Controller.text.trim().isNotEmpty &&
             _cityController.text.trim().isNotEmpty &&
             _stateController.text.trim().isNotEmpty &&
@@ -110,33 +111,32 @@ class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateM
   void _nextStep() {
     FocusScope.of(context).unfocus();
 
-    // 1. Enable visual errors immediately on click
     setState(() {
       _registerAutoValidateMode = AutovalidateMode.onUserInteraction;
     });
 
-    // 2. Trigger validation.
+    // Validate current step BEFORE proceeding
     if (_registerFormKey.currentState?.validate() ?? false) {
-      // 3. If valid, proceed
       if (_currentStep < 2) {
         setState(() {
           _currentStep++;
-          // Reset validation for the NEW step so it starts clean
           _registerAutoValidateMode = AutovalidateMode.disabled;
         });
       } else {
         _handleRegister();
       }
-    } else {
-      // Logic failed, visual errors are now shown by the Form
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Please correct the errors in the form'),
-          backgroundColor: Colors.orange,
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
     }
+    // } else {
+    //   // Show error message
+    //   ScaffoldMessenger.of(context).showSnackBar(
+    //     const SnackBar(
+    //       content: Text('Please correct the errors before continuing'),
+    //       backgroundColor: Colors.orange,
+    //       behavior: SnackBarBehavior.floating,
+    //       duration: Duration(seconds: 2),
+    //     ),
+    //   );
+    // }
   }
 
   void _previousStep() {
@@ -196,6 +196,16 @@ class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateM
     });
 
     if (_registerFormKey.currentState?.validate() ?? false) {
+      if (_selectedDob == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Please select your date of birth'),
+            backgroundColor: Colors.red,
+          ),
+        );
+        return;
+      }
+
       final viewModel = Provider.of<AuthViewModel>(context, listen: false);
 
       final success = await viewModel.register(
@@ -204,7 +214,7 @@ class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateM
         firstName: _firstNameController.text,
         lastName: _lastNameController.text,
         phone: _phoneController.text,
-        dob: _dobController.text,
+        dob: _selectedDob!, // CHANGED: Pass DateTime object
         addressLine1: _addressLine1Controller.text,
         addressLine2: _addressLine2Controller.text.isEmpty ? null : _addressLine2Controller.text,
         city: _cityController.text,
@@ -791,6 +801,7 @@ class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateM
 
             if (pickedDate != null) {
               setState(() {
+                _selectedDob = pickedDate; // CHANGED: Store DateTime
                 _dobController.text = DateFormat('yyyy-MM-dd').format(pickedDate);
               });
             }
@@ -800,8 +811,14 @@ class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateM
               labelText: 'Date of Birth',
               hintText: 'YYYY-MM-DD',
               controller: _dobController,
-              validator: (value) => value!.isEmpty ? "Date of Birth required" : null,
+              validator: (value) {
+                if (_selectedDob == null) {
+                  return "Date of Birth is required";
+                }
+                return null;
+              },
               prefixIcon: const Icon(Icons.calendar_today, color: Colors.grey),
+              onChanged: (_) => setState(() {}),
             ),
           ),
         ),
@@ -931,10 +948,11 @@ class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateM
                 hintText: '12345',
                 controller: _zipCodeController,
                 validator: Validators.validateZipCode,
+                keyboardType: TextInputType.number, // ADDED
                 prefixIcon: const Icon(Icons.markunread_mailbox_outlined, color: Colors.grey),
                 inputFormatters: [
-                  FilteringTextInputFormatter.allow(RegExp(r'[a-zA-Z0-9\s\-]')),
-                  LengthLimitingTextInputFormatter(10),
+                  FilteringTextInputFormatter.digitsOnly, // CHANGED: Digits only
+                  LengthLimitingTextInputFormatter(6), // CHANGED: Max 6 digits
                 ],
                 onChanged: (_) => setState(() {}),
               ),

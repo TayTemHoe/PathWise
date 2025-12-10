@@ -173,12 +173,13 @@ class UserModel {
       lastUpdated: _timestamp(data['lastUpdated']),
 
       // Location (Flattened from UserModel logic + UserModel specific fields)
-      addressLine1: _s(data['address_line1']) ?? _s(data['addressLine1']) ?? _s(data['address']),
-      addressLine2: _s(data['address_line2']) ?? _s(data['addressLine2']),
+      // FIX: Added lookups in `loc` for address fields and zipCode to ensure they load initially
+      addressLine1: _s(data['address_line1']) ?? _s(data['addressLine1']) ?? _s(data['address']) ?? _s(loc['addressLine1']),
+      addressLine2: _s(data['address_line2']) ?? _s(data['addressLine2']) ?? _s(loc['addressLine2']),
       city: _s(data['city']) ?? _s(loc['city']),
       state: _s(data['state']) ?? _s(loc['state']),
       country: _s(data['country']) ?? _s(loc['country']),
-      zipCode: _s(data['zip_code']) ?? _s(data['zipCode']),
+      zipCode: _s(data['zip_code']) ?? _s(data['zipCode']) ?? _s(loc['zipCode']),
 
       // Meta
       completionPercent: _d(data['completionPercent']),
@@ -192,7 +193,7 @@ class UserModel {
       // Preferences
       preferences: prefs,
 
-      // Sub-lists are usually loaded via separate collection queries, but strictly mapping if present:
+      // Sub-lists are usually loaded via separate collection queries
       skills: null,
       education: null,
       experience: null,

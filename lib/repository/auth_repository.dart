@@ -1,6 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import '../model/user.dart';
+import '../model/user_profile.dart';
 import '../services/firebase_service.dart';
 import '../utils/appConstants.dart';
 import '../utils/shared_preferences_helper.dart';
@@ -15,7 +15,7 @@ class AuthRepository {
     required String firstName,
     required String lastName,
     required String phone,
-    required String dob,
+    required DateTime dob, // CHANGED: DateTime instead of String
     required String addressLine1,
     String? addressLine2,
     required String city,
@@ -35,32 +35,30 @@ class AuthRepository {
         throw Exception('Failed to create user account');
       }
 
-      // 3. Create the user model with Firebase UID and address details
+      // 3. Create the user model with Firebase UID
       final UserModel user = UserModel(
         userId: firebaseUser.uid,
         firstName: firstName.trim(),
         lastName: lastName.trim(),
         phone: phone.trim(),
         email: email.trim().toLowerCase(),
-        dob: dob.trim(),
+        dob: Timestamp.fromDate(dob), // CHANGED: Convert DateTime to Timestamp
         addressLine1: addressLine1.trim(),
-        addressLine2: addressLine2?.trim() ?? '',
+        addressLine2: addressLine2?.trim(),
         city: city.trim(),
         state: state.trim(),
         country: country.trim(),
         zipCode: zipCode.trim(),
         userRole: userRole,
+        createdAt: Timestamp.now(), // CHANGED: Use Timestamp
+        lastUpdated: Timestamp.now(), // CHANGED: Use Timestamp
       );
 
-      // 4. Create user data map and add custom ID
-      final userMap = user.toMap();
-      userMap['createdAt'] = FieldValue.serverTimestamp();
-
-      // 5. Save user data to Firestore using the Firebase UID as the document key
+      // 4. Save user data to Firestore
       await FirebaseService.setDocument(
         AppConstants.usersCollection,
         firebaseUser.uid,
-        userMap,
+        user.toMap(),
       );
 
       // 9. Update Firebase user's display name
@@ -73,7 +71,6 @@ class AuthRepository {
 
       return user;
     } on FirebaseAuthException catch (e) {
-      // If Firebase Auth fails, we need to clean up
       await _cleanupFailedRegistration();
 
       String errorMessage = AppConstants.registerFailed;
@@ -97,7 +94,6 @@ class AuthRepository {
 
       throw Exception(errorMessage);
     } catch (e) {
-      // If anything else fails, clean up
       await _cleanupFailedRegistration();
       throw Exception('Registration failed: ${e.toString()}');
     }
@@ -122,7 +118,6 @@ class AuthRepository {
     bool rememberMe = false,
   }) async {
     try {
-      // Sign in with email and password
       final UserCredential userCredential = await _auth.signInWithEmailAndPassword(
         email: email.trim().toLowerCase(),
         password: password,
@@ -133,19 +128,16 @@ class AuthRepository {
         throw Exception('Login failed');
       }
 
-      // Get user data from Firestore
       final DocumentSnapshot userDoc = await FirebaseService.getUser(firebaseUser.uid);
 
       if (!userDoc.exists) {
         throw Exception('User data not found');
       }
 
-      final UserModel user = UserModel.fromMap(
-        userDoc.data() as Map<String, dynamic>,
-        userId: firebaseUser.uid,
+      final UserModel user = UserModel.fromFirestore(
+        userDoc as DocumentSnapshot<Map<String, dynamic>>,
       );
 
-      // Save to SharedPreferences
       await SharedPreferencesHelper.saveUserId(firebaseUser.uid);
       await SharedPreferencesHelper.saveUserData(user);
       await SharedPreferencesHelper.setLoggedIn(true);
@@ -189,14 +181,12 @@ class AuthRepository {
     return SharedPreferencesHelper.getUserData();
   }
 
-  // Check if user is logged in
   bool isUserLoggedIn() {
     final isLoggedIn = SharedPreferencesHelper.isLoggedIn();
     final rememberMe = SharedPreferencesHelper.getRememberMe();
     return isLoggedIn && rememberMe && _auth.currentUser != null;
   }
 
-  // Logout user
   Future<void> logoutUser() async {
     try {
       await _auth.signOut();
@@ -211,7 +201,6 @@ class AuthRepository {
     try {
       final formattedEmail = email.trim().toLowerCase();
 
-      // Check if email exists in Firebase Auth
       final querySnapshot = await FirebaseFirestore.instance
           .collection('users')
           .where("email", isEqualTo: formattedEmail)
@@ -222,9 +211,7 @@ class AuthRepository {
         throw Exception('No user found for this email');
       }
 
-      // Email exists, proceed to send reset link
       await _auth.sendPasswordResetEmail(email: formattedEmail);
-
     } on FirebaseAuthException catch (e) {
       String errorMessage = 'Failed to send password reset email';
 
@@ -252,28 +239,22 @@ class AuthRepository {
     try {
       final Map<String, dynamic> updateData = {};
 
-      if (firstName != null) updateData['first_name'] = firstName.trim();
-      if (lastName != null) updateData['last_name'] = lastName.trim();
+      if (firstName != null) updateData['firstName'] = firstName.trim();
+      if (lastName != null) updateData['lastName'] = lastName.trim();
       if (phone != null) updateData['phone'] = phone.trim();
 
-      // Add update timestamp
-      updateData['updatedAt'] = FieldValue.serverTimestamp();
+      updateData['lastUpdated'] = FieldValue.serverTimestamp();
 
-      // Update Firestore
       await FirebaseService.updateUser(userId, updateData);
 
-      // Get updated user data
       final DocumentSnapshot userDoc = await FirebaseService.getUser(userId);
 
-      final UserModel updatedUser = UserModel.fromMap(
-        userDoc.data() as Map<String, dynamic>,
-        userId: userId,
+      final UserModel updatedUser = UserModel.fromFirestore(
+        userDoc as DocumentSnapshot<Map<String, dynamic>>,
       );
 
-      // Update SharedPreferences
       await SharedPreferencesHelper.saveUserData(updatedUser);
 
-      // Update Firebase Auth display name if names changed
       if (firstName != null || lastName != null) {
         final User? firebaseUser = _auth.currentUser;
         if (firebaseUser != null) {

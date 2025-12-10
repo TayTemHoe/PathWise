@@ -521,10 +521,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              'Hi, ${user?.lastName} ${user?.firstName ?? "Guest"} !',
+                              'Hi, ${user?.firstName ?? "Guest"} ${user?.lastName ?? ""}!',
                               style: TextStyle(
                                 color: Colors.white.withOpacity(0.95),
-                                fontSize: 22, // Increased font size
+                                fontSize: 22,
                                 fontWeight: FontWeight.w600,
                               ),
                             ),
@@ -580,7 +580,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                 return Center(
                                   child: Text(
                                     (user?.firstName?.isNotEmpty == true)
-                                        ? user!.firstName[0].toUpperCase()
+                                        ? user!.firstName![0].toUpperCase()
                                         : "U",
                                     style: const TextStyle(
                                       fontSize: 24,
@@ -594,7 +594,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                 : Center(
                               child: Text(
                                 (user?.firstName?.isNotEmpty == true)
-                                    ? user!.firstName[0].toUpperCase()
+                                    ? user!.firstName![0].toUpperCase()
                                     : "U",
                                 style: const TextStyle(
                                   fontSize: 24,

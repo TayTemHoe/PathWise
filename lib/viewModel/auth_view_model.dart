@@ -1,6 +1,7 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
-import '../model/user.dart';
+import '../model/user_profile.dart'; // CHANGED: Import new model
 import '../repository/auth_repository.dart';
 import '../services/firebase_service.dart';
 import '../utils/shared_preferences_helper.dart';
@@ -9,23 +10,13 @@ import '../utils/validators.dart';
 class AuthViewModel extends ChangeNotifier {
   final AuthRepository _authRepository = AuthRepository();
 
-  // Loading states
   bool _isLoading = false;
   bool _isLoginMode = true;
-
-  // Error handling
   String? _errorMessage;
-
-  // Form validation
   bool _isFormValid = false;
-
-  // Remember me
   bool _rememberMe = false;
-
-  // Current user
   UserModel? _currentUser;
 
-  // Getters
   bool get isLoading => _isLoading;
   bool get isLoginMode => _isLoginMode;
   String? get errorMessage => _errorMessage;
@@ -33,38 +24,30 @@ class AuthViewModel extends ChangeNotifier {
   bool get rememberMe => _rememberMe;
   UserModel? get currentUser => _currentUser;
 
-  // Initialize
   Future<void> init() async {
     try {
       _rememberMe = SharedPreferencesHelper.getRememberMe();
-      // Check if user is logged in and get current user data
       if (_authRepository.isUserLoggedIn()) {
         _currentUser = _authRepository.getCurrentUser();
 
-        // If we have a stored user but no current user data, try to refresh from repository
         if (_currentUser == null) {
           final firebaseUser = FirebaseAuth.instance.currentUser;
           if (firebaseUser != null) {
-            // Try to get fresh user data from Firestore
             try {
               final userDoc = await FirebaseService.getUser(firebaseUser.uid);
               if (userDoc.exists) {
-                _currentUser = UserModel.fromMap(
-                  userDoc.data() as Map<String, dynamic>,
-                  userId: firebaseUser.uid,
+                _currentUser = UserModel.fromFirestore(
+                  userDoc as DocumentSnapshot<Map<String, dynamic>>,
                 );
-                // Update SharedPreferences
                 await SharedPreferencesHelper.saveUserData(_currentUser!);
               }
             } catch (e) {
-              // If we can't get user data, logout
               await logout();
             }
           }
         }
       }
     } catch (e) {
-      // If there's any error during initialization, clear the session
       await logout();
     }
   }
@@ -75,9 +58,8 @@ class AuthViewModel extends ChangeNotifier {
     try {
       final userDoc = await FirebaseService.getUser(_currentUser!.userId);
       if (userDoc.exists) {
-        _currentUser = UserModel.fromMap(
-          userDoc.data() as Map<String, dynamic>,
-          userId: _currentUser!.userId,
+        _currentUser = UserModel.fromFirestore(
+          userDoc as DocumentSnapshot<Map<String, dynamic>>,
         );
         await SharedPreferencesHelper.saveUserData(_currentUser!);
         notifyListeners();
@@ -97,13 +79,11 @@ class AuthViewModel extends ChangeNotifier {
     }
   }
 
-  // Set remember me
   void setRememberMe(bool value) {
     _rememberMe = value;
     notifyListeners();
   }
 
-  // Validate form
   void validateForm({
     required String email,
     required String password,
@@ -121,12 +101,9 @@ class AuthViewModel extends ChangeNotifier {
   }) {
     bool newFormValid = false;
 
-    // Check which form is active
     if (_isLoginMode) {
-      // For Login: Enable button if email and password are not empty
       newFormValid = email.trim().isNotEmpty && password.trim().isNotEmpty;
     } else {
-      // For Register: Enable button if all required fields have some value
       newFormValid = email.trim().isNotEmpty &&
           password.trim().isNotEmpty &&
           confirmPassword != null &&
@@ -149,17 +126,14 @@ class AuthViewModel extends ChangeNotifier {
           country.trim().isNotEmpty &&
           zipCode != null &&
           zipCode.trim().isNotEmpty;
-      // Note: addressLine2 is optional, so not included in validation
     }
 
-    // Only notify if the state actually changed
     if (_isFormValid != newFormValid) {
       _isFormValid = newFormValid;
       notifyListeners();
     }
   }
 
-  // Login
   Future<bool> login({required String email, required String password}) async {
     try {
       _setLoading(true);
@@ -172,7 +146,6 @@ class AuthViewModel extends ChangeNotifier {
       );
 
       _currentUser = user;
-
       _setLoading(false);
       return true;
     } catch (e) {
@@ -182,14 +155,13 @@ class AuthViewModel extends ChangeNotifier {
     }
   }
 
-  // Register
   Future<bool> register({
     required String email,
     required String password,
     required String firstName,
     required String lastName,
     required String phone,
-    required String dob,
+    required DateTime dob, // CHANGED: DateTime instead of String
     required String addressLine1,
     String? addressLine2,
     required String city,
@@ -208,7 +180,7 @@ class AuthViewModel extends ChangeNotifier {
         firstName: firstName,
         lastName: lastName,
         phone: phone,
-        dob: dob,
+        dob: dob, // Pass DateTime directly
         addressLine1: addressLine1,
         addressLine2: addressLine2,
         city: city,
@@ -219,7 +191,6 @@ class AuthViewModel extends ChangeNotifier {
       );
 
       _currentUser = newUser;
-
       _setLoading(false);
       return true;
     } catch (e) {
@@ -229,7 +200,6 @@ class AuthViewModel extends ChangeNotifier {
     }
   }
 
-  // Logout
   Future<void> logout() async {
     try {
       _setLoading(true);
@@ -247,7 +217,6 @@ class AuthViewModel extends ChangeNotifier {
     }
   }
 
-  // Reset password
   Future<bool> resetPassword(String email) async {
     final validationError = Validators.validateEmail(email);
     if (validationError != null) {
@@ -269,12 +238,10 @@ class AuthViewModel extends ChangeNotifier {
     }
   }
 
-  // Check if user is logged in
   bool isUserLoggedIn() {
     return _authRepository.isUserLoggedIn();
   }
 
-  // Private methods
   void _setLoading(bool loading) {
     _isLoading = loading;
     notifyListeners();

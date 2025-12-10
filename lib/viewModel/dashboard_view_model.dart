@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../model/user.dart';
+import '../model/user_profile.dart';
 import '../utils/app_color.dart';
 
 enum DashboardMode { education, career }
