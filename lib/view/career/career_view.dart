@@ -3,13 +3,13 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:path_wise/viewModel/career_view_model.dart';
 import 'package:path_wise/viewModel/profile_view_model.dart';
-import '../../viewModel/ai_match_view_model.dart';
 import 'package:path_wise/view/career/job_view.dart';
 import 'package:path_wise/model/career_suggestion.dart';
+import 'package:path_wise/view/profile/profile_overview_view.dart';
 
 import '../../utils/app_color.dart';
 
-// Defining KYYAP Design Colors locally
+// Defining Design Colors locally
 class _DesignColors {
   static const Color primary = Color(0xFF6C63FF);
   static const Color background = Color(0xFFF5F7FA);
@@ -46,7 +46,6 @@ class _CareerDiscoveryViewState extends State<CareerDiscoveryView> {
   Future<void> _fetchInitialData() async {
     final careerVM = context.read<CareerViewModel>();
     final profileVM = context.read<ProfileViewModel>();
-
 
     // Ensure profile is loaded first as we need UID
     if (profileVM.uid == null) {
@@ -88,7 +87,14 @@ class _CareerDiscoveryViewState extends State<CareerDiscoveryView> {
           icon: const Icon(
               Icons.arrow_back_ios, color: AppColors.textPrimary, size: 20),
           onPressed: () => Navigator.pop(context),
-        )
+        ),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.refresh, color: _DesignColors.primary),
+            onPressed: () => _confirmRegenerate(context),
+            tooltip: 'Regenerate Analysis',
+          ),
+        ],
       ),
       body: Consumer<CareerViewModel>(
         builder: (context, careerVM, child) {
@@ -713,6 +719,16 @@ class _CareerDiscoveryViewState extends State<CareerDiscoveryView> {
   }
 
   Future<void> _confirmGenerate(BuildContext context) async {
+    // Check profile completion before proceeding
+    final profileVM = context.read<ProfileViewModel>();
+    final completion = profileVM.profile?.completionPercent ?? 0;
+
+    // If profile completion is less than 50%, show warning dialog
+    if (completion < 50) {
+      _showProfileIncompleteDialog(context, completion);
+      return;
+    }
+
     final shouldRegenerate = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
@@ -744,10 +760,122 @@ class _CareerDiscoveryViewState extends State<CareerDiscoveryView> {
     }
   }
 
+  void _showProfileIncompleteDialog(BuildContext context, double completion) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Row(
+          children: [
+            Icon(Icons.warning_amber_rounded, color: _DesignColors.warning, size: 28),
+            const SizedBox(width: 12),
+            const Expanded(
+              child: Text(
+                'Profile Incomplete',
+                style: TextStyle(fontSize: 18),
+              ),
+            ),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Your profile is ${completion.toInt()}% complete. You need at least 50% completion to generate career predictions.',
+              style: const TextStyle(
+                color: _DesignColors.textSecondary,
+                height: 1.5,
+              ),
+            ),
+            const SizedBox(height: 16),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: _DesignColors.info.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: _DesignColors.info.withOpacity(0.3)),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Please complete these sections:',
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      color: _DesignColors.textPrimary,
+                      fontSize: 13,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  _buildRequirementItem('Skills', Icons.bolt_outlined),
+                  _buildRequirementItem('Education', Icons.school_outlined),
+                  _buildRequirementItem('Experience', Icons.work_outline),
+                  _buildRequirementItem('Job Preferences', Icons.tune_outlined),
+                  _buildRequirementItem('Location', Icons.location_on_outlined),
+                  _buildRequirementItem('Personality', Icons.psychology_outlined),
+                ],
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text(
+              'Stay Here',
+              style: TextStyle(color: _DesignColors.textSecondary),
+            ),
+          ),
+          ElevatedButton.icon(
+            onPressed: () {
+              Navigator.pop(context);
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => const ProfileOverviewScreen(),
+                ),
+              );
+            },
+            icon: const Icon(Icons.person_outline, size: 18, color: Colors.white),
+            label: const Text(
+              'Complete Profile',
+              style: TextStyle(color: Colors.white),
+            ),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: _DesignColors.primary,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildRequirementItem(String text, IconData icon) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 6),
+      child: Row(
+        children: [
+          Icon(icon, size: 16, color: _DesignColors.info),
+          const SizedBox(width: 8),
+          Text(
+            text,
+            style: const TextStyle(
+              fontSize: 12,
+              color: _DesignColors.textPrimary,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Future<void> _generatePrediction(BuildContext context) async {
     final careerVM = context.read<CareerViewModel>();
     final profileVM = context.read<ProfileViewModel>();
-    final aiMatchVM = context.read<AIMatchViewModel>();
 
     if (profileVM.profile == null) {
       await profileVM.loadAll();

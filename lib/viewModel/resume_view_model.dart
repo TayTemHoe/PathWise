@@ -8,6 +8,8 @@ import 'package:path_wise/services/resume_service.dart';
 import 'package:path_wise/services/profile_service.dart';
 import 'package:path_wise/model/user_profile.dart';
 
+import '../model/ai_match_model.dart';
+
 class ResumeViewModel extends ChangeNotifier {
   ResumeViewModel({
     ResumeService? resumeService,
@@ -295,7 +297,7 @@ class ResumeViewModel extends ChangeNotifier {
   // =============================
 
   /// Download resume as PDF
-  Future<String?> downloadResume(ResumeDoc resume) async {
+  Future<String?> downloadResume(ResumeDoc resume, List<EnglishTest>? englishT) async {
     _setDownloading(true);
     _setError(null);
 
@@ -331,6 +333,7 @@ class ResumeViewModel extends ChangeNotifier {
       final path = await _resumeService.downloadResumePDF(
         resume: resume,
         profile: _UserModel!,
+        englishTests: englishT
       );
 
       _setSuccess('Resume saved successfully!\nLocation: $path');

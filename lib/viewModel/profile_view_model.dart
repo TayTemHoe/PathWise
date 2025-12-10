@@ -173,38 +173,48 @@ class ProfileViewModel extends ChangeNotifier {
 
   // ------------- Update: Personal Info -------------
   Future<bool> updatePersonalInfo({
-    String? name,
+    String? firstName,
+    String? lastName,
     String? email,
     String? phone,
     Timestamp? dob,
-    String? gender,
     String? city,
     String? state,
     String? country,
+    String? zipCode,
+    String? addressLine1,
+    String? addressLine2,
   }) async {
     _setSavingRoot(true);
     _setError(null);
     try {
       await _service.updatePersonalInfo(
         uid: uid,
-        name: name,
+        firstName: firstName,
+        lastName: lastName,
         email: email,
         phone: phone,
         dob: dob,
-        gender: gender,
         city: city,
         state: state,
         country: country,
+        zipCode: zipCode,
+        addressLine1: addressLine1,
+        addressLine2: addressLine2,
       );
       // Update local cache
       _profile = (_profile ?? const UserModel(userId: '', firstName: '', lastName: '', email: '')).copyWith(
-        firstName: name, // Adapting to new UserModel structure if split first/last, or name
+        firstName: firstName, // Adapting to new UserModel structure if split first/last, or name
+        lastName: lastName,
         email: email ?? _profile?.email,
         phone: phone ?? _profile?.phone,
         dob: dob ?? _profile?.dob,
         city: city ?? _profile?.city,
         state: state ?? _profile?.state,
         country: country ?? _profile?.country,
+        zipCode: zipCode ?? _profile?.zipCode,
+        addressLine1: addressLine1 ?? _profile?.addressLine1,
+        addressLine2: addressLine2 ?? _profile?.addressLine2,
         lastUpdated: Timestamp.now(),
       );
       notifyListeners();

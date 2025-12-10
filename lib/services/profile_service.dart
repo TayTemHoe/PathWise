@@ -177,26 +177,32 @@ class ProfileService {
 
   Future<void> updatePersonalInfo({
     required String uid,
-    String? name,
+    String? firstName,
+    String? lastName,
     String? email,
     String? phone,
     Timestamp? dob,
-    String? gender,
     String? city,
     String? state,
     String? country,
     String? profilePictureUrl,
+    String? zipCode,
+    String? addressLine1,
+    String? addressLine2,
   }) async {
     final p = <String, dynamic>{
-      if (name != null) 'personalInfo.name': name,
-      if (email != null) 'personalInfo.email': email,
-      if (phone != null) 'personalInfo.phone': phone,
-      if (dob != null) 'personalInfo.dob': dob,
-      if (gender != null) 'personalInfo.gender': gender,
-      if (city != null) 'personalInfo.location.city': city,
-      if (state != null) 'personalInfo.location.state': state,
-      if (country != null) 'personalInfo.location.country': country,
+      if (firstName!= null) 'first_name': firstName,
+      if (lastName!= null) 'last_name': lastName,
+      if (email != null) 'email': email,
+      if (phone != null) 'phone': phone,
+      if (dob != null) 'dob': dob,
+      if (city != null) 'city': city,
+      if (state != null) 'state': state,
+      if (country != null) 'country': country,
       if (profilePictureUrl != null) 'personalInfo.profilePictureUrl': profilePictureUrl,
+      if (zipCode != null) 'zip_code': zipCode,
+      if (addressLine1 != null) 'address_line1': addressLine1,
+      if (addressLine2 != null) 'address_line2': addressLine2,
     };
     await patchRoot(uid, p);
   }

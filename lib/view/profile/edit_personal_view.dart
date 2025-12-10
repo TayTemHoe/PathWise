@@ -367,12 +367,16 @@ class _EditPersonalInfoScreenState extends State<EditPersonalInfoScreen> {
                         if (!_formKey.currentState!.validate()) return;
 
                         final ok = await vm.updatePersonalInfo(
-                          name: '${_firstNameCtrl.text.trim()} ${_lastNameCtrl.text.trim()}',
+                          firstName: _firstNameCtrl.text.trim(),
+                          lastName: _lastNameCtrl.text.trim(),
                           phone: _phoneCtrl.text.trim(),
                           dob: _dob != null ? Timestamp.fromDate(_dob!) : null,
                           city: _cityCtrl.text.trim(),
                           state: _stateCtrl.text.trim(),
                           country: _countryCtrl.text.trim(),
+                          zipCode: _zipCodeCtrl.text.trim(),
+                          addressLine1: _addressLine1Ctrl.text.trim(),
+                          addressLine2: _addressLine2Ctrl.text.trim(),
                         );
 
                         if (!mounted) return;

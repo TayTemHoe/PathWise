@@ -98,7 +98,7 @@ class _ResumeListPageState extends State<ResumeListPage> {
                       const SizedBox(height: 24),
                       _buildStatsRow(resumeVM),
                       const SizedBox(height: 24),
-                      _buildYourResumesSection(context, resumeVM),
+                      _buildYourResumesSection(context, resumeVM, profileVM),
                       const SizedBox(height: 80), // Bottom padding
                     ],
                   ),
@@ -288,7 +288,7 @@ class _ResumeListPageState extends State<ResumeListPage> {
     );
   }
 
-  Widget _buildYourResumesSection(BuildContext context, ResumeViewModel viewModel) {
+  Widget _buildYourResumesSection(BuildContext context, ResumeViewModel viewModel, ProfileViewModel pVM) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -330,7 +330,7 @@ class _ResumeListPageState extends State<ResumeListPage> {
             physics: const NeverScrollableScrollPhysics(),
             itemCount: viewModel.resumes.length,
             itemBuilder: (context, index) {
-              return _buildResumeCard(context, viewModel, viewModel.resumes[index]);
+              return _buildResumeCard(context, viewModel, viewModel.resumes[index], pVM);
             },
           ),
       ],
@@ -380,6 +380,7 @@ class _ResumeListPageState extends State<ResumeListPage> {
       BuildContext context,
       ResumeViewModel viewModel,
       ResumeDoc resume,
+      ProfileViewModel pVm,
       ) {
     final dateFormat = DateFormat('MMM dd, yyyy');
     final updatedDate = resume.updatedAt != null
@@ -474,7 +475,7 @@ class _ResumeListPageState extends State<ResumeListPage> {
                       builder: (context) => _buildLoadingDialog('Downloading resume...'),
                     );
 
-                    final path = await viewModel.downloadResume(resume);
+                    final path = await viewModel.downloadResume(resume, pVm.englishTests);
 
                     if (context.mounted) {
                       Navigator.pop(context);

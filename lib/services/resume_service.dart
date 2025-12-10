@@ -234,6 +234,7 @@ class ResumeService {
     }
   }
 
+  /// Share resume PDF
   Future<void> shareResumePDF({
     required ResumeDoc resume,
     required UserModel profile,
@@ -337,7 +338,7 @@ class ResumeService {
                     ],
 
                     if (englishTests.isNotEmpty) ...[
-                      _buildSectionHeader('ENGLISH PROFICIENCY', secondaryColor, font, resume.font.header2FontSize.toDouble()),
+                      _buildSectionHeader('LANGUAGES & PROFICIENCY', secondaryColor, font, resume.font.header2FontSize.toDouble()),
                       pw.SizedBox(height: 12),
                       ...englishTests.map((test) => _buildStyledEnglishTest(test, secondaryColor, font, resume)),
                       pw.SizedBox(height: 24),
@@ -431,7 +432,6 @@ class ResumeService {
                       pw.SizedBox(height: 16),
                     ],
 
-                    // ✅ FIXED: Skills section for Business Template
                     if (resume.sections.skills && profile.skills != null && profile.skills!.isNotEmpty) ...[
                       _buildSectionHeaderPDF('SKILLS', secondaryColor, font, 14),
                       pw.SizedBox(height: 8),
@@ -452,9 +452,8 @@ class ResumeService {
                       pw.SizedBox(height: 16),
                     ],
 
-                    // ✅ FIXED: English Tests for Business Template
                     if (englishTests.isNotEmpty) ...[
-                      _buildSectionHeaderPDF('LANGUAGES', secondaryColor, font, 14),
+                      _buildSectionHeaderPDF('LANGUAGES & PROFICIENCY', secondaryColor, font, 14),
                       pw.SizedBox(height: 8),
                       ...englishTests.map((test) => _buildStyledEnglishTest(test, secondaryColor, font, resume)),
                       pw.SizedBox(height: 16),
@@ -510,7 +509,6 @@ class ResumeService {
                     pw.Text(profile.name, style: pw.TextStyle(font: font, color: PdfColors.white, fontSize: 20, fontWeight: pw.FontWeight.bold), textAlign: pw.TextAlign.center),
                     pw.SizedBox(height: 20),
 
-                    // ✅ FIXED: Contact (Email, Phone, Location)
                     if (resume.sections.personalInfo) ...[
                       pw.Text('CONTACT', style: pw.TextStyle(color: PdfColors.white, fontWeight: pw.FontWeight.bold)),
                       pw.SizedBox(height: 10),
@@ -527,7 +525,6 @@ class ResumeService {
                       pw.SizedBox(height: 20),
                     ],
 
-                    // Skills in Sidebar
                     if (resume.sections.skills && profile.skills != null && profile.skills!.isNotEmpty) ...[
                       pw.Text('SKILLS', style: pw.TextStyle(color: PdfColors.white, fontWeight: pw.FontWeight.bold)),
                       pw.SizedBox(height: 10),
@@ -539,7 +536,6 @@ class ResumeService {
 
                     pw.SizedBox(height: 20),
 
-                    // ✅ FIXED: English Tests in Sidebar
                     if (englishTests.isNotEmpty) ...[
                       pw.Text('LANGUAGES', style: pw.TextStyle(color: PdfColors.white, fontWeight: pw.FontWeight.bold)),
                       pw.SizedBox(height: 10),
@@ -628,7 +624,6 @@ class ResumeService {
                 pw.SizedBox(height: 16),
               ],
 
-              // ✅ FIXED: Skills Section for Academic
               if (resume.sections.skills && profile.skills != null && profile.skills!.isNotEmpty) ...[
                 _buildSectionHeaderPDF('SKILLS & EXPERTISE', secondaryColor, font, 12),
                 pw.SizedBox(height: 8),
@@ -644,9 +639,8 @@ class ResumeService {
                 pw.SizedBox(height: 16),
               ],
 
-              // ✅ FIXED: English Tests for Academic
               if (englishTests.isNotEmpty) ...[
-                _buildSectionHeaderPDF('LANGUAGES', secondaryColor, font, 12),
+                _buildSectionHeaderPDF('LANGUAGES & PROFICIENCY', secondaryColor, font, 12),
                 pw.SizedBox(height: 10),
                 ...englishTests.map((test) => _buildStyledEnglishTest(test, primaryColor, font, resume)),
                 pw.SizedBox(height: 16),
@@ -668,6 +662,26 @@ class ResumeService {
   // Widget Builders (Helpers)
   // =============================
 
+  // ✅ HELPER: Aggregate subjects and grades into a string
+  String _getSubjectSummary(List<SubjectGrade> subjects) {
+    if (subjects.isEmpty) return '';
+
+    // Aggregate by grade count: e.g. { "A+": 2, "A": 3 }
+    final distribution = <String, int>{};
+    for (final s in subjects) {
+      final g = s.grade.trim();
+      if (g.isNotEmpty) {
+        distribution[g] = (distribution[g] ?? 0) + 1;
+      }
+    }
+
+    // Sort keys roughly alphabetically or however beneficial
+    final entries = distribution.entries.toList()
+      ..sort((a, b) => a.key.compareTo(b.key));
+
+    return entries.map((e) => '${e.value}${e.key}').join(', ');
+  }
+
   pw.Widget _buildStyledEducation(
       AcademicRecord edu,
       PdfColor color,
@@ -679,6 +693,9 @@ class ResumeService {
     final score = edu.cgpa != null ? 'CGPA: ${edu.cgpa}' : (edu.totalScore != null ? 'Score: ${edu.totalScore}' : null);
     final honors = edu.honors ?? edu.classOfAward ?? edu.classification;
     final dateRange = _formatDateRange(edu.startDate, edu.endDate, edu.isCurrent);
+
+    // ✅ Generate Subject Summary
+    final subjectSummary = _getSubjectSummary(edu.subjects);
 
     return pw.Container(
       margin: const pw.EdgeInsets.only(bottom: 12),
@@ -715,6 +732,8 @@ class ResumeService {
                     subTitle,
                     style: pw.TextStyle(font: font, fontSize: resume.font.contentFontSize.toDouble(), color: PdfColors.grey800),
                   ),
+
+                // Details Row
                 pw.Wrap(
                     spacing: 12,
                     children: [
@@ -728,6 +747,15 @@ class ResumeService {
                         pw.Text(edu.examType!, style: pw.TextStyle(fontSize: 10, color: PdfColors.grey700)),
                     ]
                 ),
+
+                // ✅ Subject Summary Display
+                if (subjectSummary.isNotEmpty) ...[
+                  pw.SizedBox(height: 4),
+                  pw.Text(
+                    'Results: $subjectSummary',
+                    style: pw.TextStyle(font: font, fontSize: 10, color: PdfColors.grey800),
+                  ),
+                ]
               ],
             ),
           ),
