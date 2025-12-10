@@ -307,6 +307,36 @@ class ProfileViewModel extends ChangeNotifier {
     }
   }
 
+  Future<bool> updateUserRole(String newRole) async {
+    _setSavingRoot(true);
+    _setError(null);
+    try {
+      // Update Firestore with the new role
+      await _service.updateUserRole(uid: uid, userRole: newRole);
+
+      // Update local cache
+      _profile = (_profile ?? const UserModel(
+          userId: '',
+          firstName: '',
+          lastName: '',
+          email: ''
+      )).copyWith(
+        userRole: newRole,
+        lastUpdated: Timestamp.now(),
+      );
+
+      notifyListeners();
+
+      // No need to recalculate completion as role doesn't affect it
+      return true;
+    } catch (e) {
+      debugPrint('❌ Error updating user role: $e');
+      _setError(e);
+      return false;
+    } finally {
+      _setSavingRoot(false);
+    }
+  }
   // ------------- Skills CRUD -------------
   Future<bool> addSkill(Skill draft) async {
     _setSavingSkill(true);

@@ -10,6 +10,7 @@ import 'package:intl/intl.dart'; // Ensure intl is in pubspec.yaml, widely used 
 import '../utils/app_color.dart';
 import '../viewModel/dashboard_view_model.dart';
 import '../viewModel/auth_view_model.dart';
+import '../viewModel/profile_view_model.dart';
 import '../widgets/random_circle_background.dart';
 import 'ai_match_screen.dart';
 import 'program_list_screen.dart';
@@ -30,10 +31,17 @@ class _DashboardScreenState extends State<DashboardScreen> {
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
       final authVM = context.read<AuthViewModel>();
+      final dashboardVM = context.read<DashboardViewModel>();
+
       if (authVM.currentUser != null) {
-        context.read<DashboardViewModel>().init(authVM.currentUser!);
+        // First refresh user data from Firestore to ensure we have latest role
+        await authVM.refreshCurrentUser();
+        // Then initialize dashboard with the refreshed user data
+        if (authVM.currentUser != null) {
+          dashboardVM.init(authVM.currentUser!);
+        }
       }
     });
   }
@@ -91,62 +99,57 @@ class _DashboardScreenState extends State<DashboardScreen> {
     }
   }
 
-  void _showComingSoon(String feature) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Row(
-          children: [
-            const Icon(Icons.construction, color: Colors.white, size: 20),
-            const SizedBox(width: 12),
-            Text('$feature is coming soon!',
-                style: const TextStyle(fontWeight: FontWeight.w600)),
-          ],
-        ),
-        backgroundColor: AppColors.primary,
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
-    // Using a slightly off-white background to add depth vs pure white cards
     return Scaffold(
       backgroundColor: const Color(0xFFF8F9FD),
       body: Consumer<DashboardViewModel>(
         builder: (context, viewModel, _) {
-          return CustomScrollView(
-            physics: const BouncingScrollPhysics(),
-            slivers: [
-              _buildModernAppBar(context),
-              SliverToBoxAdapter(
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(20, 10, 20, 0),
-                  child: Column(
-                    children: [
-                      _buildEnhancedWelcomeCard(viewModel),
-                      const SizedBox(height: 32),
-                      _buildSectionHeader(
-                          'Explore ${viewModel.currentMode == DashboardMode.education ? "Education" : "Career"}',
-                          Icons.explore_rounded),
-                      const SizedBox(height: 16),
-                      _buildFeaturesList(
-                        viewModel.currentMode == DashboardMode.education
-                            ? viewModel.educationFeatures
-                            : viewModel.careerFeatures,
-                      ),
-                      const SizedBox(height: 32),
-                      _buildSectionHeader(
-                          'Personal Growth', Icons.psychology_rounded),
-                      const SizedBox(height: 16),
-                      _buildFeaturesList(viewModel.sharedFeatures),
-                      const SizedBox(height: 40),
-                    ],
+          return RefreshIndicator(
+            edgeOffset: kToolbarHeight + MediaQuery.of(context).padding.top,
+            onRefresh: () async {
+              final authVM = context.read<AuthViewModel>();
+              if (authVM.currentUser != null) {
+                // Force re-fetch user data from repository to get latest role
+                await authVM.refreshCurrentUser();
+                viewModel.init(authVM.currentUser!);
+              }
+            },
+            color: AppColors.primary,
+            child: CustomScrollView(
+              physics: const AlwaysScrollableScrollPhysics(
+                parent: BouncingScrollPhysics(),
+              ),
+              slivers: [
+                _buildModernAppBar(context),
+                SliverToBoxAdapter(
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(20, 10, 20, 0),
+                    child: Column(
+                      children: [
+                        _buildEnhancedWelcomeCard(viewModel),
+                        const SizedBox(height: 32),
+                        _buildSectionHeader(
+                            'Explore ${viewModel.currentMode == DashboardMode.education ? "Education" : "Career"}',
+                            Icons.explore_rounded),
+                        const SizedBox(height: 16),
+                        _buildFeaturesList(
+                          viewModel.currentMode == DashboardMode.education
+                              ? viewModel.educationFeatures
+                              : viewModel.careerFeatures,
+                        ),
+                        const SizedBox(height: 32),
+                        _buildSectionHeader(
+                            'Personal Growth', Icons.psychology_rounded),
+                        const SizedBox(height: 16),
+                        _buildFeaturesList(viewModel.sharedFeatures),
+                        const SizedBox(height: 40),
+                      ],
+                    ),
                   ),
                 ),
-              ),
-            ],
+              ],
+            ),
           );
         },
       ),
@@ -229,6 +232,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   Widget _buildEnhancedWelcomeCard(DashboardViewModel viewModel) {
+    final profileVM = context.watch<ProfileViewModel>();
+    final photoUrl = profileVM.profile?.profilePictureUrl;
+
     final user = viewModel.currentUser;
     final isEdu = viewModel.currentMode == DashboardMode.education;
     final dateStr = DateFormat('EEE, d MMM').format(DateTime.now());
@@ -361,9 +367,15 @@ class _DashboardScreenState extends State<DashboardScreen> {
                           color: Colors.white.withOpacity(0.3),
                         ),
                         child: CircleAvatar(
-                          radius: 28, // Visible profile placeholder
+                          radius: 28,
                           backgroundColor: Colors.white,
-                          child: Text(
+                          // ✅ NEW: Load network image if available
+                          backgroundImage: (photoUrl != null && photoUrl.isNotEmpty)
+                              ? NetworkImage(photoUrl)
+                              : null,
+                          // ✅ NEW: Show text only if no image
+                          child: (photoUrl == null || photoUrl.isEmpty)
+                              ? Text(
                             (user?.firstName?.isNotEmpty == true)
                                 ? user!.firstName[0].toUpperCase()
                                 : "U",
@@ -371,7 +383,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                 fontSize: 24,
                                 fontWeight: FontWeight.bold,
                                 color: AppColors.primary),
-                          ),
+                          )
+                              : null,
                         ),
                       ),
                     ],

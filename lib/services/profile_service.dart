@@ -134,6 +134,27 @@ class ProfileService {
     }
   }
 
+  Future<void> updateUserRole({
+    required String uid,
+    required String userRole,
+  }) async {
+    try {
+      debugPrint('🔄 ProfileService: Updating user role to $userRole');
+
+      final patch = <String, dynamic>{
+        'user_role': userRole, // For backward compatibility with old field name
+      };
+
+      await patchRoot(uid, patch);
+
+      debugPrint('✅ ProfileService: User role updated successfully');
+    } catch (e, st) {
+      debugPrint('❌ ProfileService: updateUserRole error: $e');
+      debugPrint('Stack trace: $st');
+      rethrow;
+    }
+  }
+
   Future<void> createOrMergeUser(String uid, UserModel profile) async {
     try {
       debugPrint('🔧 ProfileService: Creating/merging user uid=$uid');

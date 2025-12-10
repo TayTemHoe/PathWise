@@ -32,6 +32,7 @@ class DashboardViewModel extends ChangeNotifier {
   // Initialize based on user role
   void init(UserModel user) {
     _currentUser = user;
+    // Always reset to user's role, don't keep previous state
     if (user.userRole == 'career') {
       _currentMode = DashboardMode.career;
     } else {

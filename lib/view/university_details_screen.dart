@@ -34,7 +34,6 @@ class _UniversityDetailScreenState extends State<UniversityDetailScreen>
   late TabController _tabController;
   int _availableTabCount = 0;
   final List<String> _availableTabs = [];
-  final GlobalKey _shareCardKey = GlobalKey();
 
   @override
   void initState() {
@@ -104,7 +103,17 @@ class _UniversityDetailScreenState extends State<UniversityDetailScreen>
             return _buildErrorState(viewModel);
           }
 
-          final university = viewModel.university;
+          final calculatedProgramCount = viewModel.programsByLevel.values
+              .fold(0, (sum, list) => sum + list.length);
+
+          // ✅ FIXED: Merge branches and updated program count into UniversityModel
+          final university = viewModel.university?.copyWith(
+            branches: viewModel.branches,
+            programCount: calculatedProgramCount > 0
+                ? calculatedProgramCount
+                : viewModel.university?.programCount,
+          );
+
           if (university == null) {
             return _buildEmptyState();
           }
@@ -411,11 +420,11 @@ class _UniversityDetailScreenState extends State<UniversityDetailScreen>
                       : 'QS Ranking #${university.minRanking} - ${university.maxRanking}',
                   isTopRanked: university.isTopRanked,
                 ),
-              _buildBadge(
-                AppColors.secondary,
-                Icons.business,
-                university.institutionType,
-              ),
+              // _buildBadge(
+              //   AppColors.secondary,
+              //   Icons.business,
+              //   university.institutionType,
+              // ),
               if (university.programCount > 0)
                 _buildBadge(
                   AppColors.accent,
@@ -554,6 +563,11 @@ class _UniversityDetailScreenState extends State<UniversityDetailScreen>
   }
 
   Widget _buildOverviewTab(UniversityModel university) {
+    final hasUniversityInfo =
+        (university.minRanking != null) ||
+            (university.programCount > 0) ||
+            (university.branches.length > 1);
+
     return Container(
       color: AppColors.background,
       child: SingleChildScrollView(
@@ -561,56 +575,58 @@ class _UniversityDetailScreenState extends State<UniversityDetailScreen>
         child: Column(
           children: [
             // University Information Section
-            Container(
-              padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(12.0),
+            if (hasUniversityInfo) ...[
+              Container(
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(12.0),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'University Information',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: AppColors.textPrimary,
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    if (university.minRanking != null)
+                      InfoRow(
+                        icon: Icons.emoji_events,
+                        label: 'QS Ranking',
+                        value:
+                            university.maxRanking == null ||
+                                university.minRanking == university.maxRanking
+                            ? '#${university.minRanking}'
+                            : '#${university.minRanking} - ${university.maxRanking}',
+                      ),
+                    // InfoRow(
+                    //   icon: Icons.business,
+                    //   label: 'Institution Type',
+                    //   value: university.institutionType,
+                    // ),
+                    if (university.programCount > 0)
+                      InfoRow(
+                        icon: Icons.book,
+                        label: 'Total Programs',
+                        value: '${university.programCount} programs',
+                      ),
+                    if (university.branches.length > 1)
+                      InfoRow(
+                        icon: Icons.location_city,
+                        label: 'Campuses',
+                        value: '${university.branches.length} locations',
+                      ),
+                  ],
+                ),
               ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    'University Information',
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                      color: AppColors.textPrimary,
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  if (university.minRanking != null)
-                    InfoRow(
-                      icon: Icons.emoji_events,
-                      label: 'QS Ranking',
-                      value:
-                          university.maxRanking == null ||
-                              university.minRanking == university.maxRanking
-                          ? '#${university.minRanking}'
-                          : '#${university.minRanking} - ${university.maxRanking}',
-                    ),
-                  InfoRow(
-                    icon: Icons.business,
-                    label: 'Institution Type',
-                    value: university.institutionType,
-                  ),
-                  if (university.programCount > 0)
-                    InfoRow(
-                      icon: Icons.book,
-                      label: 'Total Programs',
-                      value: '${university.programCount} programs',
-                    ),
-                  if (university.branches.length > 1)
-                    InfoRow(
-                      icon: Icons.location_city,
-                      label: 'Campuses',
-                      value: '${university.branches.length} locations',
-                    ),
-                ],
-              ),
-            ),
 
-            const SizedBox(height: 12),
+              const SizedBox(height: 12),
+            ],
 
             // About Section
             if (university.uniDescription.isNotEmpty) ...[

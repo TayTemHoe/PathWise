@@ -81,7 +81,7 @@ class _FilterBottomSheetState extends State<FilterBottomSheet> {
     // Initialize location and type
     _selectedCountry = widget.initialFilter.country;
     _selectedCity = widget.initialFilter.city;
-    _selectedType = widget.initialFilter.institutionType;
+    // _selectedType = widget.initialFilter.institutionType;
 
     // Load cities if country is selected
     if (_selectedCountry != null && !_isDisposed) {
@@ -315,8 +315,8 @@ class _FilterBottomSheetState extends State<FilterBottomSheet> {
                   const SizedBox(height: 24),
                   _buildTuitionFilter(filterVM),
                   const SizedBox(height: 24),
-                  _buildInstitutionTypeFilter(filterVM),
-                  const SizedBox(height: 24),
+                  // _buildInstitutionTypeFilter(filterVM),
+                  // const SizedBox(height: 24),
                 ],
               ),
             ),
@@ -899,7 +899,7 @@ class _FilterBottomSheetState extends State<FilterBottomSheet> {
           : null,
       country: _selectedCountry,
       city: _selectedCity,
-      institutionType: _selectedType,
+      // institutionType: _selectedType,
       minTuitionFeeMYR: _minTuitionController.text.isNotEmpty
           ? double.tryParse(_minTuitionController.text)
           : null,

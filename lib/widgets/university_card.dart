@@ -444,11 +444,11 @@ class UniversityCard extends StatelessWidget {
       runSpacing: 6,
       children: [
         if (university.minRanking != null) _buildRankingBadge(),
-        _buildInfoChip(
-          icon: Icons.business,
-          label: university.institutionType,
-          color: AppColors.secondary,
-        ),
+        // _buildInfoChip(
+        //   icon: Icons.business,
+        //   label: university.institutionType,
+        //   color: AppColors.secondary,
+        // ),
         if (university.totalFacultyStaff != null)
           _buildInfoChip(
             icon: Icons.group,
