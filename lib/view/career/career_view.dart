@@ -88,13 +88,6 @@ class _CareerDiscoveryViewState extends State<CareerDiscoveryView> {
               Icons.arrow_back_ios, color: AppColors.textPrimary, size: 20),
           onPressed: () => Navigator.pop(context),
         ),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh, color: _DesignColors.primary),
-            onPressed: () => _confirmRegenerate(context),
-            tooltip: 'Regenerate Analysis',
-          ),
-        ],
       ),
       body: Consumer<CareerViewModel>(
         builder: (context, careerVM, child) {
