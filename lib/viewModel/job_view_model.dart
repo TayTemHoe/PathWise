@@ -76,7 +76,7 @@ class JobViewModel extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Search jobs with query and country
+  /// Search jobs with query and country (basic search without filters)
   /// This fetches ALL results from API and stores them
   Future<bool> searchJobs({
     required String query,
@@ -124,7 +124,87 @@ class JobViewModel extends ChangeNotifier {
     }
   }
 
-  /// Apply filters to existing search results
+  /// MODE 1: Search jobs with filters from API
+  /// This method performs a new API search with query and applies filters
+  Future<bool> searchJobsWithFilters({
+    required String query,
+    required String country,
+    required JobFilters filters,
+  }) async {
+    try {
+      _setSearching(true);
+      _errorMessage = null;
+      _currentFilters = filters;
+
+      _lastSearchQuery = query;
+      _lastSearchCountry = country;
+
+      debugPrint('🔍 MODE 1: Searching with filters from API');
+      debugPrint('   Query: "$query", Country: "$country"');
+      debugPrint('   Active filters: ${filters.activeFilterCount}');
+
+      // Step 1: Fetch from API with query, country, and date posted
+      final results = await _jobService.fetchJobs(
+        query: query,
+        country: country,
+        datePosted: filters.dateRange,
+        maxResults: 500,
+      );
+
+      _allSearchResults = results;
+
+      // Step 2: Apply local filters (salary, location, work mode, employment type)
+      _filteredResults = _jobService.applyLocalFilters(
+        _allSearchResults,
+        filters,
+      );
+
+      _setSearching(false);
+
+      debugPrint('✅ API returned ${_allSearchResults.length} jobs');
+      debugPrint('✅ After local filters: ${_filteredResults.length} jobs');
+      return true;
+    } catch (e) {
+      debugPrint('❌ Error searching jobs with filters: $e');
+      _setError('Failed to search jobs: ${e.toString()}');
+      return false;
+    }
+  }
+
+  /// MODE 2: Apply filters to existing results only (no API call)
+  /// This method filters the already fetched results without making a new API call
+  Future<bool> applyFiltersToExistingResults(JobFilters filters) async {
+    try {
+      if (_allSearchResults.isEmpty) {
+        debugPrint('⚠️ No existing results to filter');
+        return false;
+      }
+
+      debugPrint('🔧 MODE 2: Filtering existing results (no API call)');
+      debugPrint('   Total results available: ${_allSearchResults.length}');
+      debugPrint('   Active filters: ${filters.activeFilterCount}');
+
+      _currentFilters = filters;
+
+      // Apply local filters to existing results
+      _filteredResults = _jobService.applyLocalFilters(
+        _allSearchResults,
+        filters,
+      );
+
+      notifyListeners();
+
+      debugPrint('✅ Filtered results: ${_filteredResults.length} jobs');
+      return true;
+    } catch (e) {
+      debugPrint('❌ Error applying filters to existing results: $e');
+      _setError('Failed to apply filters: ${e.toString()}');
+      return false;
+    }
+  }
+
+  /// Apply filters (legacy method - determines whether to search or filter)
+  /// DEPRECATED: Use searchJobsWithFilters() or applyFiltersToExistingResults() instead
   Future<bool> applyFilters(JobFilters filters) async {
     try {
       _currentFilters = filters;
@@ -301,7 +381,6 @@ class JobViewModel extends ChangeNotifier {
   Future<void> refreshSavedJobs(String uid) async {
     await fetchSavedJobs(uid);
   }
-
 
   /// Search in saved jobs
   List<JobModel> searchSavedJobs(String query) {

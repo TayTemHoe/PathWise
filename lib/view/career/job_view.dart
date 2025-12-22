@@ -144,6 +144,48 @@ class _JobViewState extends State<JobView> with SingleTickerProviderStateMixin {
     setState(() => _currentDisplayPage = 1);
   }
 
+  /// MODE 1: Search from API with filters
+  /// This method searches from JSearch API with query and applies filters
+  Future<void> _performSearchWithFilters() async {
+    final query = _searchController.text.trim();
+    if (query.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please enter a search term')),
+      );
+      return;
+    }
+
+    // Update temp filters with current values
+    setState(() {
+      _tempFilters = _tempFilters.copyWith(
+        query: query,
+        country: _selectedCountry,
+      );
+      _currentDisplayPage = 1;
+    });
+
+    // Close the filter sheet if open
+    if (mounted) Navigator.of(context).pop();
+
+    // Perform search with filters
+    final jobVM = context.read<JobViewModel>();
+    await jobVM.searchJobsWithFilters(
+      query: query,
+      country: _selectedCountry,
+      filters: _tempFilters,
+    );
+
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Found ${jobVM.totalSearchResults} jobs'),
+          backgroundColor: _DesignColors.success,
+        ),
+      );
+    }
+  }
+
+  /// Quick search from search bar (without opening filter sheet)
   Future<void> _performSearch() async {
     final query = _searchController.text.trim();
     if (query.isEmpty) {
@@ -161,24 +203,49 @@ class _JobViewState extends State<JobView> with SingleTickerProviderStateMixin {
       _currentDisplayPage = 1;
     });
 
-    await context.read<JobViewModel>().applyFilters(_tempFilters);
+    await context.read<JobViewModel>().searchJobsWithFilters(
+      query: query,
+      country: _selectedCountry,
+      filters: _tempFilters,
+    );
   }
 
-  // Called when "Apply Filters" is clicked in the bottom sheet
+  /// MODE 2: Filter existing results only (no API call)
+  /// This method filters the already fetched results stored in JobViewModel
   void _applyFiltersOnly() async {
+    final jobVM = context.read<JobViewModel>();
+
+    // Check if there are existing results to filter
+    if (jobVM.totalAllResults == 0) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('No existing results to filter. Please search first.'),
+          backgroundColor: _DesignColors.warning,
+        ),
+      );
+      return;
+    }
+
     setState(() {
       _currentDisplayPage = 1;
     });
 
-    // Ensure the main search query matches the filter
-    if (_tempFilters.query != null && _tempFilters.query!.isNotEmpty) {
-      _searchController.text = _tempFilters.query!;
+    // Update temp filters with current country
+    _tempFilters = _tempFilters.copyWith(country: _selectedCountry);
+
+    // Apply filters to existing results (local filtering only)
+    await jobVM.applyFiltersToExistingResults(_tempFilters);
+
+    if (mounted) {
+      Navigator.pop(context); // Close the sheet
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Filtered to ${jobVM.totalSearchResults} jobs'),
+          backgroundColor: _DesignColors.primary,
+        ),
+      );
     }
-
-    // Apply the temp filters (which now include country and query from the sheet)
-    await context.read<JobViewModel>().applyFilters(_tempFilters);
-
-    if (mounted) Navigator.pop(context); // Close the sheet
   }
 
   void _clearFilters() {
@@ -209,8 +276,8 @@ class _JobViewState extends State<JobView> with SingleTickerProviderStateMixin {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _HelpItem(icon: Icons.search, text: 'Search for jobs by title or keyword.'),
-            _HelpItem(icon: Icons.tune, text: 'Use filters to refine by location, salary, etc.'),
+            _HelpItem(icon: Icons.search, text: 'Use "Search" to fetch new jobs from API with filters.'),
+            _HelpItem(icon: Icons.filter_alt, text: 'Use "Filter Results" to filter existing results without searching again.'),
             _HelpItem(icon: Icons.bookmark_border, text: 'Tap the bookmark icon to save jobs for later.'),
             _HelpItem(icon: Icons.public, text: 'Change country to search in different regions.'),
           ],
@@ -372,40 +439,6 @@ class _JobViewState extends State<JobView> with SingleTickerProviderStateMixin {
                         ),
                         const SizedBox(height: 20),
 
-                        // Employment Type
-                        const Text('Employment Type', style: TextStyle(fontWeight: FontWeight.w600, color: _DesignColors.textPrimary)),
-                        const SizedBox(height: 8),
-                        Wrap(
-                          spacing: 8,
-                          children: ['FULLTIME', 'PARTTIME', 'INTERN'].map((type) {
-                            final isSelected = _tempFilters.employmentTypes?.contains(type) ?? false;
-                            return FilterChip(
-                              label: Text(type),
-                              selected: isSelected,
-                              onSelected: (selected) {
-                                setSheetState(() {
-                                  final types = List<String>.from(_tempFilters.employmentTypes ?? []);
-                                  if (selected) types.add(type);
-                                  else types.remove(type);
-                                  _tempFilters = _tempFilters.copyWith(employmentTypes: types.isEmpty ? null : types);
-                                });
-                              },
-                              selectedColor: _DesignColors.primary.withOpacity(0.2),
-                              checkmarkColor: _DesignColors.primary,
-                              backgroundColor: _DesignColors.background,
-                              labelStyle: TextStyle(
-                                color: isSelected ? _DesignColors.primary : _DesignColors.textSecondary,
-                                fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                              ),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(8),
-                                side: BorderSide(color: isSelected ? _DesignColors.primary : Colors.transparent),
-                              ),
-                            );
-                          }).toList(),
-                        ),
-                        const SizedBox(height: 20),
-
                         // Date Posted
                         const Text('Date Posted', style: TextStyle(fontWeight: FontWeight.w600, color: _DesignColors.textPrimary)),
                         const SizedBox(height: 8),
@@ -425,6 +458,37 @@ class _JobViewState extends State<JobView> with SingleTickerProviderStateMixin {
                               onSelected: (selected) {
                                 setSheetState(() {
                                   _tempFilters = _tempFilters.copyWith(dateRange: selected ? item['value'] : 'all');
+                                });
+                              },
+                              selectedColor: _DesignColors.primary.withOpacity(0.2),
+                              checkmarkColor: _DesignColors.primary,
+                              backgroundColor: _DesignColors.background,
+                              labelStyle: TextStyle(
+                                color: isSelected ? _DesignColors.primary : _DesignColors.textSecondary,
+                                fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                              ),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(8),
+                                side: BorderSide(color: isSelected ? _DesignColors.primary : Colors.transparent),
+                              ),
+                            );
+                          }).toList(),
+                        ),
+                        const SizedBox(height: 20),
+
+                        // Work Mode (Remote)
+                        const Text('Work Mode', style: TextStyle(fontWeight: FontWeight.w600, color: _DesignColors.textPrimary)),
+                        const SizedBox(height: 8),
+                        Wrap(
+                          spacing: 8,
+                          children: ['Remote', 'Hybrid', 'On-site'].map((mode) {
+                            final isSelected = _tempFilters.remote == mode;
+                            return FilterChip(
+                              label: Text(mode),
+                              selected: isSelected,
+                              onSelected: (selected) {
+                                setSheetState(() {
+                                  _tempFilters = _tempFilters.copyWith(remote: selected ? mode : null);
                                 });
                               },
                               selectedColor: _DesignColors.primary.withOpacity(0.2),
@@ -487,7 +551,7 @@ class _JobViewState extends State<JobView> with SingleTickerProviderStateMixin {
                   ),
                 ),
 
-                // Apply Button
+                // Action Buttons
                 Container(
                   padding: const EdgeInsets.all(20),
                   decoration: BoxDecoration(
@@ -500,19 +564,50 @@ class _JobViewState extends State<JobView> with SingleTickerProviderStateMixin {
                       ),
                     ],
                   ),
-                  child: SizedBox(
-                    width: double.infinity,
-                    height: 50,
-                    child: ElevatedButton(
-                      onPressed: _applyFiltersOnly,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: _DesignColors.primary,
-                        foregroundColor: Colors.white,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                        elevation: 0,
-                      ),
-                      child: const Text('Show Results', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-                    ),
+                  child: Consumer<JobViewModel>(
+                    builder: (context, jobVM, _) {
+                      final hasExistingResults = jobVM.totalAllResults > 0;
+
+                      return Column(
+                        children: [
+                          // Search Button (Primary action)
+                          SizedBox(
+                            width: double.infinity,
+                            height: 50,
+                            child: ElevatedButton.icon(
+                              onPressed: _performSearchWithFilters,
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: _DesignColors.primary,
+                                foregroundColor: Colors.white,
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                elevation: 0,
+                              ),
+                              icon: const Icon(Icons.search),
+                              label: const Text('Search', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                            ),
+                          ),
+
+                          // Filter Results Button (Secondary action - only show if there are existing results)
+                          if (hasExistingResults) ...[
+                            const SizedBox(height: 12),
+                            SizedBox(
+                              width: double.infinity,
+                              height: 50,
+                              child: OutlinedButton.icon(
+                                onPressed: _applyFiltersOnly,
+                                style: OutlinedButton.styleFrom(
+                                  foregroundColor: _DesignColors.primary,
+                                  side: const BorderSide(color: _DesignColors.primary, width: 2),
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                ),
+                                icon: const Icon(Icons.filter_alt),
+                                label: const Text('Filter Results', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                              ),
+                            ),
+                          ],
+                        ],
+                      );
+                    },
                   ),
                 ),
               ],
