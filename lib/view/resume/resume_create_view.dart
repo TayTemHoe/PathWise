@@ -63,7 +63,7 @@ class _TemplateSelectionPageState extends State<TemplateSelectionPage> {
       'icon': Icons.school,
       'color': Color(0xFFF59E0B),
       'gradient': [Color(0xFFF59E0B), Color(0xFFD97706)],
-      'features': ['Traditional', 'Publication Focus', 'Research Ready'],
+      'features': ['Traditional', 'Publication', 'Research Ready'],
     },
   };
 

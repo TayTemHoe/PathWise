@@ -9,7 +9,7 @@ import 'dart:io';
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 import '../model/resume_model.dart';
-import '../model/user_profile.dart'; // Ensure this exports UserModel
+import '../model/user_profile.dart';
 
 class ResumeService {
   ResumeService({
@@ -22,6 +22,13 @@ class ResumeService {
   final FirebaseAuth _auth;
 
   String get _uid => _auth.currentUser?.uid ?? 'U0001';
+
+  // =============================
+  // SVG Icons (Fixes the "X" issue)
+  // =============================
+  static const String _svgEmail = '<svg viewBox="0 0 24 24"><path d="M20 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4l-8 5-8-5V6l8 5 8-5v2z" fill="FILL_COLOR"/></svg>';
+  static const String _svgPhone = '<svg viewBox="0 0 24 24"><path d="M6.62 10.79c1.44 2.83 3.76 5.14 6.59 6.59l2.2-2.2c.27-.27.67-.36 1.02-.24 1.12.37 2.33.57 3.57.57.55 0 1 .45 1 1V20c0 .55-.45 1-1 1-9.39 0-17-7.61-17-17 0-.55.45-1 1-1h3.5c.55 0 1 .45 1 1 0 1.25.2 2.45.57 3.57.11.35.03.74-.25 1.02l-2.2 2.2z" fill="FILL_COLOR"/></svg>';
+  static const String _svgLocation = '<svg viewBox="0 0 24 24"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z" fill="FILL_COLOR"/></svg>';
 
   // =============================
   // Core refs
@@ -234,7 +241,6 @@ class ResumeService {
     }
   }
 
-  /// Share resume PDF
   Future<void> shareResumePDF({
     required ResumeDoc resume,
     required UserModel profile,
@@ -302,10 +308,10 @@ class ResumeService {
                         spacing: 20,
                         runSpacing: 8,
                         children: [
-                          if (profile.email != null) _buildContactItem('✉', profile.email!, font, resume.font.contentFontSize.toDouble()),
-                          if (profile.phone != null) _buildContactItem('📞', profile.phone!, font, resume.font.contentFontSize.toDouble()),
+                          if (profile.email != null) _buildContactItem(_svgEmail, profile.email!, font, resume.font.contentFontSize.toDouble(), PdfColors.white),
+                          if (profile.phone != null) _buildContactItem(_svgPhone, profile.phone!, font, resume.font.contentFontSize.toDouble(), PdfColors.white),
                           if (profile.city != null || profile.country != null)
-                            _buildContactItem('📍', '${profile.city ?? ''}, ${profile.country ?? ''}', font, resume.font.contentFontSize.toDouble()),
+                            _buildContactItem(_svgLocation, '${profile.city ?? ''}, ${profile.country ?? ''}', font, resume.font.contentFontSize.toDouble(), PdfColors.white),
                         ],
                       ),
                     ],
@@ -416,10 +422,10 @@ class ResumeService {
                       pw.Wrap(
                         spacing: 16, runSpacing: 8,
                         children: [
-                          if (profile.email != null) _buildContactRow('Email: ${profile.email}', font, 10),
-                          if (profile.phone != null) _buildContactRow('Phone: ${profile.phone}', font, 10),
+                          if (profile.email != null) _buildContactItem(_svgEmail, profile.email!, font, 10, PdfColors.black),
+                          if (profile.phone != null) _buildContactItem(_svgPhone, profile.phone!, font, 10, PdfColors.black),
                           if (profile.city != null || profile.country != null)
-                            _buildContactRow('Loc: ${profile.city ?? ''}, ${profile.country ?? ''}', font, 10),
+                            _buildContactItem(_svgLocation, '${profile.city ?? ''}, ${profile.country ?? ''}', font, 10, PdfColors.black),
                         ],
                       ),
                       pw.SizedBox(height: 24),
@@ -513,14 +519,14 @@ class ResumeService {
                       pw.Text('CONTACT', style: pw.TextStyle(color: PdfColors.white, fontWeight: pw.FontWeight.bold)),
                       pw.SizedBox(height: 10),
                       if (profile.email != null)
-                        pw.Text(profile.email!, style: pw.TextStyle(color: PdfColors.white, fontSize: 10), textAlign: pw.TextAlign.center),
+                        _buildContactItem(_svgEmail, profile.email!, font, 10, PdfColors.white),
                       if (profile.phone != null) ...[
                         pw.SizedBox(height: 6),
-                        pw.Text(profile.phone!, style: pw.TextStyle(color: PdfColors.white, fontSize: 10), textAlign: pw.TextAlign.center),
+                        _buildContactItem(_svgPhone, profile.phone!, font, 10, PdfColors.white),
                       ],
                       if (profile.city != null || profile.country != null) ...[
                         pw.SizedBox(height: 6),
-                        pw.Text('${profile.city ?? ''}, ${profile.country ?? ''}', style: pw.TextStyle(color: PdfColors.white, fontSize: 10), textAlign: pw.TextAlign.center),
+                        _buildContactItem(_svgLocation, '${profile.city ?? ''}, ${profile.country ?? ''}', font, 10, PdfColors.white),
                       ],
                       pw.SizedBox(height: 20),
                     ],
@@ -607,16 +613,25 @@ class ResumeService {
                     pw.Text(profile.name, style: pw.TextStyle(font: font, fontSize: 24, fontWeight: pw.FontWeight.bold)),
                     pw.Text(resume.title, style: pw.TextStyle(font: font, fontSize: 14)),
                     pw.SizedBox(height: 8),
-                    pw.Text('${profile.email ?? ''} | ${profile.phone ?? ''}', style: pw.TextStyle(font: font, fontSize: 10)),
+                    pw.Row(
+                        mainAxisSize: pw.MainAxisSize.min,
+                        children: [
+                          if (profile.email != null) _buildContactItem(_svgEmail, profile.email!, font, 10, PdfColors.black),
+                          if (profile.email != null && profile.phone != null) pw.SizedBox(width: 8),
+                          if (profile.phone != null) _buildContactItem(_svgPhone, profile.phone!, font, 10, PdfColors.black),
+                        ]
+                    ),
                     if (profile.city != null || profile.country != null)
-                      pw.Text('${profile.city ?? ''}, ${profile.country ?? ''}', style: pw.TextStyle(font: font, fontSize: 10)),
+                      pw.Padding(
+                          padding: const pw.EdgeInsets.only(top: 4),
+                          child: _buildContactItem(_svgLocation, '${profile.city ?? ''}, ${profile.country ?? ''}', font, 10, PdfColors.black)
+                      ),
                   ],
                 ),
               ),
               pw.Divider(color: primaryColor),
               pw.SizedBox(height: 20),
 
-              // Education First for Academic
               if (resume.sections.education && profile.education != null && profile.education!.isNotEmpty) ...[
                 _buildSectionHeaderPDF('EDUCATION', secondaryColor, font, 12),
                 pw.SizedBox(height: 10),
@@ -662,11 +677,8 @@ class ResumeService {
   // Widget Builders (Helpers)
   // =============================
 
-  // ✅ HELPER: Aggregate subjects and grades into a string
   String _getSubjectSummary(List<SubjectGrade> subjects) {
     if (subjects.isEmpty) return '';
-
-    // Aggregate by grade count: e.g. { "A+": 2, "A": 3 }
     final distribution = <String, int>{};
     for (final s in subjects) {
       final g = s.grade.trim();
@@ -674,11 +686,8 @@ class ResumeService {
         distribution[g] = (distribution[g] ?? 0) + 1;
       }
     }
-
-    // Sort keys roughly alphabetically or however beneficial
     final entries = distribution.entries.toList()
       ..sort((a, b) => a.key.compareTo(b.key));
-
     return entries.map((e) => '${e.value}${e.key}').join(', ');
   }
 
@@ -694,7 +703,7 @@ class ResumeService {
     final honors = edu.honors ?? edu.classOfAward ?? edu.classification;
     final dateRange = _formatDateRange(edu.startDate, edu.endDate, edu.isCurrent);
 
-    // ✅ Generate Subject Summary
+    // Summary of subjects
     final subjectSummary = _getSubjectSummary(edu.subjects);
 
     return pw.Container(
@@ -733,7 +742,6 @@ class ResumeService {
                     style: pw.TextStyle(font: font, fontSize: resume.font.contentFontSize.toDouble(), color: PdfColors.grey800),
                   ),
 
-                // Details Row
                 pw.Wrap(
                     spacing: 12,
                     children: [
@@ -748,7 +756,6 @@ class ResumeService {
                     ]
                 ),
 
-                // ✅ Subject Summary Display
                 if (subjectSummary.isNotEmpty) ...[
                   pw.SizedBox(height: 4),
                   pw.Text(
@@ -831,7 +838,7 @@ class ResumeService {
                 pw.Row(
                   children: [
                     pw.Text(exp.company ?? 'Company', style: pw.TextStyle(font: font, fontSize: 11, color: color)),
-                    if (exp.employmentType != null) pw.Text(' • ${exp.employmentType}', style: pw.TextStyle(fontSize: 10, color: PdfColors.grey)),
+                    if (exp.employmentType != null) pw.Text(' - ${exp.employmentType}', style: pw.TextStyle(fontSize: 10, color: PdfColors.grey)),
                   ],
                 ),
                 pw.Text(_formatDateRange(exp.startDate, exp.endDate, exp.isCurrent), style: pw.TextStyle(fontSize: 10, color: PdfColors.grey)),
@@ -856,10 +863,20 @@ class ResumeService {
     );
   }
 
-  pw.Widget _buildContactItem(String icon, String text, pw.Font? font, double fontSize) {
-    return pw.Row(children: [pw.Text(icon), pw.SizedBox(width: 4), pw.Text(text, style: pw.TextStyle(font: font, fontSize: fontSize, color: PdfColors.white))]);
+  // Updated to use SVG strings
+  pw.Widget _buildContactItem(String svgString, String text, pw.Font? font, double fontSize, PdfColor iconColor) {
+    // Inject color into SVG
+    final coloredSvg = svgString.replaceAll('FILL_COLOR', iconColor.toHex());
+    return pw.Row(
+        children: [
+          pw.SvgImage(svg: coloredSvg, width: 12, height: 12),
+          pw.SizedBox(width: 4),
+          pw.Text(text, style: pw.TextStyle(font: font, fontSize: fontSize, color: PdfColors.black)), // Changed text color to black/dark for visibility, verify contrast in usage
+        ]
+    );
   }
 
+  // Only for Text-based contact rows
   pw.Widget _buildContactRow(String text, pw.Font? font, double fontSize) {
     return pw.Text(text, style: pw.TextStyle(font: font, fontSize: fontSize));
   }
